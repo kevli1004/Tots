@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import ActivityKit
 
 class TotsDataManager: ObservableObject {
     // MARK: - Storage Keys
@@ -17,6 +18,15 @@ class TotsDataManager: ObservableObject {
     @Published var feedingEfficiency: Double = 0.85
     @Published var developmentScore: Int = 78
     @Published var healthTrends: [HealthTrend] = []
+    
+    // Live Activity
+    @Published var currentActivity: Activity<TotsLiveActivityAttributes>?
+    @Published var widgetEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(widgetEnabled, forKey: "widget_enabled")
+        }
+    }
+    
     @Published var babyName: String = "" {
         didSet {
             UserDefaults.standard.set(babyName, forKey: babyNameKey)
@@ -111,6 +121,9 @@ class TotsDataManager: ObservableObject {
         } else {
             babyBirthDate = Calendar.current.date(byAdding: .month, value: -8, to: Date()) ?? Date()
         }
+        
+        // Load widget settings
+        widgetEnabled = UserDefaults.standard.object(forKey: "widget_enabled") as? Bool ?? true
         
         // Load activities
         if let data = UserDefaults.standard.data(forKey: activitiesKey),
@@ -210,6 +223,9 @@ class TotsDataManager: ObservableObject {
         
         // Update weekly data based on real activities
         updateWeeklyData()
+        
+        // Save widget data
+        saveWidgetData()
     }
     
     private func updateWeeklyData() {
@@ -265,6 +281,14 @@ class TotsDataManager: ObservableObject {
     func addActivity(_ activity: TotsActivity) {
         recentActivities.insert(activity, at: 0)
         updateCountdowns() // Update countdowns after adding activity
+        
+        // Update Live Activity if running
+        updateLiveActivity()
+        
+        // Start Live Activity if not running and widget is enabled
+        if currentActivity == nil && widgetEnabled {
+            startLiveActivity()
+        }
     }
     
     private func updateTodayStats(for activity: TotsActivity) {
@@ -287,6 +311,16 @@ class TotsDataManager: ObservableObject {
             // Growth tracking doesn't affect daily stats
             break
         }
+        
+        // Save widget data
+        saveWidgetData()
+    }
+    
+    private func saveWidgetData() {
+        UserDefaults.standard.set(todayFeedings, forKey: "today_feedings")
+        UserDefaults.standard.set(todaySleepHours, forKey: "today_sleep_hours")
+        UserDefaults.standard.set(todayDiapers, forKey: "today_diapers")
+        UserDefaults.standard.set(todayTummyTime, forKey: "today_tummy_time")
     }
     
     func completeMilestone(_ milestone: Milestone) {
@@ -862,5 +896,155 @@ struct GrowthEntry: Identifiable, Codable {
     let weight: Double // kg
     let height: Double // cm
     let headCircumference: Double // cm
+}
+
+// MARK: - Live Activity Attributes
+public struct TotsLiveActivityAttributes: ActivityAttributes {
+    public struct ContentState: Codable, Hashable {
+        // Dynamic properties that change during the activity
+        public var todayFeedings: Int
+        public var todaySleepHours: Double
+        public var todayDiapers: Int
+        public var todayTummyTime: Int
+        public var lastUpdateTime: Date
+        
+        // Timer countdowns for next activities
+        public var nextFeedingTime: Date?
+        public var nextDiaperTime: Date?
+        public var nextSleepTime: Date?
+        public var nextTummyTime: Date?
+        
+        public init(todayFeedings: Int, todaySleepHours: Double, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextSleepTime: Date? = nil, nextTummyTime: Date? = nil) {
+            self.todayFeedings = todayFeedings
+            self.todaySleepHours = todaySleepHours
+            self.todayDiapers = todayDiapers
+            self.todayTummyTime = todayTummyTime
+            self.lastUpdateTime = lastUpdateTime
+            self.nextFeedingTime = nextFeedingTime
+            self.nextDiaperTime = nextDiaperTime
+            self.nextSleepTime = nextSleepTime
+            self.nextTummyTime = nextTummyTime
+        }
+    }
+
+    // Fixed properties for the activity
+    public var babyName: String
+    public var feedingGoal: Int
+    public var sleepGoal: Double
+    public var diaperGoal: Int
+    public var tummyTimeGoal: Int
+    
+    public init(babyName: String, feedingGoal: Int, sleepGoal: Double, diaperGoal: Int, tummyTimeGoal: Int) {
+        self.babyName = babyName
+        self.feedingGoal = feedingGoal
+        self.sleepGoal = sleepGoal
+        self.diaperGoal = diaperGoal
+        self.tummyTimeGoal = tummyTimeGoal
+    }
+}
+
+// MARK: - Live Activity Management
+extension TotsDataManager {
+    func startLiveActivity() {
+        // Check if Live Activities are supported on this device
+        #if targetEnvironment(simulator)
+        print("Live Activities are not supported in the iOS Simulator")
+        return
+        #endif
+        
+        let authInfo = ActivityAuthorizationInfo()
+        print("Live Activity authorization status: \(authInfo.areActivitiesEnabled)")
+        
+        guard authInfo.areActivitiesEnabled else {
+            print("Live Activities are not enabled. User needs to enable in Settings → Face ID & Passcode → Live Activities")
+            return
+        }
+        
+        // Check if activity is already running
+        if currentActivity != nil {
+            updateLiveActivity()
+            return
+        }
+        
+        let attributes = TotsLiveActivityAttributes(
+            babyName: babyName,
+            feedingGoal: 8,
+            sleepGoal: 15.0,
+            diaperGoal: 6,
+            tummyTimeGoal: 60
+        )
+        
+        let initialState = TotsLiveActivityAttributes.ContentState(
+            todayFeedings: todayFeedings,
+            todaySleepHours: todaySleepHours,
+            todayDiapers: todayDiapers,
+            todayTummyTime: todayTummyTime,
+            lastUpdateTime: Date(),
+            nextFeedingTime: nextFeedingTime,
+            nextDiaperTime: nextDiaperTime,
+            nextSleepTime: nextSleepTime,
+            nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
+        )
+        
+        do {
+            let activity = try Activity.request(
+                attributes: attributes,
+                content: .init(state: initialState, staleDate: nil),
+                pushType: nil
+            )
+            currentActivity = activity
+            print("✅ Started Live Activity: \(activity.id)")
+            print("🔒 Lock your device to see the Live Activity on the lock screen")
+        } catch {
+            print("Failed to start Live Activity: \(error)")
+            print("Error details: \(error.localizedDescription)")
+            
+            // Handle common error cases
+            let errorString = error.localizedDescription.lowercased()
+            if errorString.contains("unsupported") {
+                print("Live Activities are not supported on this device")
+            } else if errorString.contains("denied") {
+                print("Live Activities permission denied - check Settings")
+            } else if errorString.contains("disabled") {
+                print("Live Activities are disabled in Settings")
+            }
+        }
+    }
+    
+    func updateLiveActivity() {
+        guard let activity = currentActivity else { return }
+        
+        let updatedState = TotsLiveActivityAttributes.ContentState(
+            todayFeedings: todayFeedings,
+            todaySleepHours: todaySleepHours,
+            todayDiapers: todayDiapers,
+            todayTummyTime: todayTummyTime,
+            lastUpdateTime: Date(),
+            nextFeedingTime: nextFeedingTime,
+            nextDiaperTime: nextDiaperTime,
+            nextSleepTime: nextSleepTime,
+            nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
+        )
+        
+        Task {
+            await activity.update(
+                ActivityContent(
+                    state: updatedState,
+                    staleDate: nil
+                )
+            )
+        }
+    }
+    
+    func stopLiveActivity() {
+        guard let activity = currentActivity else { return }
+        
+        Task {
+            await activity.end(dismissalPolicy: .immediate)
+            await MainActor.run {
+                currentActivity = nil
+            }
+        }
+    }
 }
 

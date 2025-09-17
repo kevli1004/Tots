@@ -3,10 +3,13 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1EF69D252E7B00A6002E715A /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EF69D242E7B00A6002E715A /* WidgetKit.framework */; platformFilters = (ios, macos, ); };
+		1EF69D272E7B00A6002E715A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EF69D262E7B00A6002E715A /* SwiftUI.framework */; };
+		1EF69D362E7B00A9002E715A /* TotsWidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1EF69D222E7B00A6002E715A /* TotsWidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A1000001000000001 /* TotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000001 /* TotsApp.swift */; };
 		A1000003000000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004000000001 /* ContentView.swift */; };
 		A1000005000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000006000000001 /* Assets.xcassets */; };
@@ -21,7 +24,34 @@
 		A1000021000000001 /* AddActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022000000001 /* AddActivityView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		1EF69D342E7B00A9002E715A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1000036000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1EF69D212E7B00A6002E715A;
+			remoteInfo = TotsWidgetExtensionExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1EF69D372E7B00A9002E715A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1EF69D362E7B00A9002E715A /* TotsWidgetExtensionExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		1EF69D222E7B00A6002E715A /* TotsWidgetExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TotsWidgetExtensionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1EF69D242E7B00A6002E715A /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		1EF69D262E7B00A6002E715A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		A1000002000000001 /* TotsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TotsApp.swift; sourceTree = "<group>"; };
 		A1000004000000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A1000006000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -37,7 +67,30 @@
 		A1000023000000001 /* Tots.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tots.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1EF69D3A2E7B00A9002E715A /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1EF69D212E7B00A6002E715A /* TotsWidgetExtensionExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		1EF69D282E7B00A6002E715A /* TotsWidgetExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (1EF69D3A2E7B00A9002E715A /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = TotsWidgetExtension; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
+		1EF69D1F2E7B00A6002E715A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1EF69D272E7B00A6002E715A /* SwiftUI.framework in Frameworks */,
+				1EF69D252E7B00A6002E715A /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000024000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -48,10 +101,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1EF69D232E7B00A6002E715A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1EF69D242E7B00A6002E715A /* WidgetKit.framework */,
+				1EF69D262E7B00A6002E715A /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		A1000025000000001 = {
 			isa = PBXGroup;
 			children = (
 				A1000026000000001 /* Tots */,
+				1EF69D282E7B00A6002E715A /* TotsWidgetExtension */,
+				1EF69D232E7B00A6002E715A /* Frameworks */,
 				A1000027000000001 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -74,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000023000000001 /* Tots.app */,
+				1EF69D222E7B00A6002E715A /* TotsWidgetExtensionExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -118,6 +183,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1EF69D212E7B00A6002E715A /* TotsWidgetExtensionExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1EF69D3B2E7B00A9002E715A /* Build configuration list for PBXNativeTarget "TotsWidgetExtensionExtension" */;
+			buildPhases = (
+				1EF69D1E2E7B00A6002E715A /* Sources */,
+				1EF69D1F2E7B00A6002E715A /* Frameworks */,
+				1EF69D202E7B00A6002E715A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1EF69D282E7B00A6002E715A /* TotsWidgetExtension */,
+			);
+			name = TotsWidgetExtensionExtension;
+			packageProductDependencies = (
+			);
+			productName = TotsWidgetExtensionExtension;
+			productReference = 1EF69D222E7B00A6002E715A /* TotsWidgetExtensionExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		A1000032000000001 /* Tots */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A1000033000000001 /* Build configuration list for PBXNativeTarget "Tots" */;
@@ -125,10 +212,12 @@
 				A1000034000000001 /* Sources */,
 				A1000024000000001 /* Frameworks */,
 				A1000035000000001 /* Resources */,
+				1EF69D372E7B00A9002E715A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1EF69D352E7B00A9002E715A /* PBXTargetDependency */,
 			);
 			name = Tots;
 			productName = Tots;
@@ -142,9 +231,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1600;
+				LastSwiftUpdateCheck = 1640;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					1EF69D212E7B00A6002E715A = {
+						CreatedOnToolsVersion = 16.4;
+					};
 					A1000032000000001 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -164,11 +256,19 @@
 			projectRoot = "";
 			targets = (
 				A1000032000000001 /* Tots */,
+				1EF69D212E7B00A6002E715A /* TotsWidgetExtensionExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		1EF69D202E7B00A6002E715A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000035000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -181,6 +281,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1EF69D1E2E7B00A6002E715A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000034000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -200,7 +307,71 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		1EF69D352E7B00A9002E715A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1EF69D212E7B00A6002E715A /* TotsWidgetExtensionExtension */;
+			targetProxy = 1EF69D342E7B00A9002E715A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		1EF69D382E7B00A9002E715A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NZ895JVXX8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TotsWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TotsWidgetExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tots.Tots.TotsWidgetExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1EF69D392E7B00A9002E715A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NZ895JVXX8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TotsWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TotsWidgetExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tots.Tots.TotsWidgetExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		A1000038000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -253,7 +424,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -310,7 +481,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -330,7 +501,8 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Tots/Preview Content\"";
 				DEVELOPMENT_TEAM = NZ895JVXX8;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Tots/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -360,7 +532,8 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Tots/Preview Content\"";
 				DEVELOPMENT_TEAM = NZ895JVXX8;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Tots/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -383,6 +556,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1EF69D3B2E7B00A9002E715A /* Build configuration list for PBXNativeTarget "TotsWidgetExtensionExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1EF69D382E7B00A9002E715A /* Debug */,
+				1EF69D392E7B00A9002E715A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A1000033000000001 /* Build configuration list for PBXNativeTarget "Tots" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

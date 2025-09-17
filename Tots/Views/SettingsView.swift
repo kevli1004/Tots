@@ -158,6 +158,49 @@ struct SettingsView: View {
                 action: { showingPersonalDetails = true }
             )
             
+            // Live Activity toggle
+            HStack(spacing: 12) {
+                Image(systemName: "app.badge")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .frame(width: 24)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Live Activity")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    #if targetEnvironment(simulator)
+                    Text("Not supported in iOS Simulator - use physical device")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+                    #else
+                    Text("Show feeding & diaper countdowns on lock screen")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    #endif
+                }
+                
+                Spacer()
+                
+                Toggle("", isOn: Binding(
+                    get: { dataManager.currentActivity != nil },
+                    set: { enabled in
+                        if enabled {
+                            dataManager.startLiveActivity()
+                        } else {
+                            dataManager.stopLiveActivity()
+                        }
+                    }
+                ))
+                    .labelsHidden()
+                    #if targetEnvironment(simulator)
+                    .disabled(true)
+                    #endif
+            }
+            .padding(.vertical, 12)
+            
             SettingsRow(
                 icon: "target",
                 title: "Edit tracking goals",
