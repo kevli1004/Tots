@@ -57,8 +57,10 @@ struct SettingsView: View {
                 )
                 .frame(width: 60, height: 60)
                 .overlay(
-                    Text("👶")
-                        .font(.system(size: 32))
+                    Image("TotsIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 32, height: 32)
                 )
             
             VStack(alignment: .leading, spacing: 4) {

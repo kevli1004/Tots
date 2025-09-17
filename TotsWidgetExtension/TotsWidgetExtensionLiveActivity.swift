@@ -93,8 +93,10 @@ struct TotsWidgetSmallView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("👶")
-                    .font(.title2)
+                Image("TotsIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
                 Text(entry.babyName)
                     .font(.headline)
                     .fontWeight(.semibold)
@@ -134,8 +136,10 @@ struct TotsWidgetMediumView: View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("👶")
-                        .font(.title2)
+                    Image("TotsIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
                     Text(entry.babyName)
                         .font(.headline)
                         .fontWeight(.semibold)
@@ -183,8 +187,10 @@ struct TotsWidgetLockScreenView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("👶")
-                    .font(.caption)
+                Image("TotsIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 12, height: 12)
                 Text(entry.babyName)
                     .font(.caption)
                     .fontWeight(.medium)
@@ -379,9 +385,9 @@ func getNextActivity(from context: ActivityViewContext<TotsLiveActivityAttribute
     let now = Date()
     // Include feeding, diaper, and sleep
     let activities: [(String, Date?, Color)] = [
-        ("Feeding", context.state.nextFeedingTime, .pink),
-        ("Diaper", context.state.nextDiaperTime, .orange),
-        ("Sleep", context.state.nextSleepTime, .blue)
+        ("Feeding Time", context.state.nextFeedingTime, .pink),
+        ("Diaper Change", context.state.nextDiaperTime, .orange),
+        ("Sleep Time", context.state.nextSleepTime, .indigo)
     ]
     
     // Find the next upcoming activity
@@ -408,8 +414,10 @@ struct TotsLiveActivity: Widget {
                 // Expanded UI
                 DynamicIslandExpandedRegion(.leading) {
                     HStack {
-                        Text("👶")
-                            .font(.title2)
+                        Image("TotsIcon")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 20, height: 20)
                         Text(context.attributes.babyName)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -428,7 +436,10 @@ struct TotsLiveActivity: Widget {
                     .padding(.top, 8)
                 }
             } compactLeading: {
-                Text("👶")
+                Image("TotsIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
             } compactTrailing: {
                 if let nextActivity = getNextActivity(from: context), let nextTime = nextActivity.time {
                     VStack(spacing: 1) {
@@ -436,21 +447,26 @@ struct TotsLiveActivity: Widget {
                             .font(.caption2)
                             .fontWeight(.semibold)
                             .foregroundColor(nextActivity.color)
-                        Text(nextActivity.label.prefix(4))
-                            .font(.system(size: 8))
+                        Text("Next \(nextActivity.label.prefix(4))")
+                            .font(.system(size: 7))
                             .foregroundColor(.secondary)
                     }
                 } else {
-                    HStack(spacing: 2) {
-                        Text("👶")
-                        Text("\(context.state.todayFeedings)")
+                    VStack(spacing: 1) {
+                        Text("Activities Due")
                             .font(.caption2)
                             .fontWeight(.semibold)
+                            .foregroundColor(.orange)
+                        Text("🍼\(context.state.todayFeedings) 🧷\(context.state.todayDiapers)")
+                            .font(.system(size: 8))
+                            .foregroundColor(.secondary)
                     }
-                    .foregroundColor(.pink)
                 }
             } minimal: {
-                Text("👶")
+                Image("TotsIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
             }
             .widgetURL(URL(string: "tots://home"))
             .keylineTint(Color.pink)
@@ -467,8 +483,10 @@ struct TotsLockScreenView: View {
             // Clean header
             HStack {
                 HStack(spacing: 6) {
-                    Text("👶")
-                        .font(.system(size: 16))
+                    Image("TotsIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 16, height: 16)
                     Text(context.attributes.babyName)
                         .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
@@ -477,16 +495,24 @@ struct TotsLockScreenView: View {
                 
                 Spacer()
                 
-                // Simplified next activity indicator
+                // Next Due countdown with clear label
                 if let nextActivity = getNextActivity(from: context), let nextTime = nextActivity.time {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(nextActivity.color)
-                            .frame(width: 6, height: 6)
-                        Text(nextTime, style: .timer)
-                            .font(.system(.caption, design: .rounded))
-                            .fontWeight(.medium)
-                            .foregroundColor(nextActivity.color)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Next Due: \(nextActivity.label)")
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(nextActivity.color)
+                                .frame(width: 6, height: 6)
+                            Text(nextTime, style: .timer)
+                                .font(.system(.caption, design: .rounded))
+                                .fontWeight(.medium)
+                                .foregroundColor(nextActivity.color)
+                        }
                     }
                 }
             }
@@ -501,7 +527,8 @@ struct TotsLockScreenView: View {
                     goal: context.attributes.feedingGoal,
                     nextTime: context.state.nextFeedingTime,
                     color: .pink,
-                    position: .left
+                    position: .left,
+                    unit: nil
                 )
                 
                 // Subtle divider
@@ -512,12 +539,13 @@ struct TotsLockScreenView: View {
                 
                 // Sleep section (center)
                 CleanLockScreenSection(
-                    icon: "😴",
+                    icon: "moon.zzz.fill",
                     count: Int(context.state.todaySleepHours),
                     goal: Int(context.attributes.sleepGoal),
                     nextTime: context.state.nextSleepTime,
-                    color: .blue,
-                    position: .center
+                    color: .indigo,
+                    position: .center,
+                    unit: "h"
                 )
                 
                 // Subtle divider
@@ -528,12 +556,13 @@ struct TotsLockScreenView: View {
                 
                 // Diaper section
                 CleanLockScreenSection(
-                    icon: "🧷",
+                    icon: "🩲",
                     count: context.state.todayDiapers,
                     goal: context.attributes.diaperGoal,
                     nextTime: context.state.nextDiaperTime,
                     color: .orange,
-                    position: .right
+                    position: .right,
+                    unit: nil
                 )
             }
         }
@@ -554,48 +583,60 @@ struct CleanLockScreenSection: View {
     let nextTime: Date?
     let color: Color
     let position: SectionPosition
+    let unit: String?
+    
+    private var isDiaperIcon: Bool {
+        return icon == "🩲"
+    }
     
     var body: some View {
         VStack(alignment: position == .right ? .trailing : (position == .center ? .center : .leading), spacing: 6) {
             // Icon and count
             HStack(spacing: 6) {
                 if position != .right {
-                    Text(icon)
-                        .font(.system(size: 16))
+                    iconView
                 }
                 
                 VStack(alignment: position == .right ? .trailing : (position == .center ? .center : .leading), spacing: 1) {
-                    Text("\(count)")
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
+                    HStack(spacing: 2) {
+                        Text("\(count)")
+                            .font(.system(.title3, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        
+                        if let unit = unit {
+                            Text(unit)
+                                .font(.system(.caption, design: .rounded))
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                    }
                     
-                    Text("of \(goal)")
+                    Text("of \(goal)\(unit ?? "")")
                         .font(.system(.caption2, design: .rounded))
                         .foregroundColor(.white.opacity(0.6))
                 }
                 
                 if position == .right {
-                    Text(icon)
-                        .font(.system(size: 16))
+                    iconView
                 }
             }
             
-            // Next time indicator
+            // Next time indicator with clearer labels
             if let nextTime = nextTime, nextTime > Date() {
-                VStack(spacing: 1) {
+                VStack(alignment: position == .right ? .trailing : (position == .center ? .center : .leading), spacing: 1) {
                     Text(nextTime, style: .timer)
                         .font(.system(.caption, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundColor(color)
                     
-                    Text("until next")
+                    Text(getActivityLabel())
                         .font(.system(size: 9, design: .rounded))
                         .foregroundColor(.white.opacity(0.6))
                 }
             } else {
-                VStack(spacing: 1) {
-                    Text("Ready")
+                VStack(alignment: .center, spacing: 1) {
+                    Text("Due")
                         .font(.system(.caption, design: .rounded))
                         .fontWeight(.medium)
                         .foregroundColor(color)
@@ -607,6 +648,61 @@ struct CleanLockScreenSection: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+    
+    @ViewBuilder
+    private var iconView: some View {
+        if icon.contains(".") {
+            // SF Symbol
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(color)
+        } else if isDiaperIcon {
+            // Custom white diaper with black outline (scaled for widget)
+            Text(icon)
+                .font(.system(size: 16))
+                .foregroundColor(.white)
+                .background(
+                    Text(icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(.black)
+                        .offset(x: 0.5, y: 0.5)
+                )
+                .background(
+                    Text(icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(.black)
+                        .offset(x: -0.5, y: -0.5)
+                )
+                .background(
+                    Text(icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(.black)
+                        .offset(x: 0.5, y: -0.5)
+                )
+                .background(
+                    Text(icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(.black)
+                        .offset(x: -0.5, y: 0.5)
+                )
+        } else {
+            // Regular emoji
+            Text(icon)
+                .font(.system(size: 16))
+        }
+    }
+    
+    private func getActivityLabel() -> String {
+        if icon == "🍼" {
+            return "till feeding"
+        } else if icon == "🩲" {
+            return "till diaper"
+        } else if icon.contains("moon") {
+            return "till sleep"
+        } else {
+            return "until next"
+        }
     }
 }
 
