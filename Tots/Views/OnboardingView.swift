@@ -27,26 +27,19 @@ struct OnboardingView: View {
     
     var body: some View {
         NavigationView {
-            GeometryReader { geometry in
-                VStack(spacing: 0) {
-                    // Progress indicator
-                    progressIndicator
-                    
-                    // Content that adapts to keyboard
-                    TabView(selection: $currentStep) {
-                        appleSignInStep.tag(0)
-                        babyDetailsStep.tag(1)
-                        goalsStep.tag(2)
-                        permissionsStep.tag(3)
-                    }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .animation(.easeInOut, value: currentStep)
-                    .frame(height: geometry.size.height - 160) // Leave room for progress and buttons
-                    .clipped()
-                    
-                    // Navigation buttons
-                    navigationButtons
+            VStack(spacing: 0) {
+                // Progress indicator
+                progressIndicator
+                
+                // Content with scrollable navigation
+                TabView(selection: $currentStep) {
+                    appleSignInStep.tag(0)
+                    babyDetailsStepWithNav.tag(1)
+                    goalsStepWithNav.tag(2)
+                    permissionsStepWithNav.tag(3)
                 }
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                .animation(.easeInOut, value: currentStep)
             }
             .background(Color(.systemBackground))
         }
@@ -80,7 +73,9 @@ struct OnboardingView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 100, height: 100)
-                        .shadow(color: .pink.opacity(0.3), radius: 20, x: 0, y: 8)
+                        .shadow(color: .purple.opacity(0.3), radius: 20, x: 0, y: 8)
+                        .scaleEffect(1.0)
+                        .animation(.spring(response: 0.8, dampingFraction: 0.6).repeatForever(autoreverses: true).delay(2), value: UUID())
                     
                     VStack(spacing: 20) {
                         Text("Welcome to Tots")
@@ -111,7 +106,9 @@ struct OnboardingView: View {
                     .signInWithAppleButtonStyle(.black)
                     .frame(height: 56)
                     .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                    .scaleEffect(1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentStep)
                     
                     // Skip option
                     Button(action: {
@@ -148,10 +145,6 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding(.vertical, 20)
-        .onTapGesture {
-            // Dismiss keyboard if it's open
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        }
     }
     
     private var progressIndicator: some View {
@@ -247,7 +240,8 @@ struct OnboardingView: View {
                             .cornerRadius(16)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .stroke(babyName.isEmpty ? Color.clear : Color.purple.opacity(0.3), lineWidth: 2)
+                                    .stroke(babyName.isEmpty ? Color.clear : Color.purple.opacity(0.4), lineWidth: 2)
+                                    .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty)
                             )
                     }
                     
@@ -263,9 +257,13 @@ struct OnboardingView: View {
                             .padding(.vertical, 16)
                             .background(Color(.systemGray6))
                             .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                            )
                     }
                     
-                    // Baby age display
+                    // Baby age display with smooth animation
                     if !babyName.isEmpty {
                         VStack(spacing: 16) {
                             Text("\(babyName) is \(babyAge)")
@@ -283,9 +281,14 @@ struct OnboardingView: View {
                         .cornerRadius(20)
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                                .stroke(Color.purple.opacity(0.3), lineWidth: 1.5)
                         )
                         .padding(.top, 10)
+                        .scaleEffect(1.0)
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity).animation(.spring(response: 0.6, dampingFraction: 0.8)),
+                            removal: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.3))
+                        ))
                     }
                 }
                 .padding(.horizontal, 30)
@@ -295,6 +298,104 @@ struct OnboardingView: View {
             .padding(.top, 20)
         }
         .scrollDismissesKeyboard(.interactively)
+    }
+    
+    private var babyDetailsStepWithNav: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                babyDetailsContent
+                navigationButtons
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+    
+    private var babyDetailsContent: some View {
+        VStack(spacing: 40) {
+            VStack(spacing: 20) {
+                Text("Tell us about your baby")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                Text("This helps us personalize your experience")
+                    .font(.system(.body, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+            
+            VStack(spacing: 30) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Baby's Name")
+                        .font(.system(.headline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    TextField("Enter baby's name", text: $babyName)
+                        .font(.system(.body, design: .rounded))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(babyName.isEmpty ? Color.clear : Color.purple.opacity(0.4), lineWidth: 2)
+                                .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty)
+                        )
+                }
+                
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Birth Date")
+                        .font(.system(.headline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    DatePicker("Birth Date", selection: $babyBirthDate, displayedComponents: .date)
+                        .datePickerStyle(CompactDatePickerStyle())
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                        )
+                }
+                
+                // Baby age display with smooth animation
+                if !babyName.isEmpty {
+                    VStack(spacing: 16) {
+                        Text("\(babyName) is \(babyAge)")
+                            .font(.system(.title3, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundColor(.purple)
+                        
+                        Text("🎉 Welcome to the world, \(babyName)!")
+                            .font(.system(.body, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .background(Color.purple.opacity(0.08))
+                    .cornerRadius(20)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.purple.opacity(0.3), lineWidth: 1.5)
+                    )
+                    .padding(.top, 10)
+                    .scaleEffect(1.0)
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity).animation(.spring(response: 0.6, dampingFraction: 0.8)),
+                        removal: .scale.combined(with: .opacity).animation(.easeInOut(duration: 0.3))
+                    ))
+                }
+            }
+            .padding(.horizontal, 30)
+            
+            Spacer(minLength: 40)
+        }
+        .padding(.top, 20)
     }
     
     private var caregiverDetailsStep: some View {
@@ -528,10 +629,98 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding(.top, 40)
+    }
+    
+    private var goalsStepWithNav: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                goalsContent
+                navigationButtons
+            }
+        }
         .onTapGesture {
             // Dismiss keyboard if it's open
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
+    }
+    
+    private var goalsContent: some View {
+        VStack(spacing: 30) {
+            VStack(spacing: 16) {
+                Text("Daily Goals")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                VStack(spacing: 12) {
+                    Text("Based on \(babyName.isEmpty ? "your baby's" : "\(babyName)'s") age (\(babyAge)), here are our recommendations:")
+                        .font(.system(.body, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    // Age-based recommendations card
+                    VStack(spacing: 8) {
+                        HStack(spacing: 16) {
+                            Text("📊")
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Age-Based Recommendations")
+                                    .font(.system(.headline, design: .rounded))
+                                    .fontWeight(.semibold)
+                                Text(getAgeRecommendationText())
+                                    .font(.system(.caption, design: .rounded))
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.blue.opacity(0.08))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                    )
+                }
+            }
+            
+            VStack(spacing: 24) {
+                GoalSettingInt(
+                    icon: "🍼",
+                    title: "Feeding Goal",
+                    description: "Times per day (Recommended: \(getRecommendedFeedings()))",
+                    value: $feedingGoal,
+                    range: 4...12
+                )
+                
+                GoalSettingDouble(
+                    icon: "😴",
+                    title: "Sleep Goal",
+                    description: "Hours per day (Recommended: \(String(format: "%.0f", getRecommendedSleep())))",
+                    value: $sleepGoal,
+                    range: 10...20
+                )
+                
+                GoalSettingInt(
+                    icon: "🧷",
+                    title: "Diaper Goal",
+                    description: "Changes per day (Recommended: \(getRecommendedDiapers()))",
+                    value: $diaperGoal,
+                    range: 4...10
+                )
+            }
+            .padding(.horizontal, 30)
+            .onAppear {
+                // Set recommended values based on age
+                feedingGoal = getRecommendedFeedings()
+                sleepGoal = getRecommendedSleep()
+                diaperGoal = getRecommendedDiapers()
+            }
+            
+            Spacer(minLength: 40)
+        }
+        .padding(.top, 40)
     }
     
     private var permissionsStep: some View {
@@ -613,6 +802,93 @@ struct OnboardingView: View {
         }
     }
     
+    private var permissionsStepWithNav: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                permissionsContent
+                navigationButtons
+            }
+        }
+        .onTapGesture {
+            // Dismiss keyboard if it's open
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+    }
+    
+    private var permissionsContent: some View {
+        VStack(spacing: 30) {
+            VStack(spacing: 20) {
+                Text("Enable Features")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                Text("These features help you stay on top of your baby's needs")
+                    .font(.system(.body, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+            
+            VStack(spacing: 24) {
+                PermissionRow(
+                    icon: "bell.fill",
+                    title: "Push Notifications",
+                    description: "Get reminders for feeding, sleeping, and diaper changes",
+                    isEnabled: $enableNotifications,
+                    color: .blue
+                )
+                
+                PermissionRow(
+                    icon: "iphone",
+                    title: "Live Activities",
+                    description: "See real-time updates on your lock screen",
+                    isEnabled: $enableLiveActivity,
+                    color: .purple
+                )
+            }
+            .padding(.horizontal, 30)
+            
+            VStack(spacing: 20) {
+                Button(action: completeOnboarding) {
+                    HStack(spacing: 10) {
+                        Text("Get Started")
+                            .font(.system(.headline, design: .rounded))
+                            .fontWeight(.semibold)
+                        
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.purple.opacity(0.8), Color.purple.opacity(0.6)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(16)
+                }
+                .buttonStyle(SleekButtonStyle())
+                .disabled(babyName.isEmpty || primaryCaregiverName.isEmpty)
+                .opacity(babyName.isEmpty || primaryCaregiverName.isEmpty ? 0.6 : 1.0)
+                .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty || primaryCaregiverName.isEmpty)
+                
+                Text("You can change these settings anytime in the Settings tab")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+            .padding(.horizontal, 30)
+            
+            Spacer(minLength: 40)
+        }
+        .padding(.top, 40)
+    }
+    
     private var navigationButtons: some View {
         HStack {
             if currentStep > 0 {
@@ -684,7 +960,11 @@ struct OnboardingView: View {
                     userName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
                     if !userName.isEmpty {
                         primaryCaregiverName = userName
+                    } else {
+                        primaryCaregiverName = "Parent"  // Default fallback
                     }
+                } else {
+                    primaryCaregiverName = "Parent"  // Default when no name provided
                 }
                 
                 isSignedIn = true
@@ -888,22 +1168,26 @@ struct GoalSettingInt: View {
                 Text("\(value)")
                     .font(.system(.title2, design: .rounded))
                     .fontWeight(.bold)
-                    .foregroundColor(.pink)
+                    .foregroundColor(.purple)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(Color.pink.opacity(0.1))
-                    .cornerRadius(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.purple.opacity(0.12))
+                    )
+                    .scaleEffect(1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: value)
             }
             
             Slider(value: Binding(
                 get: { Double(value) },
                 set: { value = Int($0) }
             ), in: Double(range.lowerBound)...Double(range.upperBound), step: 1)
-                .accentColor(.pink)
+                .accentColor(.purple)
                 .background(
                     Capsule()
                         .fill(Color(.systemGray5))
-                        .frame(height: 6)
+                        .frame(height: 8)
                 )
         }
         .padding(.horizontal, 20)
@@ -946,19 +1230,23 @@ struct GoalSettingDouble: View {
                 Text(String(format: "%.0f", value))
                     .font(.system(.title2, design: .rounded))
                     .fontWeight(.bold)
-                    .foregroundColor(.pink)
+                    .foregroundColor(.purple)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(Color.pink.opacity(0.1))
-                    .cornerRadius(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.purple.opacity(0.12))
+                    )
+                    .scaleEffect(1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: value)
             }
             
             Slider(value: $value, in: range, step: 1)
-                .accentColor(.pink)
+                .accentColor(.purple)
                 .background(
                     Capsule()
                         .fill(Color(.systemGray5))
-                        .frame(height: 6)
+                        .frame(height: 8)
                 )
         }
         .padding(.horizontal, 20)
@@ -1059,9 +1347,10 @@ struct EmailComposerView: UIViewControllerRepresentable {
 struct SleekButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .brightness(configuration.isPressed ? -0.05 : 0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
