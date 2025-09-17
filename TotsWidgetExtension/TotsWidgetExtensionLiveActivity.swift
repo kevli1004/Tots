@@ -307,7 +307,7 @@ struct TotsWidget: Widget {
         }
         .configurationDisplayName("Tots Countdown")
         .description("Keep track of feeding, diaper, and sleep schedules.")
-        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
+        .supportedFamilies([]) // Empty array hides widget from home screen
     }
 }
 
@@ -377,10 +377,11 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
 // MARK: - Helper Functions
 func getNextActivity(from context: ActivityViewContext<TotsLiveActivityAttributes>) -> (label: String, time: Date?, color: Color)? {
     let now = Date()
-    // Focus on diaper and feeding mainly
+    // Include feeding, diaper, and sleep
     let activities: [(String, Date?, Color)] = [
         ("Feeding", context.state.nextFeedingTime, .pink),
-        ("Diaper", context.state.nextDiaperTime, .orange)
+        ("Diaper", context.state.nextDiaperTime, .orange),
+        ("Sleep", context.state.nextSleepTime, .blue)
     ]
     
     // Find the next upcoming activity
@@ -462,62 +463,150 @@ struct TotsLockScreenView: View {
     let context: ActivityViewContext<TotsLiveActivityAttributes>
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Header with next activity countdown
+        VStack(spacing: 0) {
+            // Clean header
             HStack {
-                Text("👶 Tots")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
+                HStack(spacing: 6) {
+                    Text("👶")
+                        .font(.system(size: 16))
+                    Text(context.attributes.babyName)
+                        .font(.system(.subheadline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                }
                 
                 Spacer()
                 
-                // Next activity countdown (feeding or diaper)
-                if let nextActivity = getNextActivity(from: context) {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Next \(nextActivity.label)")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.8))
-                        
-                        if let nextTime = nextActivity.time {
-                            Text(nextTime, style: .timer)
-                                .font(.system(.caption, design: .rounded))
-                                .fontWeight(.bold)
-                                .foregroundColor(nextActivity.color)
-                        }
+                // Simplified next activity indicator
+                if let nextActivity = getNextActivity(from: context), let nextTime = nextActivity.time {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(nextActivity.color)
+                            .frame(width: 6, height: 6)
+                        Text(nextTime, style: .timer)
+                            .font(.system(.caption, design: .rounded))
+                            .fontWeight(.medium)
+                            .foregroundColor(nextActivity.color)
                     }
-                } else {
-                    Text("All caught up!")
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.7))
                 }
             }
+            .padding(.bottom, 12)
             
-            // Focus on feeding and diaper with larger display
-            HStack(spacing: 24) {
-                // Feeding countdown
-                FeedingDiaperCountdown(
+            // Clean main content area - three sections
+            HStack(spacing: 0) {
+                // Feeding section
+                CleanLockScreenSection(
                     icon: "🍼",
-                    label: "Feeding",
                     count: context.state.todayFeedings,
                     goal: context.attributes.feedingGoal,
                     nextTime: context.state.nextFeedingTime,
-                    color: .pink
+                    color: .pink,
+                    position: .left
                 )
                 
-                // Diaper countdown
-                FeedingDiaperCountdown(
+                // Subtle divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 1, height: 40)
+                    .padding(.horizontal, 12)
+                
+                // Sleep section (center)
+                CleanLockScreenSection(
+                    icon: "😴",
+                    count: Int(context.state.todaySleepHours),
+                    goal: Int(context.attributes.sleepGoal),
+                    nextTime: context.state.nextSleepTime,
+                    color: .blue,
+                    position: .center
+                )
+                
+                // Subtle divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 1, height: 40)
+                    .padding(.horizontal, 12)
+                
+                // Diaper section
+                CleanLockScreenSection(
                     icon: "🧷",
-                    label: "Diaper",
                     count: context.state.todayDiapers,
                     goal: context.attributes.diaperGoal,
                     nextTime: context.state.nextDiaperTime,
-                    color: .orange
+                    color: .orange,
+                    position: .right
                 )
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
+}
+
+// MARK: - Clean Lock Screen Section
+enum SectionPosition {
+    case left, center, right
+}
+
+struct CleanLockScreenSection: View {
+    let icon: String
+    let count: Int
+    let goal: Int
+    let nextTime: Date?
+    let color: Color
+    let position: SectionPosition
+    
+    var body: some View {
+        VStack(alignment: position == .right ? .trailing : (position == .center ? .center : .leading), spacing: 6) {
+            // Icon and count
+            HStack(spacing: 6) {
+                if position != .right {
+                    Text(icon)
+                        .font(.system(size: 16))
+                }
+                
+                VStack(alignment: position == .right ? .trailing : (position == .center ? .center : .leading), spacing: 1) {
+                    Text("\(count)")
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text("of \(goal)")
+                        .font(.system(.caption2, design: .rounded))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                
+                if position == .right {
+                    Text(icon)
+                        .font(.system(size: 16))
+                }
+            }
+            
+            // Next time indicator
+            if let nextTime = nextTime, nextTime > Date() {
+                VStack(spacing: 1) {
+                    Text(nextTime, style: .timer)
+                        .font(.system(.caption, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundColor(color)
+                    
+                    Text("until next")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            } else {
+                VStack(spacing: 1) {
+                    Text("Ready")
+                        .font(.system(.caption, design: .rounded))
+                        .fontWeight(.medium)
+                        .foregroundColor(color)
+                    
+                    Text("now")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
