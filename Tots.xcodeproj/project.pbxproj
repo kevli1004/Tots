@@ -11,6 +11,8 @@
 		1EF69D272E7B00A6002E715A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EF69D262E7B00A6002E715A /* SwiftUI.framework */; };
 		1EF69D362E7B00A9002E715A /* TotsWidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1EF69D222E7B00A6002E715A /* TotsWidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1EF69D542E7B3A76002E715A /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF69D532E7B3A76002E715A /* OnboardingView.swift */; };
+		1EF69D682E7C2C9B002E715A /* CloudKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF69D662E7C2C9B002E715A /* CloudKitManager.swift */; };
+		1EF69D692E7C2C9B002E715A /* CloudKitSchemaSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF69D672E7C2C9B002E715A /* CloudKitSchemaSetup.swift */; };
 		A1000001000000001 /* TotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000001 /* TotsApp.swift */; };
 		A1000003000000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004000000001 /* ContentView.swift */; };
 		A1000005000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000006000000001 /* Assets.xcassets */; };
@@ -55,6 +57,8 @@
 		1EF69D262E7B00A6002E715A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		1EF69D532E7B3A76002E715A /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		1EF69D552E7B41D3002E715A /* Tots.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tots.entitlements; sourceTree = "<group>"; };
+		1EF69D662E7C2C9B002E715A /* CloudKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitManager.swift; sourceTree = "<group>"; };
+		1EF69D672E7C2C9B002E715A /* CloudKitSchemaSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSchemaSetup.swift; sourceTree = "<group>"; };
 		A1000002000000001 /* TotsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TotsApp.swift; sourceTree = "<group>"; };
 		A1000004000000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A1000006000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -150,6 +154,8 @@
 		A1000028000000001 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				1EF69D662E7C2C9B002E715A /* CloudKitManager.swift */,
+				1EF69D672E7C2C9B002E715A /* CloudKitSchemaSetup.swift */,
 				A1000010000000001 /* TotsDataManager.swift */,
 				A1000010000000002 /* SharedModels.swift */,
 			);
@@ -300,6 +306,8 @@
 				A1000003000000001 /* ContentView.swift in Sources */,
 				A1000015000000001 /* HomeView.swift in Sources */,
 				A1000017000000001 /* ProgressView.swift in Sources */,
+				1EF69D682E7C2C9B002E715A /* CloudKitManager.swift in Sources */,
+				1EF69D692E7C2C9B002E715A /* CloudKitSchemaSetup.swift in Sources */,
 				A1000019000000001 /* SettingsView.swift in Sources */,
 				A1000021000000001 /* AddActivityView.swift in Sources */,
 				A1000009000000001 /* TotsDataManager.swift in Sources */,

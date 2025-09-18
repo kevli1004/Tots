@@ -4,6 +4,9 @@ struct SettingsView: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var showingFamilyInvite = false
     @State private var showingPersonalDetails = false
+    @State private var isSettingUpCloudKit = false
+    @State private var cloudKitSetupMessage = ""
+    @State private var showingCloudKitShare = false
     
     var body: some View {
         ScrollView {
@@ -92,6 +95,74 @@ struct SettingsView: View {
     
     private var familySharingView: some View {
         VStack(spacing: 16) {
+            // CloudKit Setup Button
+            if !dataManager.familySharingEnabled {
+                Button(action: {
+                    self.setupCloudKitSharing()
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "icloud.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading) {
+                            Text("Enable Family Sharing")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("Sync data with CloudKit")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        if isSettingUpCloudKit {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .disabled(isSettingUpCloudKit)
+                
+                if !cloudKitSetupMessage.isEmpty {
+                    Text(cloudKitSetupMessage)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
+            } else {
+                // Share Button (when CloudKit is enabled)
+                Button(action: {
+                    self.shareWithFamily()
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.green)
+                        
+                        Text("Share with Family")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(16)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+            }
+            
             Button(action: {
                 showingFamilyInvite = true
             }) {
@@ -286,6 +357,23 @@ struct SettingsView: View {
                 action: { /* Logout */ }
             )
         }
+    }
+    
+    // MARK: - CloudKit Setup Methods
+    
+    private func setupCloudKitSharing() {
+        self.isSettingUpCloudKit = true
+        cloudKitSetupMessage = "CloudKit setup coming soon..."
+        
+        // Temporary placeholder
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            self.cloudKitSetupMessage = "📋 Please add CloudKit files to Xcode project first"
+            self.isSettingUpCloudKit = false
+        }
+    }
+    
+    private func shareWithFamily() {
+        cloudKitSetupMessage = "📋 Please add CloudKit files to Xcode project first"
     }
 }
 

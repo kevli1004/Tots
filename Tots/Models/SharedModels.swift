@@ -117,3 +117,17 @@ struct DayStats {
     let diapers: Int
     let tummyTime: Int
 }
+
+// MARK: - CloudKit Data Models
+
+struct BabyGoals {
+    let feeding: Int
+    let sleep: Double
+    let diaper: Int
+    
+    init(feeding: Int, sleep: Double, diaper: Int) {
+        self.feeding = feeding
+        self.sleep = sleep
+        self.diaper = diaper
+    }
+}

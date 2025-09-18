@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import ActivityKit
+import CloudKit
 
 class TotsDataManager: ObservableObject {
     // MARK: - Storage Keys
@@ -18,6 +19,12 @@ class TotsDataManager: ObservableObject {
     @Published var feedingEfficiency: Double = 0.85
     @Published var developmentScore: Int = 78
     @Published var healthTrends: [HealthTrend] = []
+    
+    // CloudKit
+    @Published var familySharingEnabled: Bool = false
+    @Published var babyProfileRecord: CKRecord?
+    // private let cloudKitManager = CloudKitManager.shared
+    // private let schemaSetup = CloudKitSchemaSetup.shared
     
     // Live Activity
     @Published var currentActivity: Activity<TotsLiveActivityAttributes>?
@@ -289,6 +296,21 @@ class TotsDataManager: ObservableObject {
         if currentActivity == nil && widgetEnabled {
             startLiveActivity()
         }
+        
+        // Sync to CloudKit if family sharing is enabled
+        // TODO: Uncomment when CloudKit files are added to Xcode project
+        /*
+        if familySharingEnabled, let profileRecord = babyProfileRecord {
+            Task {
+                do {
+                    try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
+                    print("✅ Activity synced to CloudKit")
+                } catch {
+                    print("❌ Failed to sync activity to CloudKit: \(error)")
+                }
+            }
+        }
+        */
     }
     
     private func updateTodayStats(for activity: TotsActivity) {
@@ -1046,5 +1068,64 @@ extension TotsDataManager {
             }
         }
     }
+    
+    // MARK: - CloudKit Family Sharing
+    // TODO: Uncomment when CloudKit files are added to Xcode project
+    
+    /*
+    func enableFamilySharing() async throws {
+        let goals = BabyGoals(
+            feeding: weeklyFeedingGoal / 7,
+            sleep: weeklySleepGoal / 7.0,
+            diaper: weeklyDiaperGoal / 7
+        )
+        
+        babyProfileRecord = try await cloudKitManager.createBabyProfile(
+            name: babyName,
+            birthDate: babyBirthDate,
+            goals: goals
+        )
+        
+        familySharingEnabled = true
+        UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+    }
+    
+    func shareBabyProfile() async throws -> CKShare? {
+        guard let profileRecord = babyProfileRecord else { return nil }
+        return try await cloudKitManager.shareBabyProfile(profileRecord)
+    }
+    
+    func syncFromCloudKit() async {
+        guard familySharingEnabled, let profileRecord = babyProfileRecord else { return }
+        
+        do {
+            let cloudActivities = try await cloudKitManager.fetchActivities(for: profileRecord.recordID)
+            
+            await MainActor.run {
+                // Merge cloud activities with local ones
+                for cloudActivity in cloudActivities {
+                    if !self.recentActivities.contains(where: { $0.id == cloudActivity.id }) {
+                        self.recentActivities.append(cloudActivity)
+                    }
+                }
+                
+                self.updateCountdowns()
+                self.updateLiveActivity()
+            }
+        } catch {
+            print("Failed to sync from CloudKit: \(error)")
+        }
+    }
+    
+    func checkCloudKitSchema() async {
+        let status = await schemaSetup.checkSchemaStatus()
+        print(status.description)
+        
+        if !status.allExist {
+            print("⚠️ CloudKit schema not complete. Run setup instructions.")
+            schemaSetup.printSchemaInstructions()
+        }
+    }
+    */
 }
 
