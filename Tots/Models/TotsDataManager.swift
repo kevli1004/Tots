@@ -804,17 +804,47 @@ class TotsDataManager: ObservableObject {
     
     // MARK: - Milestone Management
     
-    func getRelevantMilestones() -> [Milestone] {
-        let babyAgeInWeeks = getBabyAgeInWeeks()
+    func getBabyAgeInWeeks() -> Int {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.day], from: babyBirthDate, to: Date())
+        let days = components.day ?? 0
+        return max(0, days / 7)
+    }
+    
+    func getBabyAgeFormatted() -> String {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .weekOfYear, .day], from: babyBirthDate, to: Date())
         
-        // Get predefined milestones that are relevant for current age
-        let relevantPredefined = predefinedMilestones.filter { milestone in
-            milestone.isRelevantForAge(weeks: babyAgeInWeeks) &&
-            !milestones.contains { existing in existing.title == milestone.title }
+        let years = components.year ?? 0
+        let months = components.month ?? 0
+        let weeks = components.weekOfYear ?? 0
+        
+        if years > 0 {
+            if months > 0 {
+                return "\(years) yr \(months) month\(months == 1 ? "" : "s") old"
+            } else {
+                return "\(years) year\(years == 1 ? "" : "s") old"
+            }
+        } else if months > 0 {
+            let remainingWeeks = weeks - (months * 4)
+            if remainingWeeks > 0 {
+                return "\(months) month\(months == 1 ? "" : "s") \(remainingWeeks) week\(remainingWeeks == 1 ? "" : "s") old"
+            } else {
+                return "\(months) month\(months == 1 ? "" : "s") old"
+            }
+        } else {
+            return "\(weeks) week\(weeks == 1 ? "" : "s") old"
+        }
+    }
+    
+    func getRelevantMilestones() -> [Milestone] {
+        // Get all predefined milestones that aren't already in custom milestones
+        let availablePredefined = predefinedMilestones.filter { predefined in
+            !milestones.contains { existing in existing.title == predefined.title }
         }
         
-        // Combine with user's custom milestones and completed ones
-        return (milestones + relevantPredefined).sorted { milestone1, milestone2 in
+        // Combine ALL milestones (no age filtering here - let the UI handle age group filtering)
+        return (milestones + availablePredefined).sorted { milestone1, milestone2 in
             // Sort by: completed status (incomplete first), then by min age, then by title
             if milestone1.isCompleted != milestone2.isCompleted {
                 return !milestone1.isCompleted && milestone2.isCompleted
@@ -826,15 +856,13 @@ class TotsDataManager: ObservableObject {
         }
     }
     
-    func getBabyAgeInWeeks() -> Int {
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.day], from: babyBirthDate, to: Date())
-        let days = components.day ?? 0
-        return max(0, days / 7)
-    }
-    
     func addMilestone(_ milestone: Milestone) {
         milestones.append(milestone)
+    }
+    
+    func deleteMilestone(_ milestone: Milestone) {
+        milestones.removeAll { $0.id == milestone.id }
+        saveMilestones()
     }
     
     func uncompleteMilestone(_ milestone: Milestone) {
@@ -1589,7 +1617,7 @@ struct DayData: Identifiable {
 }
 
 struct Milestone: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     let title: String
     var isCompleted: Bool
     var completedDate: Date?
@@ -1600,6 +1628,7 @@ struct Milestone: Identifiable, Codable {
     let isPredefined: Bool
     
     init(title: String, isCompleted: Bool = false, completedDate: Date? = nil, minAgeWeeks: Int, maxAgeWeeks: Int, category: MilestoneCategory, description: String, isPredefined: Bool = false) {
+        self.id = UUID()
         self.title = title
         self.isCompleted = isCompleted
         self.completedDate = completedDate
@@ -2148,4 +2177,8 @@ extension TotsDataManager {
         }
     }
 }
+
+
+
+// MARK: - Milestone Models
 

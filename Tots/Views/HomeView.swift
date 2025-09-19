@@ -1786,7 +1786,7 @@ struct MilestonesView: View {
         VStack(spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Your baby is \(dataManager.getBabyAgeInWeeks()) weeks old")
+                    Text("Your baby is \(dataManager.getBabyAgeFormatted())")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.white.opacity(0.9))
@@ -1954,6 +1954,9 @@ struct MilestonesView: View {
                                     },
                                     onUncomplete: {
                                         dataManager.uncompleteMilestone(milestone)
+                                    },
+                                    onDelete: {
+                                        dataManager.deleteMilestone(milestone)
                                     }
                                 )
                             }
@@ -2011,80 +2014,72 @@ struct MilestoneCard: View {
     let milestone: Milestone
     let onComplete: () -> Void
     let onUncomplete: () -> Void
+    let onDelete: (() -> Void)?
     @State private var isPressed = false
     
     var body: some View {
-        HStack(spacing: 16) {
-            // Category icon
-            VStack {
-                Image(systemName: milestone.category.icon)
-                    .font(.title2)
-                    .foregroundColor(milestone.isCompleted ? .white : milestone.category.color)
-                    .frame(width: 50, height: 50)
-                    .background(
-                        Circle()
-                            .fill(milestone.isCompleted ? 
-                                  milestone.category.color : 
-                                  milestone.category.color.opacity(0.1))
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(milestone.category.color, lineWidth: milestone.isCompleted ? 0 : 2)
-                    )
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(milestone.title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(milestone.isCompleted ? .secondary : .primary)
+                    .strikethrough(milestone.isCompleted)
+                    .multilineTextAlignment(.leading)
                 
                 Spacer()
+                
+                Text(milestone.expectedAgeRange)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(milestone.category.color.opacity(0.8))
+                    )
             }
             
-            // Content
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(milestone.title)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(milestone.isCompleted ? .secondary : .primary)
-                        .strikethrough(milestone.isCompleted)
+            Text(milestone.description)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.leading)
+            
+            if milestone.isCompleted, let completedDate = milestone.completedDate {
+                HStack(spacing: 6) {
+                    Image(systemName: "party.popper.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
                     
-                    Spacer()
-                    
-                    Text(milestone.expectedAgeRange)
+                    Text("Completed \(completedDate, style: .date)")
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(milestone.category.color.opacity(0.8))
-                        )
+                        .foregroundColor(.green)
                 }
-                
-                Text(milestone.description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(milestone.isCompleted ? 2 : 3)
-                
-                if milestone.isCompleted, let completedDate = milestone.completedDate {
-                    HStack(spacing: 6) {
-                        Image(systemName: "party.popper.fill")
-                            .foregroundColor(.green)
-                            .font(.caption)
-                        
-                        Text("Completed \(completedDate, style: .date)")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.green)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.1))
-                    .clipShape(Capsule())
-                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.green.opacity(0.1))
+                .clipShape(Capsule())
             }
             
-            // Action button
-            VStack {
+            // Action buttons row
+            HStack {
                 Spacer()
                 
+                // Delete button (only for custom milestones)
+                if let onDelete = onDelete, !milestone.isPredefined {
+                    Button(action: {
+                        onDelete()
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.title3)
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                // Complete/uncomplete button
                 if milestone.isCompleted {
                     Button(action: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
@@ -2139,7 +2134,6 @@ struct MilestoneCard: View {
 struct ImprovedAddMilestoneView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: TotsDataManager
-    @State private var selectedCategory: MilestoneCategory = .motor
     @State private var customTitle = ""
     @State private var customDescription = ""
     @State private var minAgeWeeks = 4
@@ -2147,215 +2141,138 @@ struct ImprovedAddMilestoneView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Background
-                LiquidBackground()
-                
-                    VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 16) {
-                        Image(systemName: "star.circle.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(.blue)
-                        
-                        VStack(spacing: 8) {
-                            Text("Add Custom Milestone")
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                            
-                            Text("Track special moments unique to your baby's journey")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .padding(.top, 20)
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 16) {
+                    Image(systemName: "star.circle.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.blue)
                     
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            // Category Selection
-                            VStack(alignment: .leading, spacing: 16) {
-                                HStack {
-                                    Image(systemName: "tag.fill")
-                                        .foregroundColor(.blue)
-                                    Text("Choose Category")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                }
-                                
-                                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
-                                    ForEach(MilestoneCategory.allCases, id: \.self) { category in
-                                        Button(action: {
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                selectedCategory = category
-                                            }
-                                        }) {
-                                            HStack(spacing: 8) {
-                                                Image(systemName: category.icon)
-                                                    .font(.title2)
-                                                    .foregroundColor(selectedCategory == category ? .white : category.color)
-                                                
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(category.rawValue)
-                                                        .font(.subheadline)
-                                                        .fontWeight(.semibold)
-                                                        .foregroundColor(selectedCategory == category ? .white : .primary)
-                                                        .multilineTextAlignment(.leading)
-                                                }
-                                                
-                                                Spacer()
-                                            }
-                                            .padding(16)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 16)
-                                                    .fill(selectedCategory == category ? 
-                                                          category.color : 
-                                                          category.color.opacity(0.1))
-                                            )
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 16)
-                                                    .stroke(category.color, lineWidth: selectedCategory == category ? 0 : 2)
-                                            )
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                }
-                            }
-                            .liquidGlassCard()
-                            
-                            // Milestone Details
-                            VStack(alignment: .leading, spacing: 16) {
-                                HStack {
-                                    Image(systemName: "pencil.circle.fill")
-                                        .foregroundColor(.green)
-                                    Text("Milestone Details")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                }
-                                
-                                VStack(spacing: 16) {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("Title")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.secondary)
-                                        TextField("e.g., 'First giggle', 'Loves peek-a-boo'", text: $customTitle)
-                                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                                            .font(.body)
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("Description (Optional)")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.secondary)
-                                        TextField("Add more details about this milestone...", text: $customDescription, axis: .vertical)
-                                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                                            .lineLimit(2...4)
-                                            .font(.body)
-                                    }
-                                }
-                            }
-                            .liquidGlassCard()
-                            
-                            // Age Range
-                            VStack(alignment: .leading, spacing: 16) {
-                                HStack {
-                                    Image(systemName: "calendar.circle.fill")
-                                        .foregroundColor(.orange)
-                                    Text("Expected Age Range")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                }
-                                
-                                VStack(spacing: 16) {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        HStack {
-                                            Text("From: \(minAgeWeeks) weeks")
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                            Spacer()
-                                            Text("(\(minAgeWeeks/4) months)")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        Slider(value: Binding(
-                                            get: { Double(minAgeWeeks) },
-                                            set: { minAgeWeeks = Int($0) }
-                                        ), in: 0...104, step: 1)
-                                        .accentColor(selectedCategory.color)
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        HStack {
-                                            Text("To: \(maxAgeWeeks) weeks")
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                            Spacer()
-                                            Text("(\(maxAgeWeeks/4) months)")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        Slider(value: Binding(
-                                            get: { Double(maxAgeWeeks) },
-                                            set: { maxAgeWeeks = Int($0) }
-                                        ), in: 0...104, step: 1)
-                                        .accentColor(selectedCategory.color)
-                                    }
-                                }
-                            }
-                            .liquidGlassCard()
-                        }
-                        .padding(.horizontal, 16)
-                    }
-                    
-                    // Action Buttons
-                    HStack(spacing: 16) {
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color(.systemGray5))
-                        .cornerRadius(16)
+                    VStack(spacing: 8) {
+                        Text("Add Custom Milestone")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
                         
-                        Button("Add Milestone") {
-                            let milestone = Milestone(
-                                title: customTitle,
-                                minAgeWeeks: minAgeWeeks,
-                                maxAgeWeeks: max(minAgeWeeks, maxAgeWeeks),
-                                category: selectedCategory,
-                                description: customDescription.isEmpty ? "Custom milestone" : customDescription
-                            )
-                            
-                            dataManager.addMilestone(milestone)
-                            dismiss()
-                        }
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [selectedCategory.color, selectedCategory.color.opacity(0.8)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .cornerRadius(16)
-                        .disabled(customTitle.isEmpty)
-                        .opacity(customTitle.isEmpty ? 0.6 : 1.0)
+                        Text("Track special moments unique to your baby's journey")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
                 }
+                .padding(.top, 20)
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Milestone Details
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Title")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                TextField("e.g., 'First giggle', 'Loves peek-a-boo'", text: $customTitle)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .font(.body)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Description (Optional)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                TextField("Add more details about this milestone...", text: $customDescription, axis: .vertical)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .lineLimit(2...4)
+                                    .font(.body)
+                            }
+                        }
+                        
+                        // Age Range
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Expected Age Range")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            
+                            VStack(spacing: 16) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("From: \(minAgeWeeks) weeks")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                        Text("(\(minAgeWeeks/4) months)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Slider(value: Binding(
+                                        get: { Double(minAgeWeeks) },
+                                        set: { minAgeWeeks = Int($0) }
+                                    ), in: 0...104, step: 1)
+                                    .accentColor(.blue)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("To: \(maxAgeWeeks) weeks")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                        Text("(\(maxAgeWeeks/4) months)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Slider(value: Binding(
+                                        get: { Double(maxAgeWeeks) },
+                                        set: { maxAgeWeeks = Int($0) }
+                                    ), in: 0...104, step: 1)
+                                    .accentColor(.blue)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                
+                // Action Buttons
+                HStack(spacing: 16) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color(.systemGray5))
+                    .cornerRadius(16)
+                    
+                    Button("Add Milestone") {
+                        let milestone = Milestone(
+                            title: customTitle,
+                            minAgeWeeks: minAgeWeeks,
+                            maxAgeWeeks: max(minAgeWeeks, maxAgeWeeks),
+                            category: .motor, // Default category since we removed selection
+                            description: customDescription.isEmpty ? "Custom milestone" : customDescription
+                        )
+                        
+                        dataManager.addMilestone(milestone)
+                        dismiss()
+                    }
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(.blue)
+                    .cornerRadius(16)
+                    .disabled(customTitle.isEmpty)
+                    .opacity(customTitle.isEmpty ? 0.6 : 1.0)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
             .navigationBarHidden(true)
         }
