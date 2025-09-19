@@ -108,6 +108,7 @@ class CloudKitManager: ObservableObject {
     func fetchBabyProfiles() async throws -> [CKRecord] {
         // First ensure user record exists
         let userRecord = try await getOrCreateUserRecord()
+        print("🔍 CloudKit: Fetching profiles for user: \(userRecord.recordID.recordName)")
         
         // Query for baby profiles created by this user
         let userReference = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
@@ -115,8 +116,16 @@ class CloudKitManager: ObservableObject {
         let query = CKQuery(recordType: "BabyProfile", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "birthDate", ascending: false)]
         
+        print("🔍 CloudKit: Running query for BabyProfile records...")
         let result = try await privateDatabase.records(matching: query)
-        return result.matchResults.compactMap { try? $0.1.get() }
+        let profiles = result.matchResults.compactMap { try? $0.1.get() }
+        print("🔍 CloudKit: Found \(profiles.count) baby profiles")
+        
+        for (index, profile) in profiles.enumerated() {
+            print("🔍 CloudKit: Profile \(index + 1): \(profile["name"] as? String ?? "Unknown") (ID: \(profile.recordID.recordName))")
+        }
+        
+        return profiles
     }
     
     func fetchBabyProfile(recordID: CKRecord.ID) async throws -> CKRecord {
@@ -186,26 +195,20 @@ class CloudKitManager: ObservableObject {
     // MARK: - Family Sharing
     
     func shareBabyProfile(_ profileRecord: CKRecord) async throws -> CKShare {
-        let share = CKShare(rootRecord: profileRecord)
-        share[CKShare.SystemFieldKey.title] = "Baby Profile: \(profileRecord["name"] as? String ?? "Unknown")"
+        // Ensure the profile record is saved first
+        let savedProfile = try await privateDatabase.save(profileRecord)
+        
+        // Create the share
+        let share = CKShare(rootRecord: savedProfile)
+        share[CKShare.SystemFieldKey.title] = "Baby Profile: \(savedProfile["name"] as? String ?? "Unknown")"
         share.publicPermission = .none
         
-        // Save both the profile and share
-        let modifyOperation = CKModifyRecordsOperation(recordsToSave: [profileRecord, share])
-        modifyOperation.savePolicy = .changedKeys
-        modifyOperation.qualityOfService = .userInitiated
+        // Note: Participant permissions are set when users accept the share
         
-        return try await withCheckedThrowingContinuation { continuation in
-            modifyOperation.modifyRecordsResultBlock = { result in
-                switch result {
-                case .success:
-                    continuation.resume(returning: share)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-            privateDatabase.add(modifyOperation)
-        }
+        // Save the share
+        _ = try await privateDatabase.save(share)
+        
+        return share
     }
     
     func fetchSharedProfiles() async throws -> [CKRecord] {
@@ -309,44 +312,117 @@ class CloudKitManager: ObservableObject {
         
         // Notify app to show onboarding
         await MainActor.run {
+            print("📢 Posting user_signed_out notification")
             NotificationCenter.default.post(name: .init("user_signed_out"), object: nil)
         }
     }
     
     func deleteAccount() async throws {
+        print("🗑️ CloudKit: Starting comprehensive account deletion...")
+        
         // Fetch all user's records and delete them
         let userRecord = try await getOrCreateUserRecord()
+        print("🗑️ CloudKit: Found user record: \(userRecord.recordID.recordName)")
         
-        // Delete all baby profiles
+        // Delete all baby profiles and associated data
         let profiles = try await fetchBabyProfiles()
+        print("🗑️ CloudKit: Found \(profiles.count) baby profiles to delete")
+        
         for profile in profiles {
-            // Stop sharing first
-            try await stopSharingProfile(profile)
-            // Then delete the profile
-            try await privateDatabase.deleteRecord(withID: profile.recordID)
+            print("🗑️ CloudKit: Deleting profile: \(profile["name"] as? String ?? "Unknown")")
+            
+            // Stop sharing first (this also deletes the share record)
+            do {
+                try await stopSharingProfile(profile)
+                print("✅ CloudKit: Stopped sharing for profile")
+            } catch {
+                print("⚠️ CloudKit: Could not stop sharing (might not be shared): \(error)")
+            }
             
             // Delete all activities for this profile
             let activities = try await fetchActivities(for: profile.recordID)
+            print("🗑️ CloudKit: Found \(activities.count) activities to delete for this profile")
+            
             for activity in activities {
-                if let activityRecord = try? await privateDatabase.record(for: CKRecord.ID(recordName: activity.id.uuidString)) {
+                do {
+                    let activityRecord = try await privateDatabase.record(for: CKRecord.ID(recordName: activity.id.uuidString))
                     try await privateDatabase.deleteRecord(withID: activityRecord.recordID)
+                    print("✅ CloudKit: Deleted activity: \(activity.type.rawValue)")
+                } catch {
+                    print("⚠️ CloudKit: Could not delete activity \(activity.id): \(error)")
                 }
             }
+            
+            // Delete the profile record
+            try await privateDatabase.deleteRecord(withID: profile.recordID)
+            print("✅ CloudKit: Deleted baby profile record")
         }
         
-        // Delete user record
+        // Delete any remaining records by querying all record types
+        print("🗑️ CloudKit: Checking for any remaining records...")
+        
+        // Query for any remaining Activity records
+        let activityQuery = CKQuery(recordType: "Activity", predicate: NSPredicate(format: "createdBy == %@", userRecord.recordID))
+        do {
+            let (activityRecords, _) = try await privateDatabase.records(matching: activityQuery)
+            print("🗑️ CloudKit: Found \(activityRecords.count) remaining activity records")
+            for (recordID, result) in activityRecords {
+                switch result {
+                case .success(let record):
+                    try await privateDatabase.deleteRecord(withID: record.recordID)
+                    print("✅ CloudKit: Deleted remaining activity record")
+                case .failure(let error):
+                    print("⚠️ CloudKit: Could not fetch activity record \(recordID): \(error)")
+                }
+            }
+        } catch {
+            print("⚠️ CloudKit: Could not query remaining activities: \(error)")
+        }
+        
+        // Query for any remaining BabyProfile records
+        let profileQuery = CKQuery(recordType: "BabyProfile", predicate: NSPredicate(format: "createdBy == %@", userRecord.recordID))
+        do {
+            let (profileRecords, _) = try await privateDatabase.records(matching: profileQuery)
+            print("🗑️ CloudKit: Found \(profileRecords.count) remaining profile records")
+            for (recordID, result) in profileRecords {
+                switch result {
+                case .success(let record):
+                    try await privateDatabase.deleteRecord(withID: record.recordID)
+                    print("✅ CloudKit: Deleted remaining profile record")
+                case .failure(let error):
+                    print("⚠️ CloudKit: Could not fetch profile record \(recordID): \(error)")
+                }
+            }
+        } catch {
+            print("⚠️ CloudKit: Could not query remaining profiles: \(error)")
+        }
+        
+        // Delete user record last
         try await privateDatabase.deleteRecord(withID: userRecord.recordID)
+        print("✅ CloudKit: Deleted user record")
         
-        // Clear local data
-        await signOut()
-        
-        // Clear all local data
+        // Clear all local data completely
         let domain = Bundle.main.bundleIdentifier!
         UserDefaults.standard.removePersistentDomain(forName: domain)
         UserDefaults.standard.synchronize()
+        print("✅ CloudKit: Cleared all UserDefaults")
         
-        // Notify app to show onboarding
+        // Reset CloudKit manager state
         await MainActor.run {
+            self.isSignedIn = false
+            self.familyMembers = []
+            self.activeShare = nil
+            self.syncStatus = .idle
+        }
+        
+        print("🗑️ CloudKit: Account deletion completed - all iCloud data should be removed")
+        
+        // Small delay to ensure all cleanup is complete before notifying UI
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Notify app to show onboarding (single notification)
+        await MainActor.run {
+            print("📢 Account deleted - posting user_signed_out notification")
             NotificationCenter.default.post(name: .init("user_signed_out"), object: nil)
         }
     }

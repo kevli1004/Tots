@@ -23,7 +23,8 @@ struct OnboardingView: View {
     @State private var userName = ""
     @State private var isSignedIn = false
     
-    private let totalSteps = 4
+    @State private var totalSteps = 1 // Start with just Apple sign in
+    @State private var showingSteps = false // Show steps 2-4 only after sign in
     
     var body: some View {
         NavigationView {
@@ -34,9 +35,11 @@ struct OnboardingView: View {
                 // Content with scrollable navigation
                 TabView(selection: $currentStep) {
                     appleSignInStep.tag(0)
-                    babyDetailsStepWithNav.tag(1)
-                    goalsStepWithNav.tag(2)
-                    permissionsStepWithNav.tag(3)
+                    if showingSteps {
+                        babyDetailsStepWithNav.tag(1)
+                        goalsStepWithNav.tag(2)
+                        permissionsStepWithNav.tag(3)
+                    }
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 .animation(.easeInOut, value: currentStep)
@@ -59,6 +62,52 @@ struct OnboardingView: View {
                 \(primaryCaregiverName)
                 """
             )
+        }
+    }
+    
+    
+    private func checkForExistingData() {
+        Task {
+            do {
+                let profiles = try await dataManager.cloudKitManager.fetchBabyProfiles()
+                
+                await MainActor.run {
+                    if !profiles.isEmpty {
+                        // Found existing data - load it and skip onboarding
+                        print("🎉 Found existing baby profiles, loading data and completing onboarding")
+                        UserDefaults.standard.set(true, forKey: "onboarding_completed")
+                        
+                        // Load the profile data into the app
+                        Task {
+                            await dataManager.loadExistingBabyProfile()
+                            await MainActor.run {
+                                NotificationCenter.default.post(name: .init("onboarding_completed"), object: nil)
+                            }
+                        }
+                    } else {
+                        // No existing data - show registration steps
+                        print("ℹ️ No existing data found, showing registration steps")
+                        proceedToRegistration()
+                    }
+                }
+            } catch {
+                print("⚠️ CloudKit check failed: \(error)")
+                await MainActor.run {
+                    // On error, show registration steps
+                    proceedToRegistration()
+                }
+            }
+        }
+    }
+    
+    private func proceedToRegistration() {
+        // Enable the registration steps
+        showingSteps = true
+        totalSteps = 4
+        
+        // Move to step 2 (baby details)
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            currentStep = 1
         }
     }
     
@@ -92,7 +141,7 @@ struct OnboardingView: View {
                     }
                 }
                 
-                // Sign in options
+                // Sign in with Apple only
                 VStack(spacing: 24) {
                     // Sign in with Apple button
                     SignInWithAppleButton(
@@ -110,34 +159,11 @@ struct OnboardingView: View {
                     .scaleEffect(1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentStep)
                     
-                    // Skip option
-                    Button(action: {
-                        // Set default values when skipping sign in
-                        if primaryCaregiverName.isEmpty {
-                            primaryCaregiverName = "Parent"
-                        }
-                        if caregiverEmail.isEmpty {
-                            caregiverEmail = "parent@example.com"
-                        }
-                        isSignedIn = true
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            currentStep += 1
-                        }
-                    }) {
-                        Text("Continue without Sign In")
-                            .font(.system(.body, design: .rounded))
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 16)
-                    }
-                    .buttonStyle(SleekButtonStyle())
-                    
                     Text("Sign in to sync your data across devices and share with family")
                         .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .lineLimit(nil)
-                        .padding(.horizontal, 40)
                 }
                 .padding(.horizontal, 40)
             }
@@ -149,28 +175,30 @@ struct OnboardingView: View {
     
     private var progressIndicator: some View {
         VStack(spacing: 20) {
-            HStack {
-                ForEach(0..<totalSteps, id: \.self) { step in
-                    Circle()
-                        .fill(step <= currentStep ? Color.purple.opacity(0.7) : Color(.systemGray5))
-                        .frame(width: 10, height: 10)
-                        .scaleEffect(step == currentStep ? 1.2 : 1.0)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentStep)
-                    
-                    if step < totalSteps - 1 {
-                        Capsule()
-                            .fill(step < currentStep ? Color.purple.opacity(0.7) : Color(.systemGray5))
-                            .frame(height: 3)
-                            .animation(.easeInOut(duration: 0.3), value: currentStep)
+            if showingSteps {
+                HStack {
+                    ForEach(0..<totalSteps, id: \.self) { step in
+                        Circle()
+                            .fill(step <= currentStep ? Color.purple.opacity(0.7) : Color(.systemGray5))
+                            .frame(width: 10, height: 10)
+                            .scaleEffect(step == currentStep ? 1.2 : 1.0)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentStep)
+                        
+                        if step < totalSteps - 1 {
+                            Capsule()
+                                .fill(step < currentStep ? Color.purple.opacity(0.7) : Color(.systemGray5))
+                                .frame(height: 3)
+                                .animation(.easeInOut(duration: 0.3), value: currentStep)
+                        }
                     }
                 }
+                .padding(.horizontal, 50)
+                
+                Text("Step \(currentStep + 1) of \(totalSteps)")
+                    .font(.system(.caption, design: .rounded))
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 50)
-            
-            Text("Step \(currentStep + 1) of \(totalSteps)")
-                .font(.system(.caption, design: .rounded))
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
         }
         .padding(.top, 30)
         .padding(.bottom, 40)
@@ -969,14 +997,15 @@ struct OnboardingView: View {
                 
                 isSignedIn = true
                 
-                // Auto-advance to next step
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    currentStep += 1
-                }
+                print("✅ Apple Sign In successful for: \(userName)")
+                
+                // Now check for existing profiles
+                checkForExistingData()
             }
         case .failure(let error):
-            print("Apple Sign In failed: \(error.localizedDescription)")
-            // Handle error if needed
+            print("❌ Apple Sign In failed: \(error.localizedDescription)")
+            // On sign in failure, show registration steps
+            proceedToRegistration()
         }
     }
     

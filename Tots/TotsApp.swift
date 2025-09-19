@@ -4,13 +4,13 @@ import SwiftUI
 struct TotsApp: App {
     @StateObject private var dataManager = TotsDataManager()
     @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "onboarding_completed")
-    @State private var isCheckingExistingData = true
+    @State private var isCheckingExistingData = false
     
     var body: some Scene {
         WindowGroup {
             Group {
                 if isCheckingExistingData {
-                    // Show simple loading view while checking for existing data
+                    // Simple loading view while checking CloudKit
                     VStack(spacing: 20) {
                         Image("TotsIcon")
                             .resizable()
@@ -21,23 +21,18 @@ struct TotsApp: App {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
-                        Text("Checking for your data...")
+                        Text("Loading...")
                             .foregroundColor(.secondary)
                         
                         SwiftUI.ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .purple))
                     }
-                    .environmentObject(dataManager)
                 } else if showOnboarding {
                     OnboardingView()
                         .environmentObject(dataManager)
-                    .onReceive(NotificationCenter.default.publisher(for: .init("onboarding_completed"))) { _ in
-                        showOnboarding = false
-                    }
-                    .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_out"))) { _ in
-                        showOnboarding = true
-                        isCheckingExistingData = true
-                    }
+                        .onReceive(NotificationCenter.default.publisher(for: .init("onboarding_completed"))) { _ in
+                            showOnboarding = false
+                        }
                 } else {
                     ContentView()
                         .environmentObject(dataManager)
@@ -46,37 +41,40 @@ struct TotsApp: App {
             .onAppear {
                 checkForExistingUserData()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_out"))) { _ in
+                print("📱 TotsApp: Received user_signed_out notification - resetting to onboarding")
+                print("📱 TotsApp: Current showOnboarding = \(showOnboarding)")
+                
+                // Reset to show onboarding from the beginning
+                showOnboarding = true
+                isCheckingExistingData = false
+                
+                // Also make sure UserDefaults reflects this
+                UserDefaults.standard.set(false, forKey: "onboarding_completed")
+                
+                print("📱 TotsApp: Set showOnboarding = \(showOnboarding)")
+            }
+            .onChange(of: dataManager.shouldShowOnboarding) { shouldShow in
+                if shouldShow {
+                    print("📱 TotsApp: DataManager triggered onboarding - showing sign-in")
+                    showOnboarding = true
+                    isCheckingExistingData = false
+                    UserDefaults.standard.set(false, forKey: "onboarding_completed")
+                    // Reset the flag
+                    dataManager.shouldShowOnboarding = false
+                }
+            }
         }
     }
     
     private func checkForExistingUserData() {
         // If onboarding was already completed, skip the check
         if UserDefaults.standard.bool(forKey: "onboarding_completed") {
-            isCheckingExistingData = false
             return
         }
         
-        // Check if user has existing CloudKit data
-        Task {
-            do {
-                let profiles = try await CloudKitManager.shared.fetchBabyProfiles()
-                
-                await MainActor.run {
-                    if !profiles.isEmpty {
-                        // User has existing data - skip onboarding
-                        print("🎉 Found existing baby profiles, skipping onboarding")
-                        UserDefaults.standard.set(true, forKey: "onboarding_completed")
-                        showOnboarding = false
-                    }
-                    isCheckingExistingData = false
-                }
-            } catch {
-                // If CloudKit check fails, proceed with normal onboarding flow
-                print("⚠️ CloudKit check failed, proceeding with onboarding: \(error)")
-                await MainActor.run {
-                    isCheckingExistingData = false
-                }
-            }
-        }
+        // For first-time users, just show onboarding directly
+        // No automatic CloudKit checking - let them choose
+        showOnboarding = true
     }
 }

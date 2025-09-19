@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingLogoutConfirmation = false
     @State private var familyMembers: [FamilyMember] = []
+    @State private var showingDebugAlert = false
+    @State private var debugMessage = ""
     
     var body: some View {
         ScrollView {
@@ -48,7 +50,13 @@ struct SettingsView: View {
         .confirmationDialog("Delete Account", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete Account", role: .destructive) {
                 Task {
-                    try await dataManager.deleteAccount()
+                    do {
+                        try await dataManager.deleteAccount()
+                    } catch {
+                        print("❌ Failed to delete account: \(error)")
+                        // Even if CloudKit deletion fails, still sign out locally
+                        await dataManager.signOut()
+                    }
                 }
             }
             Button("Cancel", role: .cancel) { }
@@ -57,13 +65,21 @@ struct SettingsView: View {
         }
         .confirmationDialog("Sign Out", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
+                print("🚪 Sign Out button tapped")
                 Task {
+                    print("🚪 Starting sign out...")
                     await dataManager.signOut()
+                    print("✅ Signed out successfully")
                 }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will sign you out and clear all local data. Your CloudKit data will remain safe.")
+        }
+        .alert("Debug Info", isPresented: $showingDebugAlert) {
+            Button("OK") { }
+        } message: {
+            Text(debugMessage)
         }
     }
     
@@ -200,88 +216,29 @@ struct SettingsView: View {
                     .cornerRadius(12)
                 }
                 
-                // Share Button
+                // Single Share Button
                 Button(action: {
-                    self.shareWithFamily()
+                    Task {
+                        await shareWithFamily()
+                    }
                 }) {
                     HStack(spacing: 12) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.blue)
+                            .foregroundColor(.white)
                         
-                        Text("Invite New Family Member")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.primary)
+                        Text("Share with Family")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
                         
                         Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
                     }
                     .padding(16)
-                    .background(Color(.systemGray6))
+                    .background(Color.blue)
                     .cornerRadius(12)
                 }
             }
             
-            Button(action: {
-                showingFamilyInvite = true
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.3.fill")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(.blue)
-                    
-                    Text("Invite family members")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-                .padding(16)
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
-            }
-            
-            // Family sharing promo
-            VStack(spacing: 12) {
-                Text("The journey is easier together")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                
-                Text("Share tracking duties with partners and grandparents")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                
-                Button(action: {
-                    showingFamilyInvite = true
-                }) {
-                    Text("Invite Family")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.white)
-                        .cornerRadius(25)
-                }
-                .padding(.top, 8)
-            }
-            .padding(20)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [Color.blue, Color.purple]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(16)
         }
     }
     
@@ -405,6 +362,47 @@ struct SettingsView: View {
                     action: { /* Sync data */ }
                 )
             }
+            
+            SettingsRow(
+                icon: "ladybug.fill",
+                title: "Debug CloudKit Data",
+                subtitle: "Check what's in your CloudKit",
+                action: { 
+                    Task {
+                        do {
+                            let profiles = try await dataManager.cloudKitManager.fetchBabyProfiles()
+                            let message = "Found \(profiles.count) baby profiles\n\nApp State:\n• Baby Name: \(dataManager.babyName)\n• Activities: \(dataManager.recentActivities.count)"
+                            await MainActor.run {
+                                debugMessage = message
+                                showingDebugAlert = true
+                            }
+                        } catch {
+                            await MainActor.run {
+                                debugMessage = "CloudKit Error: \(error.localizedDescription)"
+                                showingDebugAlert = true
+                            }
+                        }
+                    }
+                }
+            )
+            
+            SettingsRow(
+                icon: "arrow.clockwise",
+                title: "Force Reload Profile",
+                subtitle: "Manually reload data from CloudKit",
+                action: { 
+                    Task {
+                        // Clear any cached record ID to force a fresh lookup
+                        UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
+                        await dataManager.loadExistingBabyProfile()
+                        
+                        await MainActor.run {
+                            debugMessage = "Profile reload complete!\n\n• Baby Name: \(dataManager.babyName)\n• Activities: \(dataManager.recentActivities.count)"
+                            showingDebugAlert = true
+                        }
+                    }
+                }
+            )
             
             SettingsRow(
                 icon: "trash.fill",
@@ -815,6 +813,21 @@ struct FamilyManagerView: View {
         }
     }
     
+    private func shareWithFamily() async {
+        do {
+            if let share = try await dataManager.shareBabyProfile() {
+                await MainActor.run {
+                    self.presentCloudKitShareController(share: share)
+                }
+            }
+        } catch {
+            await MainActor.run {
+                print("❌ Sharing failed: \(error.localizedDescription)")
+                // TODO: Show user-friendly error message
+            }
+        }
+    }
+    
     private func presentCloudKitShareController(share: CKShare) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = windowScene.windows.first,
@@ -831,6 +844,37 @@ struct FamilyManagerView: View {
         }
         
         topController.present(shareController, animated: true)
+    }
+    
+    
+    private var debugSectionView: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("🐛 Debug Tools")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+            
+            Button(action: {
+                Task {
+                    print("🔄 Manual Data Reload - Starting...")
+                    await dataManager.loadExistingBabyProfile()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Reload Profile Data")
+                    Spacer()
+                }
+                .padding()
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(12)
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(16)
     }
 }
 
