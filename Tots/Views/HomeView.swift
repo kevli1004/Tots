@@ -402,8 +402,9 @@ struct HomeView: View {
         var dates: [Date] = []
         
         for i in 0..<7 {
-            if let date = calendar.date(byAdding: .day, value: -i, to: Date()) {
-                dates.append(date)
+            if let date = calendar.date(byAdding: .day, value: -i, to: Date()),
+               let normalizedDate = calendar.dateInterval(of: .day, for: date)?.start {
+                dates.append(normalizedDate)
             }
         }
         
@@ -899,14 +900,14 @@ struct DatePickerHistoryView: View {
                         if let scrollDate = scrollToDate {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                 withAnimation(.easeInOut(duration: 0.5)) {
-                                    proxy.scrollTo(scrollDate, anchor: .center)
+                                    proxy.scrollTo(scrollDate, anchor: .top)
                                 }
                             }
                         }
                     }
                     .onChange(of: selectedDate) { newDate in
                         withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(newDate, anchor: .center)
+                            proxy.scrollTo(newDate, anchor: .top)
                         }
                     }
                 }

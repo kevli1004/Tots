@@ -205,7 +205,7 @@ class TotsDataManager: ObservableObject {
         // Calculate streak (consecutive days with activities)
         var streak = 0
         let calendar = Calendar.current
-        var currentDate = Date()
+        var currentDate = calendar.dateInterval(of: .day, for: Date())?.start ?? Date()
         
         while true {
             let hasActivityOnDate = recentActivities.contains { activity in
@@ -214,7 +214,12 @@ class TotsDataManager: ObservableObject {
             
             if hasActivityOnDate {
                 streak += 1
-                currentDate = calendar.date(byAdding: .day, value: -1, to: currentDate) ?? currentDate
+                if let nextDate = calendar.date(byAdding: .day, value: -1, to: currentDate),
+                   let normalizedDate = calendar.dateInterval(of: .day, for: nextDate)?.start {
+                    currentDate = normalizedDate
+                } else {
+                    break
+                }
             } else {
                 break
             }
@@ -223,7 +228,7 @@ class TotsDataManager: ObservableObject {
         streakCount = streak
         
         // Update today's stats
-        let today = Date()
+        let today = calendar.dateInterval(of: .day, for: Date())?.start ?? Date()
         let todayActivities = recentActivities.filter { calendar.isDate($0.time, inSameDayAs: today) }
         
         todayFeedings = todayActivities.filter { $0.type == .feeding }.count
@@ -248,7 +253,7 @@ class TotsDataManager: ObservableObject {
     
     private func updateWeeklyData() {
         let calendar = Calendar.current
-        let today = Date()
+        let today = calendar.dateInterval(of: .day, for: Date())?.start ?? Date()
         
         weeklyData = (0..<7).map { dayOffset in
             let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
