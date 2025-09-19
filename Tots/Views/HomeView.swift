@@ -1682,44 +1682,58 @@ struct MilestonesView: View {
     enum FilterCategory: String, CaseIterable {
         case all = "All"
         case motor = "Motor Skills"
-        case language = "Language"
-        case social = "Social"
-        case cognitive = "Cognitive"
-        case physical = "Physical"
+        case language = "Language & Communication"
+        case social = "Social & Emotional"
+        case cognitive = "Cognitive & Learning"
+        case physical = "Physical Growth"
+        case feeding = "Feeding & Eating"
+        case sleep = "Sleep & Routine"
+        case sensory = "Sensory Development"
         
         var icon: String {
             switch self {
             case .all: return "list.bullet"
             case .motor: return "figure.walk"
-            case .language: return "bubble.left"
-            case .social: return "heart"
-            case .cognitive: return "brain.head.profile"
-            case .physical: return "figure.child"
+            case .language: return "bubble.left.and.text.bubble.right.fill"
+            case .social: return "heart.2.fill"
+            case .cognitive: return "brain.head.profile.fill"
+            case .physical: return "ruler.fill"
+            case .feeding: return "fork.knife"
+            case .sleep: return "moon.zzz.fill"
+            case .sensory: return "eye.fill"
             }
         }
         
         var color: Color {
             switch self {
             case .all: return .blue
-            case .motor: return .green
-            case .language: return .orange
+            case .motor: return .blue
+            case .language: return .green
             case .social: return .pink
             case .cognitive: return .purple
-            case .physical: return .cyan
+            case .physical: return .orange
+            case .feeding: return .red
+            case .sleep: return .indigo
+            case .sensory: return .yellow
             }
         }
     }
     
     var filteredMilestones: [Milestone] {
+        let relevantMilestones = dataManager.getRelevantMilestones()
+        
         let categoryFiltered = selectedCategory == .all ? 
-            dataManager.milestones : 
-            dataManager.milestones.filter { milestone in
+            relevantMilestones : 
+            relevantMilestones.filter { milestone in
                 switch selectedCategory {
                 case .motor: return milestone.category == .motor
                 case .language: return milestone.category == .language
                 case .social: return milestone.category == .social
                 case .cognitive: return milestone.category == .cognitive
                 case .physical: return milestone.category == .physical
+                case .feeding: return milestone.category == .feeding
+                case .sleep: return milestone.category == .sleep
+                case .sensory: return milestone.category == .sensory
                 case .all: return true
                 }
             }
@@ -1938,7 +1952,7 @@ struct MilestoneCard: View {
                     
                     Spacer()
                     
-                    Text(milestone.expectedAge)
+                    Text(milestone.expectedAgeRange)
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.secondary)
@@ -2110,10 +2124,9 @@ struct AddMilestoneView: View {
                 CustomMilestoneForm(
                     category: selectedCategory,
                     title: $customTitle,
-                    description: $customDescription,
-                    expectedAge: $expectedAge
+                    description: $customDescription
                 ) { milestone in
-                    dataManager.milestones.append(milestone)
+                    dataManager.addMilestone(milestone)
                     dismiss()
                 }
             }
@@ -2121,13 +2134,8 @@ struct AddMilestoneView: View {
     }
     
     private func addPredefinedMilestone(_ predefined: PredefinedMilestone) {
-        let milestone = Milestone(
-            title: predefined.title,
-            expectedAge: predefined.expectedAge,
-            category: selectedCategory,
-            description: predefined.description
-        )
-        dataManager.milestones.append(milestone)
+        // This function is no longer needed since we use the comprehensive predefined milestones
+        // from the data manager. Users can complete milestones directly from the main view.
         dismiss()
     }
 }
@@ -2181,7 +2189,8 @@ struct CustomMilestoneForm: View {
     let category: MilestoneCategory
     @Binding var title: String
     @Binding var description: String
-    @Binding var expectedAge: String
+    @State private var minAgeWeeks: Int = 4
+    @State private var maxAgeWeeks: Int = 8
     let onSave: (Milestone) -> Void
     
     var body: some View {
@@ -2191,7 +2200,24 @@ struct CustomMilestoneForm: View {
                     TextField("Title", text: $title)
                     TextField("Description", text: $description, axis: .vertical)
                         .lineLimit(3...6)
-                    TextField("Expected Age (e.g., '6-8 months')", text: $expectedAge)
+                }
+                
+                Section("Expected Age Range") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Minimum Age: \(minAgeWeeks) weeks")
+                            .font(.subheadline)
+                        Slider(value: Binding(
+                            get: { Double(minAgeWeeks) },
+                            set: { minAgeWeeks = Int($0) }
+                        ), in: 0...208, step: 1)
+                        
+                        Text("Maximum Age: \(maxAgeWeeks) weeks")
+                            .font(.subheadline)
+                        Slider(value: Binding(
+                            get: { Double(maxAgeWeeks) },
+                            set: { maxAgeWeeks = Int($0) }
+                        ), in: 0...208, step: 1)
+                    }
                 }
                 
                 Section("Category") {
@@ -2216,13 +2242,15 @@ struct CustomMilestoneForm: View {
                     Button("Save") {
                         let milestone = Milestone(
                             title: title,
-                            expectedAge: expectedAge,
+                            minAgeWeeks: minAgeWeeks,
+                            maxAgeWeeks: max(minAgeWeeks, maxAgeWeeks),
                             category: category,
                             description: description
                         )
                         onSave(milestone)
+                        dismiss()
                     }
-                    .disabled(title.isEmpty || expectedAge.isEmpty)
+                    .disabled(title.isEmpty)
                 }
             }
         }

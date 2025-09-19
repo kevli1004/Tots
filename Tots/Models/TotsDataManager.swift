@@ -48,7 +48,7 @@ class TotsDataManager: ObservableObject {
     
     // Live Activity
     @Published var currentActivity: Activity<TotsLiveActivityAttributes>?
-    @Published var widgetEnabled: Bool = true {
+    @Published var widgetEnabled: Bool = false {
         didSet {
             UserDefaults.standard.set(widgetEnabled, forKey: "widget_enabled")
         }
@@ -117,6 +117,63 @@ class TotsDataManager: ObservableObject {
             saveGrowthData()
         }
     }
+    
+    // Predefined milestones for different age groups
+    private let predefinedMilestones: [Milestone] = [
+        // 0-3 months (Newborn)
+        Milestone(title: "First smile", minAgeWeeks: 4, maxAgeWeeks: 8, category: .social, description: "Baby shows their first social smile in response to you", isPredefined: true),
+        Milestone(title: "Holds head up briefly", minAgeWeeks: 2, maxAgeWeeks: 6, category: .motor, description: "Can lift head for short periods during tummy time", isPredefined: true),
+        Milestone(title: "Follows objects with eyes", minAgeWeeks: 3, maxAgeWeeks: 8, category: .sensory, description: "Tracks moving objects or faces with their eyes", isPredefined: true),
+        Milestone(title: "Makes cooing sounds", minAgeWeeks: 6, maxAgeWeeks: 12, category: .language, description: "Makes soft cooing or gurgling sounds", isPredefined: true),
+        Milestone(title: "Startles at loud sounds", minAgeWeeks: 0, maxAgeWeeks: 4, category: .sensory, description: "Shows startle reflex to sudden noises", isPredefined: true),
+        
+        // 3-6 months
+        Milestone(title: "Laughs out loud", minAgeWeeks: 12, maxAgeWeeks: 20, category: .social, description: "Giggles and laughs in response to play", isPredefined: true),
+        Milestone(title: "Sits with support", minAgeWeeks: 16, maxAgeWeeks: 24, category: .motor, description: "Can sit upright when supported by pillows or hands", isPredefined: true),
+        Milestone(title: "Reaches for toys", minAgeWeeks: 12, maxAgeWeeks: 20, category: .motor, description: "Deliberately reaches for and grasps objects", isPredefined: true),
+        Milestone(title: "Rolls over", minAgeWeeks: 16, maxAgeWeeks: 28, category: .motor, description: "Rolls from tummy to back or back to tummy", isPredefined: true),
+        Milestone(title: "Babbles consonants", minAgeWeeks: 20, maxAgeWeeks: 32, category: .language, description: "Makes sounds like 'ba-ba' or 'da-da'", isPredefined: true),
+        Milestone(title: "Puts everything in mouth", minAgeWeeks: 16, maxAgeWeeks: 24, category: .sensory, description: "Explores objects by putting them in mouth", isPredefined: true),
+        
+        // 6-9 months
+        Milestone(title: "Sits without support", minAgeWeeks: 24, maxAgeWeeks: 36, category: .motor, description: "Sits independently without falling over", isPredefined: true),
+        Milestone(title: "Crawls or scoots", minAgeWeeks: 28, maxAgeWeeks: 40, category: .motor, description: "Moves around by crawling, scooting, or rolling", isPredefined: true),
+        Milestone(title: "Says 'mama' or 'dada'", minAgeWeeks: 28, maxAgeWeeks: 44, category: .language, description: "Says first words, may not be specific to parent yet", isPredefined: true),
+        Milestone(title: "Plays peek-a-boo", minAgeWeeks: 32, maxAgeWeeks: 44, category: .social, description: "Enjoys and participates in peek-a-boo games", isPredefined: true),
+        Milestone(title: "Pincer grasp", minAgeWeeks: 36, maxAgeWeeks: 48, category: .motor, description: "Picks up small objects with thumb and finger", isPredefined: true),
+        Milestone(title: "Eats finger foods", minAgeWeeks: 32, maxAgeWeeks: 44, category: .feeding, description: "Self-feeds with small pieces of soft food", isPredefined: true),
+        
+        // 9-12 months
+        Milestone(title: "Pulls to standing", minAgeWeeks: 36, maxAgeWeeks: 48, category: .motor, description: "Pulls themselves up to standing position", isPredefined: true),
+        Milestone(title: "Cruises along furniture", minAgeWeeks: 40, maxAgeWeeks: 52, category: .motor, description: "Walks while holding onto furniture for support", isPredefined: true),
+        Milestone(title: "Waves bye-bye", minAgeWeeks: 36, maxAgeWeeks: 48, category: .social, description: "Waves hand to say goodbye", isPredefined: true),
+        Milestone(title: "Responds to name", minAgeWeeks: 32, maxAgeWeeks: 44, category: .language, description: "Looks when you call their name", isPredefined: true),
+        Milestone(title: "Imitates sounds", minAgeWeeks: 36, maxAgeWeeks: 52, category: .language, description: "Copies sounds and gestures you make", isPredefined: true),
+        Milestone(title: "Drinks from cup", minAgeWeeks: 40, maxAgeWeeks: 60, category: .feeding, description: "Drinks from a sippy cup or regular cup with help", isPredefined: true),
+        
+        // 12-18 months (Toddler)
+        Milestone(title: "First steps", minAgeWeeks: 48, maxAgeWeeks: 72, category: .motor, description: "Takes first independent steps", isPredefined: true),
+        Milestone(title: "Says first words", minAgeWeeks: 44, maxAgeWeeks: 68, category: .language, description: "Uses words meaningfully (mama, dada, ball, etc.)", isPredefined: true),
+        Milestone(title: "Points at objects", minAgeWeeks: 48, maxAgeWeeks: 64, category: .language, description: "Points to show you things they want or find interesting", isPredefined: true),
+        Milestone(title: "Stacks blocks", minAgeWeeks: 52, maxAgeWeeks: 72, category: .cognitive, description: "Stacks 2-3 blocks on top of each other", isPredefined: true),
+        Milestone(title: "Shows affection", minAgeWeeks: 48, maxAgeWeeks: 68, category: .social, description: "Gives hugs, kisses, or shows other signs of affection", isPredefined: true),
+        Milestone(title: "Uses spoon", minAgeWeeks: 52, maxAgeWeeks: 78, category: .feeding, description: "Attempts to use a spoon to self-feed", isPredefined: true),
+        
+        // 18-24 months
+        Milestone(title: "Runs steadily", minAgeWeeks: 72, maxAgeWeeks: 96, category: .motor, description: "Runs without falling frequently", isPredefined: true),
+        Milestone(title: "Kicks a ball", minAgeWeeks: 78, maxAgeWeeks: 104, category: .motor, description: "Kicks a ball forward while walking", isPredefined: true),
+        Milestone(title: "Two-word phrases", minAgeWeeks: 78, maxAgeWeeks: 104, category: .language, description: "Combines words like 'more milk' or 'go car'", isPredefined: true),
+        Milestone(title: "Pretend play", minAgeWeeks: 72, maxAgeWeeks: 96, category: .cognitive, description: "Pretends to feed dolls, talk on phone, etc.", isPredefined: true),
+        Milestone(title: "Follows simple instructions", minAgeWeeks: 68, maxAgeWeeks: 88, category: .cognitive, description: "Follows one-step instructions like 'come here'", isPredefined: true),
+        Milestone(title: "Shows independence", minAgeWeeks: 78, maxAgeWeeks: 104, category: .social, description: "Wants to do things by themselves", isPredefined: true),
+        
+        // 2+ years
+        Milestone(title: "Jumps with both feet", minAgeWeeks: 96, maxAgeWeeks: 130, category: .motor, description: "Jumps off ground with both feet together", isPredefined: true),
+        Milestone(title: "Three-word sentences", minAgeWeeks: 104, maxAgeWeeks: 130, category: .language, description: "Uses sentences with 3+ words", isPredefined: true),
+        Milestone(title: "Sorts shapes", minAgeWeeks: 104, maxAgeWeeks: 130, category: .cognitive, description: "Sorts objects by shape, color, or size", isPredefined: true),
+        Milestone(title: "Plays with other children", minAgeWeeks: 104, maxAgeWeeks: 156, category: .social, description: "Engages in parallel or cooperative play", isPredefined: true),
+        Milestone(title: "Potty training", minAgeWeeks: 104, maxAgeWeeks: 208, category: .physical, description: "Shows interest in or begins potty training", isPredefined: true),
+    ]
     
     // Word tracking - loaded from storage
     @Published var words: [BabyWord] = [] {
@@ -192,7 +249,7 @@ class TotsDataManager: ObservableObject {
         }
         
         // Load widget settings
-        widgetEnabled = UserDefaults.standard.object(forKey: "widget_enabled") as? Bool ?? true
+        widgetEnabled = UserDefaults.standard.object(forKey: "widget_enabled") as? Bool ?? false
         
         // Load units preference
         useMetricUnits = UserDefaults.standard.object(forKey: "use_metric_units") as? Bool ?? true
@@ -207,9 +264,6 @@ class TotsDataManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: milestonesKey),
            let milestones = try? JSONDecoder().decode([Milestone].self, from: data) {
             self.milestones = milestones
-        } else {
-            // Initialize with default milestones if none exist
-            initializeDefaultMilestones()
         }
         
         // Load growth data
@@ -261,17 +315,6 @@ class TotsDataManager: ObservableObject {
         }
     }
     
-    private func initializeDefaultMilestones() {
-        milestones = [
-            Milestone(title: "First Smile", expectedAge: "6-8 weeks", category: .social, description: "First genuine social smile"),
-            Milestone(title: "Holds Head Up", expectedAge: "2-4 months", category: .motor, description: "Can hold head steady when upright"),
-            Milestone(title: "First Tooth", expectedAge: "6-10 months", category: .physical, description: "First tooth has broken through"),
-            Milestone(title: "Sits Without Support", expectedAge: "6-8 months", category: .motor, description: "Can sit upright without falling over"),
-            Milestone(title: "Says First Word", expectedAge: "8-12 months", category: .language, description: "First recognizable word like 'mama' or 'dada'"),
-            Milestone(title: "Crawls", expectedAge: "7-10 months", category: .motor, description: "Moves forward on hands and knees"),
-            Milestone(title: "Pulls to Stand", expectedAge: "9-12 months", category: .motor, description: "Pulls themselves up to standing position"),
-        ]
-    }
     
     private func calculateStats() {
         totalActivitiesLogged = recentActivities.count
@@ -616,21 +659,27 @@ class TotsDataManager: ObservableObject {
         if let index = milestones.firstIndex(where: { $0.id == milestone.id }) {
             milestones[index].isCompleted = true
             milestones[index].completedDate = Date()
-            
-            // Add milestone activity
-            let activity = TotsActivity(
-                type: .milestone,
-                time: Date(),
-                details: milestone.title,
-                mood: .happy,
-                notes: milestone.description
-            )
-            addActivity(activity)
-            
-            // Update development score
-            updateDevelopmentScore()
-            generateAIInsights()
+        } else if milestone.isPredefined {
+            // Add the predefined milestone as completed
+            var completedMilestone = milestone
+            completedMilestone.isCompleted = true
+            completedMilestone.completedDate = Date()
+            milestones.append(completedMilestone)
         }
+        
+        // Add milestone activity
+        let activity = TotsActivity(
+            type: .milestone,
+            time: Date(),
+            details: milestone.title,
+            mood: .happy,
+            notes: milestone.description
+        )
+        addActivity(activity)
+        
+        // Update development score
+        updateDevelopmentScore()
+        generateAIInsights()
     }
     
     // MARK: - Word Tracking
@@ -692,6 +741,41 @@ class TotsDataManager: ObservableObject {
     var wordsByCategory: [WordCategory: [BabyWord]] {
         return Dictionary(grouping: words) { $0.category }
     }
+    
+    // MARK: - Milestone Management
+    
+    func getRelevantMilestones() -> [Milestone] {
+        let babyAgeInWeeks = getBabyAgeInWeeks()
+        
+        // Get predefined milestones that are relevant for current age
+        let relevantPredefined = predefinedMilestones.filter { milestone in
+            milestone.isRelevantForAge(weeks: babyAgeInWeeks) &&
+            !milestones.contains { existing in existing.title == milestone.title }
+        }
+        
+        // Combine with user's custom milestones and completed ones
+        return (milestones + relevantPredefined).sorted { milestone1, milestone2 in
+            // Sort by: completed status (incomplete first), then by min age, then by title
+            if milestone1.isCompleted != milestone2.isCompleted {
+                return !milestone1.isCompleted && milestone2.isCompleted
+            }
+            if milestone1.minAgeWeeks != milestone2.minAgeWeeks {
+                return milestone1.minAgeWeeks < milestone2.minAgeWeeks
+            }
+            return milestone1.title < milestone2.title
+        }
+    }
+    
+    func getBabyAgeInWeeks() -> Int {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.weekOfYear], from: babyBirthDate, to: Date())
+        return max(0, components.weekOfYear ?? 0)
+    }
+    
+    func addMilestone(_ milestone: Milestone) {
+        milestones.append(milestone)
+    }
+    
     
     // MARK: - Growth Percentile Calculations
     
@@ -1441,34 +1525,65 @@ struct Milestone: Identifiable, Codable {
     let title: String
     var isCompleted: Bool
     var completedDate: Date?
-    let expectedAge: String
+    let minAgeWeeks: Int // Minimum age in weeks
+    let maxAgeWeeks: Int // Maximum age in weeks  
     let category: MilestoneCategory
     let description: String
+    let isPredefined: Bool
     
-    init(title: String, isCompleted: Bool = false, completedDate: Date? = nil, expectedAge: String, category: MilestoneCategory, description: String) {
+    init(title: String, isCompleted: Bool = false, completedDate: Date? = nil, minAgeWeeks: Int, maxAgeWeeks: Int, category: MilestoneCategory, description: String, isPredefined: Bool = false) {
         self.title = title
         self.isCompleted = isCompleted
         self.completedDate = completedDate
-        self.expectedAge = expectedAge
+        self.minAgeWeeks = minAgeWeeks
+        self.maxAgeWeeks = maxAgeWeeks
         self.category = category
         self.description = description
+        self.isPredefined = isPredefined
+    }
+    
+    var expectedAgeRange: String {
+        if minAgeWeeks == maxAgeWeeks {
+            return "\(minAgeWeeks) weeks"
+        } else if minAgeWeeks < 52 && maxAgeWeeks < 52 {
+            return "\(minAgeWeeks)-\(maxAgeWeeks) weeks"
+        } else {
+            let minMonths = minAgeWeeks / 4
+            let maxMonths = maxAgeWeeks / 4
+            if minMonths == maxMonths {
+                return "\(minMonths) months"
+            } else {
+                return "\(minMonths)-\(maxMonths) months"
+            }
+        }
+    }
+    
+    func isRelevantForAge(weeks: Int) -> Bool {
+        // Show milestones that are within 4 weeks of being due, or overdue
+        return weeks >= (minAgeWeeks - 4) && weeks <= (maxAgeWeeks + 8)
     }
 }
 
 enum MilestoneCategory: String, CaseIterable, Codable {
     case motor = "Motor Skills"
-    case language = "Language"
-    case social = "Social"
-    case cognitive = "Cognitive"
-    case physical = "Physical"
+    case language = "Language & Communication"
+    case social = "Social & Emotional"
+    case cognitive = "Cognitive & Learning"
+    case physical = "Physical Growth"
+    case feeding = "Feeding & Eating"
+    case sleep = "Sleep & Routine"
+    case sensory = "Sensory Development"
     
     var icon: String {
         switch self {
         case .motor: return "figure.walk"
-        case .language: return "message.fill"
-        case .social: return "heart.fill"
-        case .cognitive: return "brain.head.profile"
+        case .language: return "bubble.left.and.text.bubble.right.fill"
+        case .social: return "heart.2.fill"
+        case .cognitive: return "brain.head.profile.fill"
         case .physical: return "ruler.fill"
+        case .feeding: return "fork.knife"
+        case .sleep: return "moon.zzz.fill"
+        case .sensory: return "eye.fill"
         }
     }
     
@@ -1479,6 +1594,9 @@ enum MilestoneCategory: String, CaseIterable, Codable {
         case .social: return .pink
         case .cognitive: return .purple
         case .physical: return .orange
+        case .feeding: return .red
+        case .sleep: return .indigo
+        case .sensory: return .yellow
         }
     }
 }

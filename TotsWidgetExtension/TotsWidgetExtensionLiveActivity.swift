@@ -302,38 +302,8 @@ struct LockScreenCountdown: View {
     }
 }
 
-// MARK: - Regular Widget Configuration
+// MARK: - Regular Widget Configuration (Removed - replaced by TotsSummaryWidget)
 
-struct TotsWidget: Widget {
-    let kind: String = "TotsWidget"
-    
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: TotsWidgetProvider()) { entry in
-            TotsWidgetView(entry: entry)
-        }
-        .configurationDisplayName("Tots Countdown")
-        .description("Keep track of feeding, diaper, and sleep schedules.")
-        .supportedFamilies([]) // Empty array hides widget from home screen
-    }
-}
-
-struct TotsWidgetView: View {
-    let entry: TotsWidgetEntry
-    @Environment(\.widgetFamily) var widgetFamily
-    
-    var body: some View {
-        switch widgetFamily {
-        case .systemSmall:
-            TotsWidgetSmallView(entry: entry)
-        case .systemMedium:
-            TotsWidgetMediumView(entry: entry)
-        case .accessoryRectangular:
-            TotsWidgetLockScreenView(entry: entry)
-        default:
-            TotsWidgetSmallView(entry: entry)
-        }
-    }
-}
 
 // MARK: - Live Activity Attributes (Standalone for Widget Extension)
 public struct TotsLiveActivityAttributes: ActivityAttributes {

@@ -297,6 +297,31 @@ struct SettingsView: View {
             }
             .padding(.vertical, 12)
             
+            // Home Screen Widget toggle
+            HStack(spacing: 12) {
+                Image(systemName: "widget.small")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .frame(width: 24)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Home Screen Widget")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Text("Add Tots summary widget to your home screen")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Toggle("", isOn: $dataManager.widgetEnabled)
+                    .labelsHidden()
+            }
+            .padding(.vertical, 12)
+            
             SettingsRow(
                 icon: "target",
                 title: "Edit tracking goals",
