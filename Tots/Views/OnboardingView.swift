@@ -3,6 +3,7 @@ import MessageUI
 import UserNotifications
 import AuthenticationServices
 
+
 struct OnboardingView: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var currentStep = 0
@@ -28,23 +29,27 @@ struct OnboardingView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Progress indicator
-                progressIndicator
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
                 
-                // Content with scrollable navigation
-                TabView(selection: $currentStep) {
-                    appleSignInStep.tag(0)
-                    if showingSteps {
-                        babyDetailsStepWithNav.tag(1)
-                        goalsStepWithNav.tag(2)
-                        permissionsStepWithNav.tag(3)
+                VStack(spacing: 0) {
+                    // Progress indicator
+                    progressIndicator
+                    
+                    // Content with scrollable navigation
+                    TabView(selection: $currentStep) {
+                        appleSignInStep.tag(0)
+                        if showingSteps {
+                            babyDetailsStepWithNav.tag(1)
+                            goalsStepWithNav.tag(2)
+                            permissionsStepWithNav.tag(3)
+                        }
                     }
+                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                    .animation(.easeInOut, value: currentStep)
                 }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                .animation(.easeInOut, value: currentStep)
             }
-            .background(Color(.systemBackground))
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .sheet(isPresented: $showingEmailComposer) {
@@ -364,10 +369,9 @@ struct OnboardingView: View {
                         .font(.system(.body, design: .rounded))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(16)
+                        .liquidGlassCard()
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: 20)
                                 .stroke(babyName.isEmpty ? Color.clear : Color.purple.opacity(0.4), lineWidth: 2)
                                 .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty)
                         )
@@ -383,10 +387,9 @@ struct OnboardingView: View {
                         .datePickerStyle(CompactDatePickerStyle())
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(16)
+                        .liquidGlassCard()
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: 20)
                                 .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                         )
                 }

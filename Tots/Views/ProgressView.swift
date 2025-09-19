@@ -1,5 +1,6 @@
 import SwiftUI
 
+
 struct ProgressView: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var selectedTimeframe: TimeFrame = .thisWeek
@@ -19,24 +20,29 @@ struct ProgressView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Time frame selector
-                    timeFrameSelectorView
-                    
-                    // Key stats
-                    keyStatsView
-                    
-                    // Weekly overview
-                    weeklyOverviewView
-                    
-                    // Milestones
-                    milestonesView
-                    
-                    // Growth tracking
-                    growthView
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Time frame selector
+                        timeFrameSelectorView
+                        
+                        // Key stats
+                        keyStatsView
+                        
+                        // Weekly overview
+                        weeklyOverviewView
+                        
+                        // Milestones
+                        milestonesView
+                        
+                        // Growth tracking
+                        growthView
+                    }
+                    .padding()
                 }
-                .padding()
             }
             .navigationTitle("Progress")
             .navigationBarTitleDisplayMode(.large)

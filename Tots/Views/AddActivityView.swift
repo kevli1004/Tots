@@ -1,5 +1,6 @@
 import SwiftUI
 
+
 struct AddActivityView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: TotsDataManager
@@ -59,7 +60,11 @@ struct AddActivityView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                ScrollView {
                     VStack(spacing: 24) {
                         // Time selector
                         timeSelectorView
@@ -73,18 +78,9 @@ struct AddActivityView: View {
                         // Save button
                         saveButtonView
                     }
-                .padding()
+                    .padding()
+                }
             }
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(.secondarySystemGroupedBackground),
-                        Color(.systemGroupedBackground).opacity(0.3)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
                 .navigationTitle("Add \(selectedActivityType.name)")
                 .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -121,6 +117,12 @@ struct AddActivityView: View {
                         Image(systemName: "figure.child")
                             .font(.title2)
                             .foregroundColor(selectedActivityType.color)
+                    } else if selectedActivityType.rawValue == "DiaperIcon" {
+                        Image(selectedActivityType.rawValue)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 24, height: 24)
+                            .foregroundColor(selectedActivityType.color)
                     } else {
                         Text(selectedActivityType.rawValue)
                             .font(.title2)
@@ -150,9 +152,7 @@ struct AddActivityView: View {
             DatePicker("Activity Time", selection: $activityTime, displayedComponents: [.date, .hourAndMinute])
                 .datePickerStyle(CompactDatePickerStyle())
                 .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                .liquidGlassCard()
         }
     }
     
@@ -505,9 +505,7 @@ struct AddActivityView: View {
             
             TextField("Any additional details...", text: $notes, axis: .vertical)
                 .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                .liquidGlassCard()
                 .lineLimit(3...6)
         }
     }
@@ -521,8 +519,7 @@ struct AddActivityView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(isFormValid ? Color.black : Color(.systemGray4))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
+                .liquidGlassCard()
         }
         .disabled(!isFormValid)
     }

@@ -805,8 +805,8 @@ struct TotsActivity: Identifiable, Codable {
 
 enum ActivityType: String, CaseIterable, Codable {
     case feeding = "🍼"
-    case diaper = "🩲"
-    case sleep = "😴"
+    case diaper = "DiaperIcon"
+    case sleep = "moon.zzz.fill"
     case milestone = "🎉"
     case play = "🧸"
     case growth = "📏"
@@ -825,7 +825,7 @@ enum ActivityType: String, CaseIterable, Codable {
         var color: Color {
             switch self {
             case .feeding: return .pink
-            case .diaper: return .orange
+            case .diaper: return .white
             case .sleep: return .purple
             case .milestone: return .purple
             case .play: return .green

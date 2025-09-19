@@ -1,6 +1,7 @@
 import SwiftUI
 import CloudKit
 
+
 struct SettingsView: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var showingFamilyInvite = false
@@ -17,27 +18,31 @@ struct SettingsView: View {
     @State private var shareDelegate: ShareControllerDelegate?
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                headerView
-                
-                // Baby profile
-                babyProfileView
-                
-                // Family sharing
-                familySharingView
-                
-                // Settings options
-                settingsOptionsView
-                
-                // Support section
-                supportSectionView
+        ZStack {
+            // Liquid animated background
+            LiquidBackground()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    headerView
+                    
+                    // Baby profile
+                    babyProfileView
+                    
+                    // Family sharing
+                    familySharingView
+                    
+                    // Settings options
+                    settingsOptionsView
+                    
+                    // Support section
+                    supportSectionView
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
         }
-        .background(Color(.systemBackground))
         .sheet(isPresented: $showingFamilyInvite) {
             FamilyInviteView()
         }
@@ -172,8 +177,7 @@ struct SettingsView: View {
                         }
                     }
                     .padding(16)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                    .liquidGlassCard()
                 }
                 .disabled(isSettingUpCloudKit)
                 
@@ -213,8 +217,7 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     .padding(16)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                    .liquidGlassCard()
                 }
                 
                 // Single Share Button

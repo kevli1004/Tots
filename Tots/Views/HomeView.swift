@@ -1,5 +1,45 @@
 import SwiftUI
 
+// MARK: - Liquid Glass Effects
+extension View {
+    func liquidGlassCard(cornerRadius: CGFloat = 20, shadowRadius: CGFloat = 10) -> some View {
+        self
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.regularMaterial)
+                    .shadow(color: .black.opacity(0.1), radius: shadowRadius, x: 0, y: 4)
+            }
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(.white.opacity(0.3), lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+    }
+}
+
+struct LiquidBackground: View {
+    @State private var animateGradient = false
+    
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color.blue.opacity(0.4),
+                Color.purple.opacity(0.35),
+                Color.pink.opacity(0.3),
+                Color.orange.opacity(0.35)
+            ],
+            startPoint: animateGradient ? .topLeading : .bottomTrailing,
+            endPoint: animateGradient ? .bottomTrailing : .topLeading
+        )
+        .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.easeInOut(duration: 20).repeatForever(autoreverses: true)) {
+                animateGradient.toggle()
+            }
+        }
+    }
+}
+
 struct HomeView: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var showingDatePicker = false
@@ -10,29 +50,24 @@ struct HomeView: View {
     
     var body: some View {
         NavigationView {
-        ScrollView {
-                VStack(spacing: 24) {
-                    // Countdown timers
-                    countdownView
-                    
-                    // Today's summary with goals
-                    todaySummaryWithGoalsView
-                    
-                    // Recent activities
-                    recentActivitiesView
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Countdown timers
+                        countdownView
+                        
+                        // Today's summary with goals
+                        todaySummaryWithGoalsView
+                        
+                        // Recent activities
+                        recentActivitiesView
+                    }
+                    .padding()
                 }
-                .padding()
             }
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(.secondarySystemGroupedBackground),
-                        Color(.systemGroupedBackground).opacity(0.3)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
                 .navigationTitle("")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -55,9 +90,16 @@ struct HomeView: View {
                     Button(action: {
                         showingActivitySelector = true
                     }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.primary)
+                        ZStack {
+                            Circle()
+                                .fill(.regularMaterial)
+                                .frame(width: 40, height: 40)
+                                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                            
+                            Image(systemName: "plus")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.primary)
+                        }
                     }
                 }
             }
@@ -149,6 +191,12 @@ struct HomeView: View {
                                                     Image(systemName: "figure.child")
                                                         .font(.system(size: 24, weight: .medium))
                                                         .foregroundColor(type.color)
+                                                } else if type.rawValue == "DiaperIcon" {
+                                                    Image(type.rawValue)
+                                                        .resizable()
+                                                        .aspectRatio(contentMode: .fit)
+                                                        .frame(width: 28, height: 28)
+                                                        .foregroundColor(type.color)
                                                 } else {
                                                     Text(type.rawValue)
                                                         .font(.system(size: 28))
@@ -189,10 +237,10 @@ struct HomeView: View {
                         }
                         .background(
                             RoundedRectangle(cornerRadius: 32)
-                                .fill(.regularMaterial)
+                                .fill(.thickMaterial)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 32)
-                                        .stroke(.quaternary, lineWidth: 1)
+                                        .stroke(.white.opacity(0.2), lineWidth: 1)
                                 )
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 32))
@@ -227,11 +275,11 @@ struct HomeView: View {
                 )
                 
                 CountdownCard(
-                    icon: "🩲",
+                    icon: "DiaperIcon",
                     title: "Diaper",
                     countdown: dataManager.formatCountdown(dataManager.nextDiaperCountdown),
                     time: dataManager.nextDiaperTime,
-                    color: .orange
+                    color: .white
                 )
                 
                 CountdownCard(
@@ -306,11 +354,11 @@ struct HomeView: View {
                 )
                 
                 SummaryGoalCard(
-                    icon: "🩲",
+                    icon: "DiaperIcon",
                     title: "Diapers",
                     current: dataManager.todayDiapers,
                     goal: 6,
-                    color: .orange
+                    color: .white
                 )
                 
                 SummaryGoalCard(
@@ -476,7 +524,7 @@ struct CountdownCard: View {
     }
     
     private var isDiaperIcon: Bool {
-        return icon == "🩲"
+        return icon == "DiaperIcon"
     }
     
     var body: some View {
@@ -487,34 +535,12 @@ struct CountdownCard: View {
                     .font(.title2)
                     .foregroundColor(color)
             } else if isDiaperIcon {
-                // Custom white diaper with black outline
-                Text(icon)
-                    .font(.title2)
+                // Custom SVG diaper icon
+                Image(icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 24, height: 24)
                     .foregroundColor(.white)
-                    .background(
-                        Text(icon)
-                            .font(.title2)
-                            .foregroundColor(.black)
-                            .offset(x: 1, y: 1)
-                    )
-                    .background(
-                        Text(icon)
-                            .font(.title2)
-                            .foregroundColor(.black)
-                            .offset(x: -1, y: -1)
-                    )
-                    .background(
-                        Text(icon)
-                            .font(.title2)
-                            .foregroundColor(.black)
-                            .offset(x: 1, y: -1)
-                    )
-                    .background(
-                        Text(icon)
-                            .font(.title2)
-                            .foregroundColor(.black)
-                            .offset(x: -1, y: 1)
-                    )
             } else {
                 // Regular Emoji
                 Text(icon)
@@ -543,9 +569,7 @@ struct CountdownCard: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
         .padding(.horizontal, 16)
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
+        .liquidGlassCard(cornerRadius: 20, shadowRadius: 15)
     }
 }
 
@@ -556,7 +580,7 @@ struct SummaryCard: View {
     let color: Color
     
     private var isDiaperIcon: Bool {
-        return icon == "🩲"
+        return icon == "DiaperIcon"
     }
     
     var body: some View {
@@ -568,34 +592,12 @@ struct SummaryCard: View {
                         .foregroundColor(color)
                         .font(.title2)
                 } else if isDiaperIcon {
-                    // Custom white diaper with black outline
-                    Text(icon)
-                        .font(.title2)
+                    // Custom SVG diaper icon
+                    Image(icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 24, height: 24)
                         .foregroundColor(.white)
-                        .background(
-                            Text(icon)
-                                .font(.title2)
-                                .foregroundColor(.black)
-                                .offset(x: 1, y: 1)
-                        )
-                        .background(
-                            Text(icon)
-                                .font(.title2)
-                                .foregroundColor(.black)
-                                .offset(x: -1, y: -1)
-                        )
-                        .background(
-                            Text(icon)
-                                .font(.title2)
-                                .foregroundColor(.black)
-                                .offset(x: 1, y: -1)
-                        )
-                        .background(
-                            Text(icon)
-                                .font(.title2)
-                                .foregroundColor(.black)
-                                .offset(x: -1, y: 1)
-                        )
                 } else {
                     // Regular Emoji
                     Text(icon)
@@ -623,9 +625,7 @@ struct SummaryCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
+        .liquidGlassCard(cornerRadius: 16, shadowRadius: 12)
     }
 }
 
@@ -647,7 +647,7 @@ struct SummaryGoalCard: View {
     }
     
     private var isDiaperIcon: Bool {
-        return icon == "🩲"
+        return icon == "DiaperIcon"
     }
     
     private var currentValue: String {
@@ -700,34 +700,12 @@ struct SummaryGoalCard: View {
                         .foregroundColor(color)
                         .font(.title2)
                 } else if isDiaperIcon {
-                    // Custom white diaper with black outline
-                    Text(icon)
-                        .font(.title2)
+                    // Custom SVG diaper icon
+                    Image(icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 24, height: 24)
                         .foregroundColor(.white)
-                        .background(
-                            Text(icon)
-                                .font(.title2)
-                                .foregroundColor(.black)
-                                .offset(x: 1, y: 1)
-                        )
-                        .background(
-                            Text(icon)
-                                .font(.title2)
-                                .foregroundColor(.black)
-                                .offset(x: -1, y: -1)
-                        )
-                        .background(
-                            Text(icon)
-                                .font(.title2)
-                                .foregroundColor(.black)
-                                .offset(x: 1, y: -1)
-                        )
-                        .background(
-                            Text(icon)
-                                .font(.title2)
-                                .foregroundColor(.black)
-                                .offset(x: -1, y: 1)
-                        )
                 } else {
                     // Regular Emoji
                     Text(icon)
@@ -776,9 +754,7 @@ struct SummaryGoalCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
+        .liquidGlassCard(cornerRadius: 16, shadowRadius: 12)
     }
 }
 
@@ -836,35 +812,18 @@ struct ActivityRow: View {
                 .frame(width: 40, height: 40)
                 .overlay(
                     Group {
-                        if activity.type.rawValue == "🩲" {
-                            // Custom white diaper with black outline
-                            Text(activity.type.rawValue)
-                                .font(.caption)
+                        if activity.type.rawValue == "DiaperIcon" {
+                            // Custom SVG diaper icon
+                            Image(activity.type.rawValue)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 16, height: 16)
                                 .foregroundColor(.white)
-                                .background(
-                                    Text(activity.type.rawValue)
-                                        .font(.caption)
-                                        .foregroundColor(.black)
-                                        .offset(x: 0.5, y: 0.5)
-                                )
-                                .background(
-                                    Text(activity.type.rawValue)
-                                        .font(.caption)
-                                        .foregroundColor(.black)
-                                        .offset(x: -0.5, y: -0.5)
-                                )
-                                .background(
-                                    Text(activity.type.rawValue)
-                                        .font(.caption)
-                                        .foregroundColor(.black)
-                                        .offset(x: 0.5, y: -0.5)
-                                )
-                                .background(
-                                    Text(activity.type.rawValue)
-                                        .font(.caption)
-                                        .foregroundColor(.black)
-                                        .offset(x: -0.5, y: 0.5)
-                                )
+                        } else if activity.type.rawValue == "moon.zzz.fill" {
+                            // SF Symbol sleep icon
+                            Image(systemName: activity.type.rawValue)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white)
                         } else {
                             Text(activity.type.rawValue)
                                 .font(.caption)
@@ -918,24 +877,28 @@ struct DatePickerHistoryView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Horizontal date selector
-                dateScrollerView
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
                 
-                        Divider()
-                
-                // Scrollable multi-day history
-                ScrollViewReader { proxy in
-                    ScrollView(showsIndicators: false) {
-                        LazyVStack(spacing: 0) {
-                            ForEach(historyDates, id: \.self) { date in
-                                DayHistoryCard(date: date)
-                                    .id(date)
-                                    .environmentObject(dataManager)
+                VStack(spacing: 0) {
+                    // Horizontal date selector
+                    dateScrollerView
+                    
+                            Divider()
+                    
+                    // Scrollable multi-day history
+                    ScrollViewReader { proxy in
+                        ScrollView(showsIndicators: false) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(historyDates, id: \.self) { date in
+                                    DayHistoryCard(date: date)
+                                        .id(date)
+                                        .environmentObject(dataManager)
+                                }
                             }
+                            .padding(.vertical, 8)
                         }
-                        .padding(.vertical, 8)
-                    }
                     .onAppear {
                         // Scroll to selected date
                         if let scrollDate = scrollToDate {
@@ -952,6 +915,7 @@ struct DatePickerHistoryView: View {
                         }
                     }
                 }
+            }
             }
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.inline)
@@ -1105,7 +1069,7 @@ struct DayHistoryCard: View {
                             StatPill(icon: "😴", value: "\(String(format: "%.1f", dayStats.sleepHours))h")
                         }
                         if dayStats.diapers > 0 {
-                            StatPill(icon: "🩲", value: "\(dayStats.diapers)")
+                            StatPill(icon: "DiaperIcon", value: "\(dayStats.diapers)")
                         }
                     }
                 }
@@ -1138,40 +1102,18 @@ struct StatPill: View {
     let value: String
     
     private var isDiaperIcon: Bool {
-        return icon == "🩲"
+        return icon == "DiaperIcon"
     }
     
     var body: some View {
         HStack(spacing: 4) {
             if isDiaperIcon {
-                // Custom white diaper with black outline
-                Text(icon)
-                    .font(.caption2)
+                // Custom SVG diaper icon
+                Image(icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 12, height: 12)
                     .foregroundColor(.white)
-                    .background(
-                        Text(icon)
-                            .font(.caption2)
-                            .foregroundColor(.black)
-                            .offset(x: 0.5, y: 0.5)
-                    )
-                    .background(
-                        Text(icon)
-                            .font(.caption2)
-                            .foregroundColor(.black)
-                            .offset(x: -0.5, y: -0.5)
-                    )
-                    .background(
-                        Text(icon)
-                            .font(.caption2)
-                            .foregroundColor(.black)
-                            .offset(x: 0.5, y: -0.5)
-                    )
-                    .background(
-                        Text(icon)
-                            .font(.caption2)
-                            .foregroundColor(.black)
-                            .offset(x: -0.5, y: 0.5)
-                    )
             } else {
                 Text(icon)
                     .font(.caption2)
@@ -1182,9 +1124,7 @@ struct StatPill: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
+        .liquidGlassCard(cornerRadius: 16, shadowRadius: 12)
     }
 }
 
@@ -1213,8 +1153,21 @@ struct TimelineActivityRow: View {
             // Activity content
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(activity.type.rawValue)
-                        .font(.caption2)
+                    if activity.type.rawValue == "DiaperIcon" {
+                        Image(activity.type.rawValue)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 12, height: 12)
+                            .foregroundColor(.primary)
+                    } else if activity.type.rawValue == "moon.zzz.fill" {
+                        // SF Symbol sleep icon
+                        Image(systemName: activity.type.rawValue)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.primary)
+                    } else {
+                        Text(activity.type.rawValue)
+                            .font(.caption2)
+                    }
                     
                     Text(activity.type.name)
                         .font(.subheadline)
