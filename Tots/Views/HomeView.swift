@@ -112,7 +112,7 @@ struct HomeView: View {
             if let editingActivity = editingActivity {
                 AddActivityView(editingActivity: editingActivity)
             } else {
-                AddActivityView(preselectedType: selectedActivityType)
+            AddActivityView(preselectedType: selectedActivityType)
             }
         }
         .onChange(of: showingAddActivity) { isShowing in
@@ -556,8 +556,8 @@ struct CountdownCard: View {
             if !isFlipped {
                 VStack(spacing: 14) {
                     // Icon section
-                    if icon.contains(".") {
-                        Image(systemName: icon)
+            if icon.contains(".") {
+                Image(systemName: icon)
                             .font(.title)
                             .foregroundColor(color)
                     } else if isDiaperIcon {
@@ -612,26 +612,26 @@ struct CountdownCard: View {
                     // Same icon but smaller
                     if icon.contains(".") {
                         Image(systemName: icon)
-                            .font(.title2)
-                            .foregroundColor(color)
-                    } else if isDiaperIcon {
-                        Image(icon)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 24, height: 24)
-                            .foregroundColor(.white)
-                    } else {
-                        Text(icon)
-                            .font(.title2)
-                    }
-                    
-                    Text(title)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                        .textCase(.uppercase)
-                        .tracking(0.5)
-                    
+                    .font(.title2)
+                    .foregroundColor(color)
+            } else if isDiaperIcon {
+                Image(icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 24, height: 24)
+                    .foregroundColor(.white)
+            } else {
+                Text(icon)
+                    .font(.title2)
+            }
+            
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
+            
                     VStack(spacing: 8) {
                         // Today's stats specific to activity type
                         if title.lowercased() == "feed" {
@@ -644,7 +644,7 @@ struct CountdownCard: View {
                                     Text("\(getTodayActualFeedings())")
                                         .font(.title2)
                                         .fontWeight(.bold)
-                                        .foregroundColor(color)
+                .foregroundColor(color)
                                     Text("feeds")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
@@ -659,7 +659,7 @@ struct CountdownCard: View {
                                         .fontWeight(.bold)
                                         .foregroundColor(color)
                                     Text("consumed")
-                                        .font(.caption2)
+                    .font(.caption2)
                                         .foregroundColor(.secondary)
                                 }
                             }
@@ -716,7 +716,7 @@ struct CountdownCard: View {
                                 Text("Total: \(dataManager.todayDiapers)")
                                     .font(.caption)
                                     .foregroundColor(color)
-                                    .fontWeight(.medium)
+                    .fontWeight(.medium)
                             }
                         }
                         
@@ -1779,6 +1779,10 @@ struct MilestonesView: View {
                 ImprovedAddMilestoneView()
                     .environmentObject(dataManager)
             }
+            .onTapGesture {
+                // Dismiss keyboard when tapping outside search field
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
         }
     }
     
@@ -1987,26 +1991,31 @@ struct AgeGroupChip: View {
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: ageGroup.icon)
-                    .font(.caption)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(isSelected ? .white : ageGroup.color)
+                
                 Text(ageGroup.rawValue)
                     .font(.subheadline)
-                    .fontWeight(.medium)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isSelected ? .white : .primary)
             }
-            .foregroundColor(isSelected ? .white : ageGroup.color)
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? ageGroup.color : ageGroup.color.opacity(0.1))
+                RoundedRectangle(cornerRadius: 25)
+                    .fill(isSelected ? ageGroup.color : Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(ageGroup.color, lineWidth: isSelected ? 0 : 2)
+                RoundedRectangle(cornerRadius: 25)
+                    .stroke(isSelected ? Color.clear : ageGroup.color.opacity(0.2), lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isSelected ? 1.05 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
 
@@ -2141,26 +2150,9 @@ struct ImprovedAddMilestoneView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 16) {
-                    Image(systemName: "star.circle.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.blue)
-                    
-                    VStack(spacing: 8) {
-                        Text("Add Custom Milestone")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                        
-                        Text("Track special moments unique to your baby's journey")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-                .padding(.top, 20)
+            ZStack {
+                // Background
+                LiquidBackground()
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -2187,6 +2179,8 @@ struct ImprovedAddMilestoneView: View {
                                     .font(.body)
                             }
                         }
+                        .padding(20)
+                        .liquidGlassCard()
                         
                         // Age Range
                         VStack(alignment: .leading, spacing: 16) {
@@ -2232,49 +2226,48 @@ struct ImprovedAddMilestoneView: View {
                                 }
                             }
                         }
+                        .padding(20)
+                        .liquidGlassCard()
+                        
+                        // Save button
+                        Button("Add Milestone") {
+                            let milestone = Milestone(
+                                title: customTitle,
+                                minAgeWeeks: minAgeWeeks,
+                                maxAgeWeeks: max(minAgeWeeks, maxAgeWeeks),
+                                category: .motor, // Default category since we removed selection
+                                description: customDescription.isEmpty ? "Custom milestone" : customDescription
+                            )
+                            
+                            dataManager.addMilestone(milestone)
+                            dismiss()
+                        }
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(.blue)
+                        .cornerRadius(16)
+                        .disabled(customTitle.isEmpty)
+                        .opacity(customTitle.isEmpty ? 0.6 : 1.0)
                     }
-                    .padding(.horizontal, 20)
+                    .padding()
                 }
-                
-                // Action Buttons
-                HStack(spacing: 16) {
+            }
+            .navigationTitle("Add Custom Milestone")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color(.systemGray5))
-                    .cornerRadius(16)
-                    
-                    Button("Add Milestone") {
-                        let milestone = Milestone(
-                            title: customTitle,
-                            minAgeWeeks: minAgeWeeks,
-                            maxAgeWeeks: max(minAgeWeeks, maxAgeWeeks),
-                            category: .motor, // Default category since we removed selection
-                            description: customDescription.isEmpty ? "Custom milestone" : customDescription
-                        )
-                        
-                        dataManager.addMilestone(milestone)
-                        dismiss()
-                    }
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(.blue)
-                    .cornerRadius(16)
-                    .disabled(customTitle.isEmpty)
-                    .opacity(customTitle.isEmpty ? 0.6 : 1.0)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
             }
-            .navigationBarHidden(true)
+            .onTapGesture {
+                // Dismiss keyboard when tapping outside
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
         }
     }
 }
