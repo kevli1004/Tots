@@ -752,7 +752,7 @@ class TotsDataManager: ObservableObject {
     
     func startCountdownTimer() {
         countdownTimer?.invalidate()
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
                 self?.updateCountdowns()
             }

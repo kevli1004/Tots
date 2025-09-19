@@ -506,6 +506,7 @@ struct CountdownCard: View {
     let color: Color
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var isFlashing = false
+    @State private var isFlipped = false
     
     private var timeString: String {
         guard let time = time else { return "" }
@@ -519,7 +520,7 @@ struct CountdownCard: View {
     }
     
     private var countdownText: String {
-        return dataManager.formatCountdownWithSeconds(countdownInterval)
+        return dataManager.formatCountdown(countdownInterval)
     }
     
     private var isDue: Bool {
@@ -527,73 +528,209 @@ struct CountdownCard: View {
     }
     
     var body: some View {
-        VStack(spacing: 14) {
-            // Icon section - larger and more prominent
-            if icon.contains(".") {
-                // SF Symbol
-                Image(systemName: icon)
-                    .font(.title)
-                    .foregroundColor(color)
-            } else if isDiaperIcon {
-                // Custom SVG diaper icon
-                Image(icon)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 32, height: 32)
-                    .foregroundColor(.white)
-            } else {
-                // Regular Emoji
-                Text(icon)
-                    .font(.title)
-            }
-            
-            // Title
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.5)
-            
-            // Main countdown display - larger and more prominent
-            VStack(spacing: 4) {
-                Text(countdownText)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(isDue ? .red : color)
-                    .opacity(isDue && isFlashing ? 0.3 : 1.0)
-                    .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isFlashing)
-                
-                // Show "until next" label for better context
-                if !isDue {
-                    Text("until next")
-                        .font(.caption2)
+        ZStack {
+            // Front side - Countdown
+            if !isFlipped {
+                VStack(spacing: 14) {
+                    // Icon section
+                    if icon.contains(".") {
+                        Image(systemName: icon)
+                            .font(.title)
+                            .foregroundColor(color)
+                    } else if isDiaperIcon {
+                        Image(icon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 32, height: 32)
+                            .foregroundColor(.white)
+                    } else {
+                        Text(icon)
+                            .font(.title)
+                    }
+                    
+                    Text(title)
+                        .font(.caption)
+                        .fontWeight(.medium)
                         .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                    
+                    VStack(spacing: 4) {
+                        if isDue {
+                            Text("DUE")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.red)
+                                .opacity(isFlashing ? 0.3 : 1.0)
+                                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isFlashing)
+                        } else {
+                            Text(countdownText)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(color)
+                            
+                            Text("until next \(title.lowercased())")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fontWeight(.medium)
+                        }
+                    }
+                    
+                    // Tap hint
+                    Text("tap for details")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
                         .fontWeight(.medium)
                 }
             }
-            
-            // Target time display
-            if !timeString.isEmpty && !isDue {
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Text(timeString)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+            // Back side - Activity Details
+            else {
+                VStack(spacing: 14) {
+                    // Same icon but smaller
+                    if icon.contains(".") {
+                        Image(systemName: icon)
+                            .font(.title2)
+                            .foregroundColor(color)
+                    } else if isDiaperIcon {
+                        Image(icon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 24, height: 24)
+                            .foregroundColor(.white)
+                    } else {
+                        Text(icon)
+                            .font(.title2)
+                    }
+                    
+                    Text(title)
+                        .font(.caption)
                         .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                    
+                    VStack(spacing: 8) {
+                        // Today's stats specific to activity type
+                        if title.lowercased() == "feed" {
+                            // Feeding stats
+                            HStack(spacing: 16) {
+                                VStack(spacing: 2) {
+                                    Text("Today")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("\(getTodayActualFeedings())")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(color)
+                                    Text("feeds")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                VStack(spacing: 2) {
+                                    Text("Estimated")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("\(getTodayRealisticOz()) oz")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(color)
+                                    Text("consumed")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            // Calories estimate
+                            Text("\(getTodayRealisticOz() * 20) calories")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.orange)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(6)
+                                
+                        } else {
+                            // Diaper stats breakdown
+                            VStack(spacing: 6) {
+                                Text("Today's Diapers")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                HStack(spacing: 12) {
+                                    VStack(spacing: 2) {
+                                        Text("\(getTodayPooDiapers())")
+                                            .font(.subheadline)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.brown)
+                                        Text("poo")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    VStack(spacing: 2) {
+                                        Text("\(getTodayPeeDiapers())")
+                                            .font(.subheadline)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.blue)
+                                        Text("pee")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    VStack(spacing: 2) {
+                                        Text("\(getTodayMixedDiapers())")
+                                            .font(.subheadline)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.purple)
+                                        Text("mixed")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                
+                                Text("Total: \(dataManager.todayDiapers)")
+                                    .font(.caption)
+                                    .foregroundColor(color)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        
+                        // Last activity time
+                        if let lastActivityTime = getLastActivityTime() {
+                            Text("Last \(title.lowercased()): \(lastActivityTime)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
             }
         }
         .frame(maxWidth: .infinity)
+        .frame(height: 160) // Fixed height for consistent flip animation
         .padding(.vertical, 24)
         .padding(.horizontal, 20)
-        .liquidGlassCard(cornerRadius: 20, shadowRadius: 15)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.white.opacity(0.9))
+                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 4)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(.white.opacity(0.3), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .rotation3DEffect(
+            .degrees(isFlipped ? 180 : 0),
+            axis: (x: 0, y: 1, z: 0)
+        )
+        .scaleEffect(x: isFlipped ? -1 : 1, y: 1) // Fix mirroring on back side
+        .onTapGesture {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                isFlipped.toggle()
+            }
+        }
         .onChange(of: isDue) { newValue in
             if newValue {
                 isFlashing = true
@@ -601,6 +738,134 @@ struct CountdownCard: View {
                 isFlashing = false
             }
         }
+    }
+    
+    private func getLastActivityTime() -> String? {
+        let activityType: ActivityType
+        switch title.lowercased() {
+        case "feed":
+            activityType = .feeding
+        case "diaper":
+            activityType = .diaper
+        default:
+            return nil
+        }
+        
+        if let lastActivity = dataManager.recentActivities.first(where: { $0.type == activityType }) {
+            let timeAgo = Date().timeIntervalSince(lastActivity.time)
+            let hours = Int(timeAgo) / 3600
+            let minutes = Int(timeAgo) % 3600 / 60
+            
+            if hours > 0 {
+                return "\(hours)h \(minutes)m ago"
+            } else {
+                return "\(minutes)m ago"
+            }
+        }
+        return nil
+    }
+    
+    private func getAverageInterval() -> String {
+        switch title.lowercased() {
+        case "feed":
+            return "3 hours"
+        case "diaper":
+            return "2.5 hours"
+        default:
+            return "N/A"
+        }
+    }
+    
+    private func getTodayOz() -> Int {
+        // Use the dataManager's todayFeedings count (which includes demo data)
+        // Estimate 3-4 oz per feeding for average baby
+        return dataManager.todayFeedings * 3
+    }
+    
+    private func getTodayCalories() -> Int {
+        // Breast milk/formula has about 20 calories per oz
+        return getTodayOz() * 20
+    }
+    
+    private func getTodayActualFeedings() -> Int {
+        // Use the dataManager's todayFeedings count for consistency
+        return dataManager.todayFeedings
+    }
+    
+    private func getTodayRealisticOz() -> Int {
+        // Get actual feeding activities for today
+        let today = Calendar.current.dateInterval(of: .day, for: Date())?.start ?? Date()
+        let todayFeedingActivities = dataManager.recentActivities.filter { 
+            $0.type == .feeding && Calendar.current.isDate($0.time, inSameDayAs: today)
+        }
+        
+        var totalOz = 0
+        
+        // Extract actual oz amounts from activity details
+        for activity in todayFeedingActivities {
+            let details = activity.details.lowercased()
+            
+            // Look for patterns like "4 oz", "3.5 oz", "2oz", etc.
+            let ozPattern = #"(\d+(?:\.\d+)?)\s*oz"#
+            if let regex = try? NSRegularExpression(pattern: ozPattern),
+               let match = regex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+               let range = Range(match.range(at: 1), in: details) {
+                if let ozAmount = Double(String(details[range])) {
+                    totalOz += Int(ozAmount)
+                }
+            } else {
+                // Fallback to reasonable estimate if no oz found in details
+                totalOz += 3
+            }
+        }
+        
+        // If no actual activities, fall back to demo calculation
+        if todayFeedingActivities.isEmpty {
+            return dataManager.todayFeedings * 3
+        }
+        
+        return totalOz
+    }
+    
+    private func getTodayPooDiapers() -> Int {
+        // Get today's diaper activities and count those with poo
+        let today = Calendar.current.dateInterval(of: .day, for: Date())?.start ?? Date()
+        let todayDiaperActivities = dataManager.recentActivities.filter { 
+            $0.type == .diaper && Calendar.current.isDate($0.time, inSameDayAs: today)
+        }
+        
+        return todayDiaperActivities.filter { 
+            $0.details.lowercased().contains("poo") || $0.details.lowercased().contains("💩") || $0.details.lowercased().contains("dirty")
+        }.count
+    }
+    
+    private func getTodayPeeDiapers() -> Int {
+        // Get today's diaper activities and count those with only pee
+        let today = Calendar.current.dateInterval(of: .day, for: Date())?.start ?? Date()
+        let todayDiaperActivities = dataManager.recentActivities.filter { 
+            $0.type == .diaper && Calendar.current.isDate($0.time, inSameDayAs: today)
+        }
+        
+        return todayDiaperActivities.filter { activity in
+            let details = activity.details.lowercased()
+            return (details.contains("pee") || details.contains("💧") || details.contains("wet")) && 
+                   !details.contains("poo") && !details.contains("💩") && !details.contains("dirty")
+        }.count
+    }
+    
+    private func getTodayMixedDiapers() -> Int {
+        // Get today's diaper activities and count those with both
+        let today = Calendar.current.dateInterval(of: .day, for: Date())?.start ?? Date()
+        let todayDiaperActivities = dataManager.recentActivities.filter { 
+            $0.type == .diaper && Calendar.current.isDate($0.time, inSameDayAs: today)
+        }
+        
+        return todayDiaperActivities.filter { activity in
+            let details = activity.details.lowercased()
+            return (details.contains("mixed") || details.contains("both") || 
+                   (details.contains("poo") && details.contains("pee")) ||
+                   (details.contains("💩") && details.contains("💧")))
+        }.count
     }
 }
 
