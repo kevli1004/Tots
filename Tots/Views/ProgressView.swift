@@ -172,21 +172,45 @@ struct ProgressView: View {
     
     private var growthView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Growth")
-                .font(.headline)
-                .fontWeight(.semibold)
+            HStack {
+                Text("Growth")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                // Unit toggle
+                HStack(spacing: 8) {
+                    Text("cm/kg")
+                        .font(.caption)
+                        .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
+                        .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
+                    
+                    Toggle("", isOn: Binding(
+                        get: { !dataManager.useMetricUnits },
+                        set: { dataManager.useMetricUnits = !$0 }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .scaleEffect(0.8)
+                    
+                    Text("in/lb")
+                        .font(.caption)
+                        .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
+                        .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
+                }
+            }
             
             HStack(spacing: 16) {
                 GrowthCard(
                     title: "Weight",
-                    value: "\(String(format: "%.1f", dataManager.currentWeight)) kg",
+                    value: dataManager.formatWeight(dataManager.currentWeight),
                     subtitle: "75th percentile",
                     color: .green
                 )
                 
                 GrowthCard(
                     title: "Height",
-                    value: "\(String(format: "%.1f", dataManager.growthData.last?.height ?? 68.5)) cm",
+                    value: dataManager.formatHeight(dataManager.growthData.last?.height ?? 68.5),
                     subtitle: "82nd percentile",
                     color: .blue
                 )

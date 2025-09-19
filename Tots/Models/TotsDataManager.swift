@@ -37,6 +37,13 @@ class TotsDataManager: ObservableObject {
         }
     }
     
+    // Units preference
+    @Published var useMetricUnits: Bool = true {
+        didSet {
+            UserDefaults.standard.set(useMetricUnits, forKey: "use_metric_units")
+        }
+    }
+    
     @Published var babyName: String = "" {
         didSet {
             UserDefaults.standard.set(babyName, forKey: babyNameKey)
@@ -113,6 +120,40 @@ class TotsDataManager: ObservableObject {
         growthData.last?.weight ?? 14.2
     }
     
+    // MARK: - Unit Conversion Helpers
+    
+    func formatWeight(_ weightInKg: Double) -> String {
+        if useMetricUnits {
+            return String(format: "%.1f kg", weightInKg)
+        } else {
+            let weightInLbs = weightInKg * 2.20462
+            return String(format: "%.1f lbs", weightInLbs)
+        }
+    }
+    
+    func formatHeight(_ heightInCm: Double) -> String {
+        if useMetricUnits {
+            return String(format: "%.1f cm", heightInCm)
+        } else {
+            let heightInInches = heightInCm / 2.54
+            return String(format: "%.1f in", heightInInches)
+        }
+    }
+    
+    func convertWeightToKg(_ weight: Double, fromImperial: Bool = false) -> Double {
+        if fromImperial {
+            return weight / 2.20462
+        }
+        return weight
+    }
+    
+    func convertHeightToCm(_ height: Double, fromImperial: Bool = false) -> Double {
+        if fromImperial {
+            return height * 2.54
+        }
+        return height
+    }
+    
     init() {
         loadData()
         updateCountdowns()
@@ -132,6 +173,9 @@ class TotsDataManager: ObservableObject {
         
         // Load widget settings
         widgetEnabled = UserDefaults.standard.object(forKey: "widget_enabled") as? Bool ?? true
+        
+        // Load units preference
+        useMetricUnits = UserDefaults.standard.object(forKey: "use_metric_units") as? Bool ?? true
         
         // Load activities
         if let data = UserDefaults.standard.data(forKey: activitiesKey),

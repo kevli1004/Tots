@@ -29,8 +29,10 @@ struct AddActivityView: View {
     @State private var height = ""
     @State private var selectedWeightLbs: Double = 8.0
     @State private var selectedWeightOz: Double = 0.0
+    @State private var selectedWeightKg: Double = 3.6
     @State private var selectedHeightFt: Int = 1
     @State private var selectedHeightIn: Double = 8.0
+    @State private var selectedHeightCm: Double = 50.8
     
     // Tummy time stopwatch states
     @State private var tummyTimeIsRunning = false
@@ -383,6 +385,35 @@ struct AddActivityView: View {
     
     private var growthDetailsView: some View {
         VStack(alignment: .leading, spacing: 20) {
+            // Unit toggle
+            HStack {
+                Text("Units")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                HStack(spacing: 8) {
+                    Text("kg/cm")
+                        .font(.caption)
+                        .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
+                        .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
+                    
+                    Toggle("", isOn: Binding(
+                        get: { !dataManager.useMetricUnits },
+                        set: { dataManager.useMetricUnits = !$0 }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .scaleEffect(0.8)
+                    
+                    Text("lb/in")
+                        .font(.caption)
+                        .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
+                        .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
+                }
+            }
+            
             // Weight slider
             VStack(alignment: .leading, spacing: 12) {
                 Text("Weight")
@@ -390,45 +421,72 @@ struct AddActivityView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
                 
-                VStack(spacing: 12) {
-                    HStack {
-                        Text("4 lbs")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text(String(format: "%.1f lbs %.0f oz", selectedWeightLbs, selectedWeightOz))
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        Spacer()
-                        Text("20 lbs")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    VStack(spacing: 8) {
+                if dataManager.useMetricUnits {
+                    // Metric weight (kg)
+                    VStack(spacing: 12) {
                         HStack {
-                            Text("Pounds")
-                                .font(.caption2)
+                            Text("2 kg")
+                                .font(.caption)
                                 .foregroundColor(.secondary)
                             Spacer()
+                            Text(String(format: "%.1f kg", selectedWeightKg))
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("10 kg")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        Slider(value: $selectedWeightLbs, in: 4...20, step: 0.1)
-                            .accentColor(.blue)
                         
-                        HStack {
-                            Text("Ounces")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        Slider(value: $selectedWeightOz, in: 0...15, step: 0.5)
+                        Slider(value: $selectedWeightKg, in: 2...10, step: 0.1)
                             .accentColor(.blue)
                     }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                } else {
+                    // Imperial weight (lbs/oz)
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("4 lbs")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(String(format: "%.1f lbs %.0f oz", selectedWeightLbs, selectedWeightOz))
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("20 lbs")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text("Pounds")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            Slider(value: $selectedWeightLbs, in: 4...20, step: 0.1)
+                                .accentColor(.blue)
+                            
+                            HStack {
+                                Text("Ounces")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            Slider(value: $selectedWeightOz, in: 0...15, step: 0.5)
+                                .accentColor(.blue)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             }
             
             // Height slider
@@ -438,48 +496,75 @@ struct AddActivityView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
                 
-                VStack(spacing: 12) {
-                    HStack {
-                        Text("1' 0\"")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text(String(format: "%d' %.1f\"", selectedHeightFt, selectedHeightIn))
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        Spacer()
-                        Text("3' 0\"")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    VStack(spacing: 8) {
+                if dataManager.useMetricUnits {
+                    // Metric height (cm)
+                    VStack(spacing: 12) {
                         HStack {
-                            Text("Feet")
-                                .font(.caption2)
+                            Text("30 cm")
+                                .font(.caption)
                                 .foregroundColor(.secondary)
                             Spacer()
+                            Text(String(format: "%.1f cm", selectedHeightCm))
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("100 cm")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        Slider(value: Binding(
-                            get: { Double(selectedHeightFt) },
-                            set: { selectedHeightFt = Int($0) }
-                        ), in: 1...3, step: 1)
-                            .accentColor(.blue)
                         
-                        HStack {
-                            Text("Inches")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        Slider(value: $selectedHeightIn, in: 0...11.5, step: 0.5)
+                        Slider(value: $selectedHeightCm, in: 30...100, step: 0.5)
                             .accentColor(.blue)
                     }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                } else {
+                    // Imperial height (feet/inches)
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("1' 0\"")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(String(format: "%d' %.1f\"", selectedHeightFt, selectedHeightIn))
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("3' 0\"")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text("Feet")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            Slider(value: Binding(
+                                get: { Double(selectedHeightFt) },
+                                set: { selectedHeightFt = Int($0) }
+                            ), in: 1...3, step: 1)
+                                .accentColor(.blue)
+                            
+                            HStack {
+                                Text("Inches")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            Slider(value: $selectedHeightIn, in: 0...11.5, step: 0.5)
+                                .accentColor(.blue)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             }
         }
     }
@@ -586,10 +671,14 @@ struct AddActivityView: View {
             let seconds = Int(tummyTimeElapsed) % 60
             details = "Tummy time - \(minutes)m \(seconds)s"
         case .growth:
-            let totalWeightLbs = selectedWeightLbs + (selectedWeightOz / 16.0)
-            let totalHeightInches = Double(selectedHeightFt * 12) + selectedHeightIn
-            details = String(format: "Weight: %.1f lbs, Height: %d'%.1f\"", 
-                           totalWeightLbs, selectedHeightFt, selectedHeightIn)
+            if dataManager.useMetricUnits {
+                details = String(format: "Weight: %.1f kg, Height: %.1f cm", 
+                               selectedWeightKg, selectedHeightCm)
+            } else {
+                let totalWeightLbs = selectedWeightLbs + (selectedWeightOz / 16.0)
+                details = String(format: "Weight: %.1f lbs, Height: %d'%.1f\"", 
+                               totalWeightLbs, selectedHeightFt, selectedHeightIn)
+            }
         }
         
         if let editingActivity = editingActivity {
@@ -601,8 +690,8 @@ struct AddActivityView: View {
                 mood: .content,
                 duration: getDuration(),
                 notes: notes.isEmpty ? nil : notes,
-                weight: selectedActivityType == .growth ? selectedWeightLbs + (selectedWeightOz / 16.0) : nil,
-                height: selectedActivityType == .growth ? Double(selectedHeightFt * 12) + selectedHeightIn : nil
+                weight: selectedActivityType == .growth ? getWeight() : nil,
+                height: selectedActivityType == .growth ? getHeight() : nil
             ))
         } else {
             // Create new activity
@@ -613,8 +702,8 @@ struct AddActivityView: View {
                 mood: .content,
                 duration: getDuration(),
                 notes: notes.isEmpty ? nil : notes,
-                weight: selectedActivityType == .growth ? selectedWeightLbs + (selectedWeightOz / 16.0) : nil,
-                height: selectedActivityType == .growth ? Double(selectedHeightFt * 12) + selectedHeightIn : nil
+                weight: selectedActivityType == .growth ? getWeight() : nil,
+                height: selectedActivityType == .growth ? getHeight() : nil
             )
             
             dataManager.addActivity(activity)
@@ -775,6 +864,26 @@ struct AddActivityView: View {
             return Int(tummyTimeElapsed / 60) // Convert seconds to minutes
         default:
             return nil
+        }
+    }
+    
+    private func getWeight() -> Double {
+        if dataManager.useMetricUnits {
+            return selectedWeightKg
+        } else {
+            // Convert imperial to kg for storage
+            let totalWeightLbs = selectedWeightLbs + (selectedWeightOz / 16.0)
+            return dataManager.convertWeightToKg(totalWeightLbs, fromImperial: true)
+        }
+    }
+    
+    private func getHeight() -> Double {
+        if dataManager.useMetricUnits {
+            return selectedHeightCm
+        } else {
+            // Convert imperial to cm for storage
+            let totalHeightInches = Double(selectedHeightFt * 12) + selectedHeightIn
+            return dataManager.convertHeightToCm(totalHeightInches, fromImperial: true)
         }
     }
 }
