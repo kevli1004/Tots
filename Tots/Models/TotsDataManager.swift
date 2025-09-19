@@ -121,6 +121,70 @@ class TotsDataManager: ObservableObject {
         }
     }
     
+    // Word tracking - loaded from storage
+    @Published var words: [BabyWord] = [] {
+        didSet {
+            saveWords()
+        }
+    }
+    
+    var wordCount: Int {
+        return words.count
+    }
+    
+    var wordsByCategory: [WordCategory: [BabyWord]] {
+        return Dictionary(grouping: words) { $0.category }
+    }
+    
+    // Top 200+ baby words organized by category for autocomplete
+    let commonBabyWords: [WordCategory: [String]] = [
+        .people: [
+            "mama", "dada", "papa", "baby", "mommy", "daddy", "grandma", "grandpa", "nana", "pop",
+            "sister", "brother", "family", "me", "you", "name", "boy", "girl", "friend", "person",
+            "lady", "man", "kid", "child", "aunt", "uncle", "cousin", "neighbor"
+        ],
+        .animals: [
+            "dog", "cat", "cow", "duck", "fish", "bird", "horse", "pig", "sheep", "chicken",
+            "bear", "lion", "tiger", "elephant", "monkey", "rabbit", "mouse", "frog", "bee", "butterfly",
+            "snake", "turtle", "owl", "fox", "deer", "squirrel", "puppy", "kitty", "bunny", "doggy"
+        ],
+        .food: [
+            "milk", "water", "cookie", "banana", "apple", "more", "eat", "drink", "hungry", "bottle",
+            "cup", "spoon", "bowl", "plate", "bread", "cheese", "crackers", "juice", "snack", "dinner",
+            "breakfast", "lunch", "hot", "cold", "sweet", "yummy", "orange", "grape", "berry", "cake",
+            "ice cream", "pizza", "pasta", "soup", "sandwich", "toast", "cereal", "yogurt"
+        ],
+        .actions: [
+            "go", "up", "down", "stop", "come", "sit", "stand", "walk", "run", "jump", "dance",
+            "play", "look", "see", "watch", "listen", "hear", "touch", "hold", "give", "take",
+            "put", "get", "open", "close", "push", "pull", "throw", "catch", "kick", "hug",
+            "kiss", "sleep", "wake", "wash", "brush", "clean", "help", "work", "read", "sing"
+        ],
+        .objects: [
+            "ball", "book", "car", "cup", "shoe", "toy", "hat", "shirt", "pants", "sock",
+            "diaper", "blanket", "pillow", "bed", "chair", "table", "door", "window", "phone", "keys",
+            "bag", "box", "bottle", "pacifier", "blocks", "doll", "truck", "train", "plane", "bike",
+            "swing", "slide", "sandbox", "bubble", "music", "tv", "computer", "camera", "watch", "glasses"
+        ],
+        .feelings: [
+            "happy", "sad", "mad", "love", "good", "bad", "nice", "pretty", "beautiful", "funny",
+            "scared", "brave", "excited", "tired", "sleepy", "awake", "hungry", "full", "thirsty", "hurt",
+            "better", "sick", "well", "fine", "okay", "great", "wonderful", "amazing", "surprised", "proud"
+        ],
+        .sounds: [
+            "wow", "oh", "uh-oh", "shh", "boom", "beep", "pop", "bang", "crash", "splash",
+            "meow", "woof", "moo", "quack", "roar", "chirp", "buzz", "hiss", "oink", "baa",
+            "neigh", "trumpet", "honk", "ring", "tick", "tock", "whoosh", "zoom", "vroom", "choo-choo"
+        ],
+        .other: [
+            "yes", "no", "please", "thank you", "help", "mine", "yours", "this", "that", "here",
+            "there", "where", "what", "who", "when", "why", "how", "big", "little", "small",
+            "tall", "short", "long", "round", "square", "red", "blue", "yellow", "green", "purple",
+            "pink", "orange", "black", "white", "brown", "gray", "one", "two", "three", "many",
+            "all", "some", "none", "first", "last", "again", "more", "done", "finished", "ready"
+        ]
+    ]
+    
     // Comprehensive predefined milestones based on AAP, CDC, and WHO guidelines
     private let predefinedMilestones: [Milestone] = [
         // BIRTH TO 2 MONTHS
@@ -234,13 +298,6 @@ class TotsDataManager: ObservableObject {
         Milestone(title: "Naps regularly", minAgeWeeks: 12, maxAgeWeeks: 104, category: .sleep, description: "Takes predictable naps", isPredefined: true),
         Milestone(title: "Transitions to toddler bed", minAgeWeeks: 104, maxAgeWeeks: 208, category: .sleep, description: "Ready for toddler bed", isPredefined: true),
     ]
-    
-    // Word tracking - loaded from storage
-    @Published var words: [BabyWord] = [] {
-        didSet {
-            saveWords()
-        }
-    }
     
     var babyAge: String {
         let months = Calendar.current.dateComponents([.month], from: babyBirthDate, to: Date()).month ?? 0
@@ -792,14 +849,6 @@ class TotsDataManager: ObservableObject {
             words[index].category = category
             words[index].notes = notes
         }
-    }
-    
-    var wordCount: Int {
-        return words.count
-    }
-    
-    var wordsByCategory: [WordCategory: [BabyWord]] {
-        return Dictionary(grouping: words) { $0.category }
     }
     
     // MARK: - Milestone Management

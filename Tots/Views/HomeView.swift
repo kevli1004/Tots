@@ -2571,48 +2571,139 @@ struct AddWordView: View {
     @State private var word = ""
     @State private var selectedCategory: WordCategory = .other
     @State private var notes = ""
-    @State private var showingSuggestions = false
+    @State private var searchText = ""
     
-    // Common first words suggestions
-    let commonWords: [String: [String]] = [
-        "People": ["mama", "dada", "papa", "baby", "bye-bye", "hi"],
-        "Animals": ["dog", "cat", "cow", "duck", "fish", "bird"],
-        "Food": ["milk", "water", "cookie", "banana", "apple", "more"],
-        "Actions": ["go", "up", "down", "stop", "come", "sit"],
-        "Objects": ["ball", "book", "car", "cup", "shoe", "toy"],
-        "Feelings": ["happy", "sad", "mad", "love", "good", "bad"],
-        "Sounds": ["wow", "oh", "uh-oh", "shh", "boom", "beep"],
-        "Other": ["yes", "no", "please", "thank you", "help", "mine"]
-    ]
+    var filteredSuggestions: [String] {
+        let categoryWords = dataManager.commonBabyWords[selectedCategory] ?? []
+        
+        if searchText.isEmpty {
+            return categoryWords.prefix(8).map { $0 }
+        } else {
+            return categoryWords.filter { 
+                $0.localizedCaseInsensitiveContains(searchText)
+            }.prefix(8).map { $0 }
+        }
+    }
     
     var body: some View {
         NavigationView {
-            Form {
-                Section("Word Details") {
-                    TextField("Word", text: $word)
-                        .autocapitalization(.none)
-                    
-                    Picker("Category", selection: $selectedCategory) {
-                        ForEach(WordCategory.allCases, id: \.self) { category in
-                            HStack {
-                                Image(systemName: category.icon)
-                                Text(category.rawValue)
-                            }
-                            .tag(category)
-                        }
-                    }
-                    
-                    TextField("Notes (optional)", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
-                }
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
                 
-                Section("Suggestions") {
-                    ForEach(commonWords[selectedCategory.rawValue] ?? [], id: \.self) { suggestion in
-                        Button(suggestion.capitalized) {
-                            word = suggestion
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Word Details Section
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Word")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                TextField("What word did they say?", text: $word)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .font(.body)
+                                    .autocapitalization(.none)
+                                    .onChange(of: word) { newValue in
+                                        searchText = newValue
+                                    }
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Category")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                
+                                Picker("Category", selection: $selectedCategory) {
+                                    ForEach(WordCategory.allCases, id: \.self) { category in
+                                        HStack {
+                                            Image(systemName: category.icon)
+                                                .foregroundColor(category.color)
+                                            Text(category.rawValue)
+                                        }
+                                        .tag(category)
+                                    }
+                                }
+                                .pickerStyle(MenuPickerStyle())
+                                .accentColor(selectedCategory.color)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Notes (Optional)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                TextField("Any special context or details...", text: $notes, axis: .vertical)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .lineLimit(2...4)
+                                    .font(.body)
+                            }
                         }
-                        .foregroundColor(.primary)
+                        .padding(20)
+                        .liquidGlassCard()
+                        
+                        // Suggestions Section
+                        if !filteredSuggestions.isEmpty {
+                            VStack(alignment: .leading, spacing: 16) {
+                                HStack {
+                                    Image(systemName: "lightbulb.fill")
+                                        .foregroundColor(.yellow)
+                                    Text("Suggestions")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                }
+                                
+                                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
+                                    ForEach(filteredSuggestions, id: \.self) { suggestion in
+                                        Button(action: {
+                                            word = suggestion
+                                            searchText = suggestion
+                                        }) {
+                                            HStack {
+                                                Image(systemName: selectedCategory.icon)
+                                                    .font(.caption)
+                                                    .foregroundColor(selectedCategory.color)
+                                                Text(suggestion.capitalized)
+                                                    .font(.subheadline)
+                                                    .fontWeight(.medium)
+                                                    .foregroundColor(.primary)
+                                                Spacer()
+                                            }
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 12)
+                                            .background(Color(.systemBackground))
+                                            .cornerRadius(12)
+                                            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
+                            }
+                            .padding(20)
+                            .liquidGlassCard()
+                        }
+                        
+                        // Save button
+                        Button("Add Word") {
+                            dataManager.addWord(
+                                word.trimmingCharacters(in: .whitespacesAndNewlines), 
+                                category: selectedCategory, 
+                                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                            )
+                            dismiss()
+                        }
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(selectedCategory.color)
+                        .cornerRadius(16)
+                        .disabled(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .opacity(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1.0)
                     }
+                    .padding()
                 }
             }
             .navigationTitle("Add Word")
@@ -2623,17 +2714,10 @@ struct AddWordView: View {
                         dismiss()
                     }
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        dataManager.addWord(word.trimmingCharacters(in: .whitespacesAndNewlines), 
-                                          category: selectedCategory, 
-                                          notes: notes.trimmingCharacters(in: .whitespacesAndNewlines))
-                        dismiss()
-                    }
-                    .disabled(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .fontWeight(.semibold)
-                }
+            }
+            .onTapGesture {
+                // Dismiss keyboard when tapping outside
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
         }
     }

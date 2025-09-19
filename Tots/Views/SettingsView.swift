@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var showingDebugAlert = false
     @State private var debugMessage = ""
     @State private var shareDelegate: ShareControllerDelegate?
+    @State private var profileImageUpdateTrigger = false
     
     var body: some View {
         ZStack {
@@ -29,6 +30,7 @@ struct SettingsView: View {
                     
                     // Baby profile
                     babyProfileView
+                        .id(profileImageUpdateTrigger)
                     
                     // Family sharing
                     familySharingView
@@ -48,6 +50,10 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingPersonalDetails) {
             PersonalDetailsView()
+                .onDisappear {
+                    // Trigger refresh of profile view when returning from PersonalDetailsView
+                    profileImageUpdateTrigger.toggle()
+                }
         }
         .sheet(isPresented: $showingFamilyManager) {
             FamilyManagerView(familyMembers: $familyMembers)
@@ -100,36 +106,52 @@ struct SettingsView: View {
     
     private var babyProfileView: some View {
         HStack(spacing: 16) {
-            // Baby avatar
-            Circle()
-                .fill(
-                    LinearGradient(
-                        gradient: Gradient(colors: [Color.pink.opacity(0.3), Color.blue.opacity(0.3)]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 60, height: 60)
-                .overlay(
-                    Image("TotsIcon")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 32, height: 32)
-                )
+            // Baby avatar - show profile picture if available, otherwise show TotsIcon
+            Button(action: {
+                showingPersonalDetails = true
+            }) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color.pink.opacity(0.3), Color.blue.opacity(0.3)]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+                    
+                    if let profileImageData = UserDefaults.standard.data(forKey: "baby_profile_image"),
+                       let profileImage = UIImage(data: profileImageData) {
+                        Image(uiImage: profileImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 60, height: 60)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 2)
+                                    .shadow(color: .black.opacity(0.1), radius: 1)
+                            )
+                    } else {
+                        Image("TotsIcon")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 32, height: 32)
+                    }
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
             
             VStack(alignment: .leading, spacing: 4) {
-                Button(action: {
-                    showingPersonalDetails = true
-                }) {
-                    HStack {
-                        Text(dataManager.babyName.isEmpty ? "Enter your baby's name" : dataManager.babyName)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.primary)
-                        
-                        Image(systemName: "pencil")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
+                HStack {
+                    Text(dataManager.babyName.isEmpty ? "Enter your baby's name" : dataManager.babyName)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
                 }
                 
                 Text(dataManager.babyAge)
@@ -641,42 +663,174 @@ struct PersonalDetailsView: View {
     @State private var babyName = ""
     @State private var birthDate = Date()
     @State private var primaryCaregiverName = ""
+    @State private var profileImage: UIImage?
+    @State private var showingImagePicker = false
+    @State private var showingDeleteConfirmation = false
     
     var body: some View {
         NavigationView {
-            Form {
-                Section("Baby Information") {
-                    HStack {
-                        Text("Name")
-                        Spacer()
-                        TextField("Baby's name", text: $babyName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    DatePicker("Birth Date", selection: $birthDate, displayedComponents: .date)
-                }
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
                 
-                Section("Caregivers") {
-                    HStack {
-                        Text("Primary Caregiver")
-                        Spacer()
-                        TextField("Your name", text: $primaryCaregiverName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .multilineTextAlignment(.trailing)
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Profile Picture Section
+                        VStack(spacing: 16) {
+                            Text("Profile Picture")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                            
+                            Button(action: {
+                                showingImagePicker = true
+                            }) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [.blue.opacity(0.3), .purple.opacity(0.3)]),
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 120, height: 120)
+                                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                    
+                                    if let profileImage = profileImage {
+                                        Image(uiImage: profileImage)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 120, height: 120)
+                                            .clipShape(Circle())
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(Color.white, lineWidth: 4)
+                                                    .shadow(color: .black.opacity(0.1), radius: 2)
+                                            )
+                                    } else {
+                                        VStack(spacing: 8) {
+                                            Image(systemName: "person.crop.circle.fill.badge.plus")
+                                                .font(.system(size: 40))
+                                                .foregroundColor(.white)
+                                            Text("Add Photo")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                }
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            if profileImage != nil {
+                                Button("Remove Photo") {
+                                    profileImage = nil
+                                    saveProfileImage(nil)
+                                }
+                                .font(.caption)
+                                .foregroundColor(.red)
+                            }
+                        }
+                        .padding(20)
+                        .liquidGlassCard()
+                        
+                        // Baby Information Section
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Image(systemName: "person.fill")
+                                    .foregroundColor(.blue)
+                                Text("Baby Information")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            VStack(spacing: 16) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Name")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.secondary)
+                                    TextField("Baby's name", text: $babyName)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .font(.body)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Birth Date")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.secondary)
+                                    DatePicker("", selection: $birthDate, displayedComponents: .date)
+                                        .datePickerStyle(CompactDatePickerStyle())
+                                        .labelsHidden()
+                                }
+                            }
+                        }
+                        .padding(20)
+                        .liquidGlassCard()
+                        
+                        // Caregivers Section
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Image(systemName: "heart.fill")
+                                    .foregroundColor(.pink)
+                                Text("Primary Caregiver")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Your Name")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                TextField("Your name", text: $primaryCaregiverName)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .font(.body)
+                            }
+                        }
+                        .padding(20)
+                        .liquidGlassCard()
+                        
+                        // Data Management Section
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Image(systemName: "folder.fill")
+                                    .foregroundColor(.orange)
+                                Text("Data Management")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            VStack(spacing: 12) {
+                                Button("Export Data") {
+                                    exportData()
+                                }
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.blue)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(12)
+                                
+                                Button("Clear All Data") {
+                                    showingDeleteConfirmation = true
+                                }
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.red)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(12)
+                            }
+                        }
+                        .padding(20)
+                        .liquidGlassCard()
                     }
-                }
-                
-                Section("Data Management") {
-                    Button("Export Data") {
-                        exportData()
-                    }
-                    .foregroundColor(.blue)
-                    
-                    Button("Clear All Data") {
-                        clearAllData()
-                    }
-                    .foregroundColor(.red)
+                    .padding()
                 }
             }
             .navigationTitle("Personal Details")
@@ -694,7 +848,25 @@ struct PersonalDetailsView: View {
                         dismiss()
                     }
                     .disabled(babyName.isEmpty)
+                    .fontWeight(.semibold)
                 }
+            }
+            .sheet(isPresented: $showingImagePicker) {
+                ImagePicker(selectedImage: $profileImage) { image in
+                    saveProfileImage(image)
+                }
+            }
+            .alert("Clear All Data", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    clearAllData()
+                }
+            } message: {
+                Text("This will permanently delete all your baby's data including activities, milestones, and growth records. This action cannot be undone.")
+            }
+            .onTapGesture {
+                // Dismiss keyboard when tapping outside
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
         }
         .onAppear {
@@ -706,12 +878,29 @@ struct PersonalDetailsView: View {
         babyName = dataManager.babyName
         birthDate = dataManager.babyBirthDate
         primaryCaregiverName = UserDefaults.standard.string(forKey: "primary_caregiver_name") ?? ""
+        loadProfileImage()
     }
     
     private func saveSettings() {
         dataManager.babyName = babyName
         dataManager.babyBirthDate = birthDate
         UserDefaults.standard.set(primaryCaregiverName, forKey: "primary_caregiver_name")
+    }
+    
+    private func loadProfileImage() {
+        if let imageData = UserDefaults.standard.data(forKey: "baby_profile_image"),
+           let image = UIImage(data: imageData) {
+            profileImage = image
+        }
+    }
+    
+    private func saveProfileImage(_ image: UIImage?) {
+        if let image = image,
+           let imageData = image.jpegData(compressionQuality: 0.8) {
+            UserDefaults.standard.set(imageData, forKey: "baby_profile_image")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "baby_profile_image")
+        }
     }
     
     private func exportData() {
@@ -958,6 +1147,52 @@ class ShareControllerDelegate: NSObject, UICloudSharingControllerDelegate {
     
     func cloudSharingControllerDidStopSharing(_ csc: UICloudSharingController) {
         print("ℹ️ Sharing stopped")
+    }
+}
+
+// MARK: - Image Picker
+
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    let onImageSelected: (UIImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        picker.allowsEditing = true
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let editedImage = info[.editedImage] as? UIImage {
+                parent.selectedImage = editedImage
+                parent.onImageSelected(editedImage)
+            } else if let originalImage = info[.originalImage] as? UIImage {
+                parent.selectedImage = originalImage
+                parent.onImageSelected(originalImage)
+            }
+            
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
     }
 }
 
