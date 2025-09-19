@@ -19,6 +19,22 @@ class TotsDataManager: ObservableObject {
     @Published var sleepPatterns: [SleepPattern] = []
     @Published var feedingEfficiency: Double = 0.85
     @Published var developmentScore: Int = 78
+    
+    // Growth percentile data
+    var currentBMI: Double {
+        guard let latestGrowth = growthData.last else { return 0.0 }
+        let weightKg = convertWeightToKg(latestGrowth.weight)
+        let heightM = convertHeightToCm(latestGrowth.height) / 100.0
+        return weightKg / (heightM * heightM)
+    }
+    
+    var currentWeight: Double {
+        return growthData.last?.weight ?? 15.0 // Default weight in lbs
+    }
+    
+    var currentHeight: Double {
+        return growthData.last?.height ?? 68.5 // Default height in cm
+    }
     @Published var healthTrends: [HealthTrend] = []
     
     // CloudKit
@@ -122,10 +138,6 @@ class TotsDataManager: ObservableObject {
                 return "\(years)y \(remainingMonths)m old"
             }
         }
-    }
-    
-    var currentWeight: Double {
-        growthData.last?.weight ?? 14.2
     }
     
     // MARK: - Unit Conversion Helpers
@@ -349,6 +361,136 @@ class TotsDataManager: ObservableObject {
         }.reversed()
     }
     
+    func getDataForTimeframe(_ timeframe: ProgressView.TimeFrame) -> [DayData] {
+        let calendar = Calendar.current
+        let today = calendar.dateInterval(of: .day, for: Date())?.start ?? Date()
+        
+        switch timeframe {
+        case .thisWeek, .lastWeek:
+            let (startDate, days) = getTimeframeRange(timeframe, from: today)
+            return (0..<days).map { dayOffset in
+                let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate)!
+                return getDayData(for: date, formatter: "E")
+            }
+            
+        case .thisMonth:
+            // For monthly view, aggregate data by week to prevent overflow
+            let (startDate, _) = getTimeframeRange(timeframe, from: today)
+            let endDate = today
+            
+            var weeklyData: [DayData] = []
+            var currentWeekStart = startDate
+            
+            while currentWeekStart < endDate {
+                let weekEnd = min(calendar.date(byAdding: .day, value: 6, to: currentWeekStart) ?? endDate, endDate)
+                
+                // Aggregate data for this week
+                var totalFeedings = 0
+                var totalDiapers = 0
+                var totalSleepHours = 0.0
+                var totalTummyTime = 0
+                var totalPlayTime = 0
+                var daysInWeek = 0
+                
+                var date = currentWeekStart
+                while date <= weekEnd {
+                    let dayActivities = recentActivities.filter { calendar.isDate($0.time, inSameDayAs: date) }
+                    
+                    totalFeedings += dayActivities.filter { $0.type == .feeding }.count
+                    totalDiapers += dayActivities.filter { $0.type == .diaper }.count
+                    
+                    let sleepActivities = dayActivities.filter { $0.type == .sleep }
+                    totalSleepHours += Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
+                    
+                    let tummyActivities = dayActivities.filter { $0.type == .play && $0.details.lowercased().contains("tummy") }
+                    totalTummyTime += tummyActivities.compactMap { $0.duration }.reduce(0, +)
+                    
+                    let playActivities = dayActivities.filter { $0.type == .play && !$0.details.lowercased().contains("tummy") }
+                    totalPlayTime += playActivities.compactMap { $0.duration }.reduce(0, +)
+                    
+                    daysInWeek += 1
+                    date = calendar.date(byAdding: .day, value: 1, to: date) ?? date
+                }
+                
+                // Calculate averages for the week
+                let avgFeedings = daysInWeek > 0 ? totalFeedings / daysInWeek : 0
+                let avgDiapers = daysInWeek > 0 ? totalDiapers / daysInWeek : 0
+                let avgSleepHours = daysInWeek > 0 ? totalSleepHours / Double(daysInWeek) : 0.0
+                let avgTummyTime = daysInWeek > 0 ? totalTummyTime / daysInWeek : 0
+                let avgPlayTime = daysInWeek > 0 ? totalPlayTime / daysInWeek : 0
+                
+                let formatter = DateFormatter()
+                formatter.dateFormat = "M/d"
+                let weekLabel = formatter.string(from: currentWeekStart)
+                
+                weeklyData.append(DayData(
+                    day: weekLabel,
+                    date: currentWeekStart,
+                    feedings: avgFeedings,
+                    diapers: avgDiapers,
+                    sleepHours: avgSleepHours,
+                    tummyTime: avgTummyTime,
+                    playTime: avgPlayTime
+                ))
+                
+                currentWeekStart = calendar.date(byAdding: .day, value: 7, to: currentWeekStart) ?? currentWeekStart
+            }
+            
+            return weeklyData
+        }
+    }
+    
+    private func getDayData(for date: Date, formatter: String) -> DayData {
+        let calendar = Calendar.current
+        let dayActivities = recentActivities.filter { calendar.isDate($0.time, inSameDayAs: date) }
+        
+        let feedings = dayActivities.filter { $0.type == .feeding }.count
+        let diapers = dayActivities.filter { $0.type == .diaper }.count
+        
+        let sleepActivities = dayActivities.filter { $0.type == .sleep }
+        let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
+        
+        let tummyActivities = dayActivities.filter { $0.type == .play && $0.details.lowercased().contains("tummy") }
+        let tummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
+        
+        let playActivities = dayActivities.filter { $0.type == .play && !$0.details.lowercased().contains("tummy") }
+        let playTime = playActivities.compactMap { $0.duration }.reduce(0, +)
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = formatter
+        let dayString = dateFormatter.string(from: date)
+        
+        return DayData(
+            day: dayString,
+            date: date,
+            feedings: feedings,
+            diapers: diapers,
+            sleepHours: sleepHours,
+            tummyTime: tummyTime,
+            playTime: playTime
+        )
+    }
+    
+    private func getTimeframeRange(_ timeframe: ProgressView.TimeFrame, from today: Date) -> (startDate: Date, days: Int) {
+        let calendar = Calendar.current
+        
+        switch timeframe {
+        case .thisWeek:
+            let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today
+            return (startOfWeek, 7)
+            
+        case .lastWeek:
+            let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: today) ?? today
+            let startOfLastWeek = calendar.dateInterval(of: .weekOfYear, for: lastWeek)?.start ?? today
+            return (startOfLastWeek, 7)
+            
+        case .thisMonth:
+            let startOfMonth = calendar.dateInterval(of: .month, for: today)?.start ?? today
+            let daysInMonth = calendar.range(of: .day, in: .month, for: today)?.count ?? 30
+            return (startOfMonth, daysInMonth)
+        }
+    }
+    
     var weeklyProgress: (feedings: Double, diapers: Double, sleep: Double, tummyTime: Double) {
         let totalFeedings = weeklyData.reduce(0) { $0 + $1.feedings }
         let totalDiapers = weeklyData.reduce(0) { $0 + $1.diapers }
@@ -546,6 +688,193 @@ class TotsDataManager: ObservableObject {
     
     var wordsByCategory: [WordCategory: [BabyWord]] {
         return Dictionary(grouping: words) { $0.category }
+    }
+    
+    // MARK: - Growth Percentile Calculations
+    
+    func getWeightPercentile() -> Int {
+        guard let latestGrowth = growthData.last else { return 50 }
+        return getWeightPercentile(for: latestGrowth)
+    }
+    
+    func getHeightPercentile() -> Int {
+        guard let latestGrowth = growthData.last else { return 50 }
+        return getHeightPercentile(for: latestGrowth)
+    }
+    
+    func getBMIPercentile() -> Int {
+        guard let latestGrowth = growthData.last else { return 50 }
+        return getBMIPercentile(for: latestGrowth)
+    }
+    
+    func getWeightPercentile(for entry: GrowthEntry) -> Int {
+        let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
+        let weightKg = convertWeightToKg(entry.weight)
+        
+        // WHO growth standards with age-appropriate standard deviation
+        let expectedWeight = getExpectedWeight(ageInMonths: ageInMonths)
+        let standardDeviation = getWeightStandardDeviation(ageInMonths: ageInMonths)
+        let percentile = calculatePercentile(value: weightKg, expected: expectedWeight, standardDeviation: standardDeviation)
+        return percentile
+    }
+    
+    func getHeightPercentile(for entry: GrowthEntry) -> Int {
+        let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
+        let heightCm = convertHeightToCm(entry.height)
+        
+        // WHO growth standards with age-appropriate standard deviation
+        let expectedHeight = getExpectedHeight(ageInMonths: ageInMonths)
+        let standardDeviation = getHeightStandardDeviation(ageInMonths: ageInMonths)
+        let percentile = calculatePercentile(value: heightCm, expected: expectedHeight, standardDeviation: standardDeviation)
+        return percentile
+    }
+    
+    func getBMIPercentile(for entry: GrowthEntry) -> Int {
+        let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
+        let weightKg = convertWeightToKg(entry.weight)
+        let heightM = convertHeightToCm(entry.height) / 100.0
+        let bmi = weightKg / (heightM * heightM)
+        
+        // WHO BMI-for-age standards with age-appropriate standard deviation
+        let expectedBMI = getExpectedBMI(ageInMonths: ageInMonths)
+        let standardDeviation = getBMIStandardDeviation(ageInMonths: ageInMonths)
+        let percentile = calculatePercentile(value: bmi, expected: expectedBMI, standardDeviation: standardDeviation)
+        return percentile
+    }
+    
+    private func getWeightStandardDeviation(ageInMonths: Int) -> Double {
+        // WHO weight standard deviations (kg)
+        let whoWeightSD: [Double] = [
+            0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.3, // 0-12 months
+            1.3, 1.4, 1.4, 1.4, 1.5, 1.5, 1.5, 1.6, 1.6, 1.6, 1.7, 1.7 // 13-24 months
+        ]
+        
+        if ageInMonths < whoWeightSD.count {
+            return whoWeightSD[ageInMonths]
+        } else {
+            return 1.8 // Default for older ages
+        }
+    }
+    
+    private func getHeightStandardDeviation(ageInMonths: Int) -> Double {
+        // WHO height standard deviations (cm)
+        let whoHeightSD: [Double] = [
+            1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.4, 2.5, 2.5, 2.6, 2.6, 2.7, 2.7, // 0-12 months
+            2.8, 2.8, 2.9, 2.9, 3.0, 3.0, 3.1, 3.1, 3.2, 3.2, 3.3, 3.3 // 13-24 months
+        ]
+        
+        if ageInMonths < whoHeightSD.count {
+            return whoHeightSD[ageInMonths]
+        } else {
+            return 3.5 // Default for older ages
+        }
+    }
+    
+    private func getBMIStandardDeviation(ageInMonths: Int) -> Double {
+        // WHO BMI standard deviations (kg/m²)
+        let whoBMISD: [Double] = [
+            1.3, 1.4, 1.4, 1.3, 1.2, 1.2, 1.1, 1.1, 1.0, 1.0, 1.0, 1.0, 0.9, // 0-12 months
+            0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9 // 13-24 months
+        ]
+        
+        if ageInMonths < whoBMISD.count {
+            return whoBMISD[ageInMonths]
+        } else {
+            return 1.0 // Default for older ages
+        }
+    }
+    
+    var growthPercentileHistory: [(date: Date, weightPercentile: Int, heightPercentile: Int, bmiPercentile: Int)] {
+        return growthData.map { entry in
+            (
+                date: entry.date,
+                weightPercentile: getWeightPercentile(for: entry),
+                heightPercentile: getHeightPercentile(for: entry),
+                bmiPercentile: getBMIPercentile(for: entry)
+            )
+        }
+    }
+    
+    private func getAgeInMonths() -> Int {
+        let components = Calendar.current.dateComponents([.month], from: babyBirthDate, to: Date())
+        return max(0, components.month ?? 0)
+    }
+    
+    private func getExpectedWeight(ageInMonths: Int) -> Double {
+        // WHO growth standards 50th percentile for boys/girls average (in kg)
+        let whoWeightData: [Double] = [
+            3.3, 4.5, 5.6, 6.4, 7.0, 7.5, 7.9, 8.3, 8.6, 8.9, 9.2, 9.4, 9.6, // 0-12 months
+            9.9, 10.1, 10.3, 10.5, 10.7, 10.9, 11.1, 11.3, 11.5, 11.8, 12.0, 12.2 // 13-24 months
+        ]
+        
+        if ageInMonths < whoWeightData.count {
+            return whoWeightData[ageInMonths]
+        } else {
+            // Extrapolate for older ages
+            return 12.2 + Double(ageInMonths - 24) * 0.15
+        }
+    }
+    
+    private func getExpectedHeight(ageInMonths: Int) -> Double {
+        // WHO growth standards 50th percentile for boys/girls average (in cm)
+        let whoHeightData: [Double] = [
+            49.9, 54.7, 58.4, 61.4, 63.9, 65.9, 67.6, 69.2, 70.6, 72.0, 73.3, 74.5, 75.7, // 0-12 months
+            76.9, 78.0, 79.1, 80.2, 81.2, 82.3, 83.2, 84.2, 85.1, 86.0, 86.9, 87.8 // 13-24 months
+        ]
+        
+        if ageInMonths < whoHeightData.count {
+            return whoHeightData[ageInMonths]
+        } else {
+            // Extrapolate for older ages
+            return 87.8 + Double(ageInMonths - 24) * 0.5
+        }
+    }
+    
+    private func getExpectedBMI(ageInMonths: Int) -> Double {
+        // WHO BMI-for-age 50th percentile (kg/m²)
+        let whoBMIData: [Double] = [
+            13.3, 14.9, 16.3, 16.8, 16.8, 16.6, 16.4, 16.2, 16.0, 15.8, 15.7, 15.5, 15.4, // 0-12 months
+            15.3, 15.2, 15.1, 15.0, 14.9, 14.9, 14.8, 14.8, 14.7, 14.7, 14.7, 14.6 // 13-24 months
+        ]
+        
+        if ageInMonths < whoBMIData.count {
+            return whoBMIData[ageInMonths]
+        } else {
+            // Extrapolate for older ages
+            return 14.6 + Double(ageInMonths - 24) * -0.02
+        }
+    }
+    
+    private func calculatePercentile(value: Double, expected: Double, standardDeviation: Double) -> Int {
+        let zScore = (value - expected) / standardDeviation
+        
+        // More accurate z-score to percentile conversion using cumulative distribution
+        let percentile = cumulativeNormalDistribution(zScore) * 100
+        
+        return max(3, min(97, Int(percentile.rounded())))
+    }
+    
+    private func cumulativeNormalDistribution(_ z: Double) -> Double {
+        // Approximation of cumulative normal distribution using error function
+        return 0.5 * (1 + erf(z / sqrt(2)))
+    }
+    
+    private func erf(_ x: Double) -> Double {
+        // Approximation of error function
+        let a1 = 0.254829592
+        let a2 = -0.284496736
+        let a3 = 1.421413741
+        let a4 = -1.453152027
+        let a5 = 1.061405429
+        let p = 0.3275911
+        
+        let sign = x < 0 ? -1.0 : 1.0
+        let absX = abs(x)
+        
+        let t = 1.0 / (1.0 + p * absX)
+        let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-absX * absX)
+        
+        return sign * y
     }
     
     // MARK: - AI & Smart Features
