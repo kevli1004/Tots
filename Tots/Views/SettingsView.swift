@@ -363,17 +363,50 @@ struct SettingsView: View {
     
     private func setupCloudKitSharing() {
         self.isSettingUpCloudKit = true
-        cloudKitSetupMessage = "CloudKit setup coming soon..."
+        cloudKitSetupMessage = "Setting up CloudKit..."
         
-        // Temporary placeholder
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.cloudKitSetupMessage = "📋 Please add CloudKit files to Xcode project first"
-            self.isSettingUpCloudKit = false
+        Task {
+            do {
+                // Check schema first
+                await dataManager.checkCloudKitSchema()
+                
+                // Enable family sharing
+                try await dataManager.enableFamilySharing()
+                
+                await MainActor.run {
+                    cloudKitSetupMessage = "✅ CloudKit enabled successfully!"
+                    isSettingUpCloudKit = false
+                }
+                
+                // Clear message after delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    cloudKitSetupMessage = ""
+                }
+                
+            } catch {
+                await MainActor.run {
+                    cloudKitSetupMessage = "❌ Setup failed: \(error.localizedDescription)"
+                    isSettingUpCloudKit = false
+                }
+            }
         }
     }
     
     private func shareWithFamily() {
-        cloudKitSetupMessage = "📋 Please add CloudKit files to Xcode project first"
+        Task {
+            do {
+                if let share = try await dataManager.shareBabyProfile() {
+                    await MainActor.run {
+                        // Present sharing UI
+                        showingCloudKitShare = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    cloudKitSetupMessage = "❌ Sharing failed: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 }
 

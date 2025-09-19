@@ -23,8 +23,8 @@ class TotsDataManager: ObservableObject {
     // CloudKit
     @Published var familySharingEnabled: Bool = false
     @Published var babyProfileRecord: CKRecord?
-    // private let cloudKitManager = CloudKitManager.shared
-    // private let schemaSetup = CloudKitSchemaSetup.shared
+    private let cloudKitManager = CloudKitManager.shared
+    private let schemaSetup = CloudKitSchemaSetup.shared
     
     // Live Activity
     @Published var currentActivity: Activity<TotsLiveActivityAttributes>?
@@ -151,6 +151,14 @@ class TotsDataManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: growthDataKey),
            let growth = try? JSONDecoder().decode([GrowthEntry].self, from: data) {
             growthData = growth
+        }
+        
+        // Load CloudKit settings
+        familySharingEnabled = UserDefaults.standard.bool(forKey: "family_sharing_enabled")
+        
+        // Always try to fetch existing baby profiles from CloudKit
+        Task {
+            await loadExistingBabyProfile()
         }
         
         // Calculate stats from loaded data
@@ -297,20 +305,31 @@ class TotsDataManager: ObservableObject {
             startLiveActivity()
         }
         
-        // Sync to CloudKit if family sharing is enabled
-        // TODO: Uncomment when CloudKit files are added to Xcode project
-        /*
-        if familySharingEnabled, let profileRecord = babyProfileRecord {
-            Task {
-                do {
-                    try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
-                    print("✅ Activity synced to CloudKit")
-                } catch {
-                    print("❌ Failed to sync activity to CloudKit: \(error)")
+        // Debug logging
+        print("🔍 Add Activity Debug:")
+        print("   familySharingEnabled: \(familySharingEnabled)")
+        print("   babyProfileRecord: \(babyProfileRecord != nil ? "exists" : "nil")")
+        
+        // Always sync to CloudKit (create baby profile if needed)
+        Task {
+            do {
+                // Ensure we have a baby profile record
+                if babyProfileRecord == nil {
+                    print("🍼 No baby profile found, creating one...")
+                    await createDefaultBabyProfile()
                 }
+                
+                guard let profileRecord = babyProfileRecord else {
+                    print("❌ Failed to create baby profile record")
+                    return
+                }
+                
+                try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
+                print("✅ Activity synced to CloudKit")
+            } catch {
+                print("❌ Failed to sync activity to CloudKit: \(error)")
             }
         }
-        */
     }
     
     private func updateTodayStats(for activity: TotsActivity) {
@@ -1070,9 +1089,7 @@ extension TotsDataManager {
     }
     
     // MARK: - CloudKit Family Sharing
-    // TODO: Uncomment when CloudKit files are added to Xcode project
     
-    /*
     func enableFamilySharing() async throws {
         let goals = BabyGoals(
             feeding: weeklyFeedingGoal / 7,
@@ -1088,6 +1105,7 @@ extension TotsDataManager {
         
         familySharingEnabled = true
         UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+        UserDefaults.standard.set(babyProfileRecord!.recordID.recordName, forKey: "baby_profile_record_id")
     }
     
     func shareBabyProfile() async throws -> CKShare? {
@@ -1117,15 +1135,123 @@ extension TotsDataManager {
         }
     }
     
+    private func loadBabyProfileRecord(recordName: String) async {
+        do {
+            let recordID = CKRecord.ID(recordName: recordName)
+            let record = try await cloudKitManager.fetchBabyProfile(recordID: recordID)
+            await MainActor.run {
+                self.babyProfileRecord = record
+                print("✅ Baby profile record loaded successfully")
+            }
+        } catch {
+            print("❌ Failed to load baby profile record: \(error)")
+        }
+    }
+    
+    private func loadExistingBabyProfile() async {
+        // First check if we have a stored record ID (for existing installations)
+        if let recordName = UserDefaults.standard.string(forKey: "baby_profile_record_id") {
+            print("🍼 Found saved baby profile record ID: \(recordName)")
+            await loadBabyProfileRecord(recordName: recordName)
+            return
+        }
+        
+        // If no stored record ID, try to fetch existing profiles from CloudKit
+        print("🔍 No stored record ID found, searching CloudKit for existing baby profiles...")
+        do {
+            let profiles = try await cloudKitManager.fetchBabyProfiles()
+            
+            if let mostRecentProfile = profiles.first {
+                await MainActor.run {
+                    self.babyProfileRecord = mostRecentProfile
+                    // Store the record ID for future use
+                    UserDefaults.standard.set(mostRecentProfile.recordID.recordName, forKey: "baby_profile_record_id")
+                    
+                    // Update local data with CloudKit data
+                    if let name = mostRecentProfile["name"] as? String {
+                        self.babyName = name
+                    }
+                    if let birthDate = mostRecentProfile["birthDate"] as? Date {
+                        self.babyBirthDate = birthDate
+                    }
+                    
+                    // Load goals from CloudKit
+                    if let feedingGoal = mostRecentProfile["feedingGoal"] as? Int {
+                        UserDefaults.standard.set(feedingGoal, forKey: "feeding_goal")
+                    }
+                    if let sleepGoal = mostRecentProfile["sleepGoal"] as? Double {
+                        UserDefaults.standard.set(sleepGoal, forKey: "sleep_goal")
+                    }
+                    if let diaperGoal = mostRecentProfile["diaperGoal"] as? Int {
+                        UserDefaults.standard.set(diaperGoal, forKey: "diaper_goal")
+                    }
+                    
+                    print("✅ Found existing baby profile: \(self.babyName)")
+                    print("🔄 Updated local data with CloudKit profile and goals")
+                }
+                
+                // Also sync activities from CloudKit
+                await syncFromCloudKit()
+            } else {
+                print("📝 No existing baby profiles found in CloudKit")
+            }
+        } catch {
+            print("❌ Failed to fetch baby profiles from CloudKit: \(error)")
+        }
+    }
+    
+    private func createDefaultBabyProfile() async {
+        do {
+            // Use default values if not set
+            let name = babyName.isEmpty ? "Baby" : babyName
+            let birthDate = babyBirthDate
+            let goals = BabyGoals(
+                feeding: weeklyFeedingGoal / 7,
+                sleep: weeklySleepGoal / 7.0,
+                diaper: weeklyDiaperGoal / 7
+            )
+            
+            let record = try await cloudKitManager.createBabyProfile(
+                name: name,
+                birthDate: birthDate,
+                goals: goals
+            )
+            
+            await MainActor.run {
+                self.babyProfileRecord = record
+                UserDefaults.standard.set(record.recordID.recordName, forKey: "baby_profile_record_id")
+                print("✅ Default baby profile created and saved")
+            }
+        } catch {
+            print("❌ Failed to create default baby profile: \(error)")
+        }
+    }
+    
     func checkCloudKitSchema() async {
         let status = await schemaSetup.checkSchemaStatus()
         print(status.description)
         
         if !status.allExist {
-            print("⚠️ CloudKit schema not complete. Run setup instructions.")
-            schemaSetup.printSchemaInstructions()
+            print("⚠️ CloudKit schema not complete. Attempting automatic setup...")
+            
+            // Try to create schema automatically
+            do {
+                try await schemaSetup.createSampleRecordsForSchema()
+                print("✅ Schema created automatically!")
+            } catch {
+                print("❌ Automatic schema creation failed: \(error)")
+                print("\n" + String(repeating: "=", count: 60))
+                print("🔧 MANUAL CLOUDKIT SETUP REQUIRED")
+                print(String(repeating: "=", count: 60))
+                schemaSetup.printSchemaInstructions()
+                print("\n💡 KEY ISSUE: The 'createdBy' field must be a REFERENCE type, not String!")
+                print("   1. Go to CloudKit Console")
+                print("   2. Delete any existing 'createdBy' fields that are String type") 
+                print("   3. Add new 'createdBy' field as Reference to Users")
+                print("   4. Do the same for 'babyProfile' field in Activity (Reference to BabyProfile)")
+                print(String(repeating: "=", count: 60))
+            }
         }
     }
-    */
 }
 

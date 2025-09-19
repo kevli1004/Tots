@@ -6,7 +6,7 @@ import SwiftUI
 class CloudKitManager: ObservableObject {
     static let shared = CloudKitManager()
     
-    private let container = CKContainer.default()
+    private let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
     private let privateDatabase: CKDatabase
     private let sharedDatabase: CKDatabase
     
@@ -22,6 +22,13 @@ class CloudKitManager: ObservableObject {
     private init() {
         privateDatabase = container.privateCloudDatabase
         sharedDatabase = container.sharedCloudDatabase
+        
+        // Debug: Print which environment we're using
+        print("🔧 CloudKit Environment Info:")
+        print("   Container ID: \(container.containerIdentifier ?? "unknown")")
+        print("   Environment: Production (aps-environment=production)")
+        print("   Database: Private CloudKit Database")
+        
         checkAccountStatus()
     }
     
@@ -97,11 +104,21 @@ class CloudKitManager: ObservableObject {
     }
     
     func fetchBabyProfiles() async throws -> [CKRecord] {
-        let query = CKQuery(recordType: "BabyProfile", predicate: NSPredicate(value: true))
-        query.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        // First ensure user record exists
+        let userRecord = try await getOrCreateUserRecord()
+        
+        // Query for baby profiles created by this user
+        let userReference = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
+        let predicate = NSPredicate(format: "createdBy == %@", userReference)
+        let query = CKQuery(recordType: "BabyProfile", predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "birthDate", ascending: false)]
         
         let result = try await privateDatabase.records(matching: query)
         return result.matchResults.compactMap { try? $0.1.get() }
+    }
+    
+    func fetchBabyProfile(recordID: CKRecord.ID) async throws -> CKRecord {
+        return try await privateDatabase.record(for: recordID)
     }
     
     // MARK: - Activity Management
