@@ -47,6 +47,7 @@ struct HomeView: View {
     @State private var showingActivitySelector = false
     @State private var showingAddActivity = false
     @State private var selectedActivityType: ActivityType = .feeding
+    @State private var editingActivity: TotsActivity?
     
     var body: some View {
         NavigationView {
@@ -108,7 +109,16 @@ struct HomeView: View {
             DatePickerHistoryView(selectedDate: $selectedHistoryDate)
         }
         .sheet(isPresented: $showingAddActivity) {
-            AddActivityView(preselectedType: selectedActivityType)
+            if let editingActivity = editingActivity {
+                AddActivityView(editingActivity: editingActivity)
+            } else {
+                AddActivityView(preselectedType: selectedActivityType)
+            }
+        }
+        .onChange(of: showingAddActivity) { isShowing in
+            if !isShowing {
+                editingActivity = nil
+            }
         }
         .overlay(
             // Sleek Activity Selector Overlay
@@ -424,10 +434,23 @@ struct HomeView: View {
             
             VStack(spacing: 12) {
                 ForEach(dataManager.recentActivities.prefix(5)) { activity in
-                    ActivityRow(activity: activity)
+                    ActivityRow(activity: activity) {
+                        // Edit action
+                        editingActivity = activity
+                        showingAddActivity = true
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button("Delete", role: .destructive) {
+                            deleteActivity(activity)
+                        }
+                    }
                 }
             }
         }
+    }
+    
+    private func deleteActivity(_ activity: TotsActivity) {
+        dataManager.deleteActivity(activity)
     }
     
     private func getDaysOld() -> Int {
@@ -1094,6 +1117,7 @@ struct ProgressRing: View {
 
 struct ActivityRow: View {
     let activity: TotsActivity
+    let onTap: () -> Void
     
     private var timeString: String {
         let formatter = DateFormatter()
@@ -1146,6 +1170,10 @@ struct ActivityRow: View {
             }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 

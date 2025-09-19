@@ -338,6 +338,39 @@ class TotsDataManager: ObservableObject {
         }
     }
     
+    func deleteActivity(_ activity: TotsActivity) {
+        recentActivities.removeAll { $0.id == activity.id }
+        updateCountdowns() // Update countdowns after deleting activity
+        
+        // Update Live Activity if running
+        updateLiveActivity()
+        
+        // Recalculate stats
+        calculateStats()
+    }
+    
+    func updateActivity(_ oldActivity: TotsActivity, with newActivity: TotsActivity) {
+        if let index = recentActivities.firstIndex(where: { $0.id == oldActivity.id }) {
+            // Create updated activity with same ID
+            var updatedActivity = newActivity
+            updatedActivity = TotsActivity(
+                type: newActivity.type,
+                time: newActivity.time,
+                details: newActivity.details,
+                mood: newActivity.mood,
+                duration: newActivity.duration,
+                notes: newActivity.notes,
+                weight: newActivity.weight,
+                height: newActivity.height
+            )
+            
+            recentActivities[index] = updatedActivity
+            updateCountdowns()
+            updateLiveActivity()
+            calculateStats()
+        }
+    }
+    
     private func updateTodayStats(for activity: TotsActivity) {
         switch activity.type {
         case .feeding:

@@ -7,9 +7,11 @@ struct AddActivityView: View {
     @State private var selectedActivityType: ActivityType = .feeding
     
     let preselectedType: ActivityType?
+    let editingActivity: TotsActivity?
     
-    init(preselectedType: ActivityType? = nil) {
+    init(preselectedType: ActivityType? = nil, editingActivity: TotsActivity? = nil) {
         self.preselectedType = preselectedType
+        self.editingActivity = editingActivity
     }
     @State private var activityTime = Date()
     @State private var selectedMood: BabyMood = .content
@@ -29,6 +31,12 @@ struct AddActivityView: View {
     @State private var selectedWeightOz: Double = 0.0
     @State private var selectedHeightFt: Int = 1
     @State private var selectedHeightIn: Double = 8.0
+    
+    // Tummy time stopwatch states
+    @State private var tummyTimeIsRunning = false
+    @State private var tummyTimeStartTime: Date?
+    @State private var tummyTimeElapsed: TimeInterval = 0
+    @State private var tummyTimeTimer: Timer?
     
     enum FeedingType: String, CaseIterable {
         case bottle = "Bottle"
@@ -81,7 +89,7 @@ struct AddActivityView: View {
                     .padding()
                 }
             }
-                .navigationTitle("Add \(selectedActivityType.name)")
+                .navigationTitle(editingActivity != nil ? "Edit \(selectedActivityType.name)" : "Add \(selectedActivityType.name)")
                 .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -92,9 +100,22 @@ struct AddActivityView: View {
             }
         }
         .onAppear {
-            if let preselectedType = preselectedType {
+            if let editingActivity = editingActivity {
+                // Populate fields for editing
+                selectedActivityType = editingActivity.type
+                activityTime = editingActivity.time
+                notes = editingActivity.notes ?? ""
+                
+                // Parse activity-specific data from details
+                parseActivityDetails(editingActivity)
+            } else if let preselectedType = preselectedType {
                 selectedActivityType = preselectedType
             }
+        }
+        .onDisappear {
+            // Clean up timer when view disappears
+            tummyTimeTimer?.invalidate()
+            tummyTimeTimer = nil
         }
     }
     
@@ -168,7 +189,7 @@ struct AddActivityView: View {
         case .milestone:
             milestoneDetailsView
         case .play:
-            EmptyView()
+            tummyTimeDetailsView
         case .growth:
             growthDetailsView
         }
@@ -561,7 +582,9 @@ struct AddActivityView: View {
         case .milestone:
             details = milestoneDescription.isEmpty ? milestoneTitle : "\(milestoneTitle) - \(milestoneDescription)"
         case .play:
-            details = "Play time"
+            let minutes = Int(tummyTimeElapsed / 60)
+            let seconds = Int(tummyTimeElapsed) % 60
+            details = "Tummy time - \(minutes)m \(seconds)s"
         case .growth:
             let totalWeightLbs = selectedWeightLbs + (selectedWeightOz / 16.0)
             let totalHeightInches = Double(selectedHeightFt * 12) + selectedHeightIn
@@ -569,19 +592,177 @@ struct AddActivityView: View {
                            totalWeightLbs, selectedHeightFt, selectedHeightIn)
         }
         
-        let activity = TotsActivity(
-            type: selectedActivityType,
-            time: activityTime,
-            details: details,
-            mood: .content, // Default to content mood
-            duration: getDuration(),
-            notes: notes.isEmpty ? nil : notes,
-            weight: selectedActivityType == .growth ? selectedWeightLbs + (selectedWeightOz / 16.0) : nil,
-            height: selectedActivityType == .growth ? Double(selectedHeightFt * 12) + selectedHeightIn : nil
-        )
+        if let editingActivity = editingActivity {
+            // Update existing activity
+            dataManager.updateActivity(editingActivity, with: TotsActivity(
+                type: selectedActivityType,
+                time: activityTime,
+                details: details,
+                mood: .content,
+                duration: getDuration(),
+                notes: notes.isEmpty ? nil : notes,
+                weight: selectedActivityType == .growth ? selectedWeightLbs + (selectedWeightOz / 16.0) : nil,
+                height: selectedActivityType == .growth ? Double(selectedHeightFt * 12) + selectedHeightIn : nil
+            ))
+        } else {
+            // Create new activity
+            let activity = TotsActivity(
+                type: selectedActivityType,
+                time: activityTime,
+                details: details,
+                mood: .content,
+                duration: getDuration(),
+                notes: notes.isEmpty ? nil : notes,
+                weight: selectedActivityType == .growth ? selectedWeightLbs + (selectedWeightOz / 16.0) : nil,
+                height: selectedActivityType == .growth ? Double(selectedHeightFt * 12) + selectedHeightIn : nil
+            )
+            
+            dataManager.addActivity(activity)
+        }
         
-        dataManager.addActivity(activity)
         dismiss()
+    }
+    
+    private var tummyTimeDetailsView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Tummy Time")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+            
+            VStack(spacing: 20) {
+                // Stopwatch display
+                VStack(spacing: 8) {
+                    Text(formatElapsedTime(tummyTimeElapsed))
+                        .font(.system(size: 48, weight: .bold, design: .monospaced))
+                        .foregroundColor(tummyTimeIsRunning ? .green : .primary)
+                    
+                    Text(tummyTimeIsRunning ? "Timer Running" : "Timer Stopped")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Start/Stop button (only show one at a time)
+                if tummyTimeIsRunning {
+                    Button(action: stopTummyTime) {
+                        HStack {
+                            Image(systemName: "stop.fill")
+                            Text("Stop")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(12)
+                    }
+                } else {
+                    Button(action: startTummyTime) {
+                        HStack {
+                            Image(systemName: "play.fill")
+                            Text("Start")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(12)
+                    }
+                }
+                
+                // Reset button
+                Button(action: resetTummyTime) {
+                    HStack {
+                        Image(systemName: "arrow.counterclockwise")
+                        Text("Reset")
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                }
+                .disabled(tummyTimeIsRunning)
+            }
+            .padding()
+            .liquidGlassCard()
+        }
+    }
+    
+    private func formatElapsedTime(_ timeInterval: TimeInterval) -> String {
+        let minutes = Int(timeInterval) / 60
+        let seconds = Int(timeInterval) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    private func startTummyTime() {
+        tummyTimeIsRunning = true
+        tummyTimeStartTime = Date()
+        
+        tummyTimeTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if let startTime = tummyTimeStartTime {
+                tummyTimeElapsed = Date().timeIntervalSince(startTime)
+            }
+        }
+    }
+    
+    private func stopTummyTime() {
+        tummyTimeIsRunning = false
+        tummyTimeTimer?.invalidate()
+        tummyTimeTimer = nil
+    }
+    
+    private func resetTummyTime() {
+        tummyTimeElapsed = 0
+        tummyTimeStartTime = nil
+    }
+    
+    private func parseActivityDetails(_ activity: TotsActivity) {
+        let details = activity.details.lowercased()
+        
+        switch activity.type {
+        case .feeding:
+            // Parse feeding amount from details like "Bottle - 4.0 oz"
+            let ozPattern = #"(\d+(?:\.\d+)?)\s*oz"#
+            if let regex = try? NSRegularExpression(pattern: ozPattern),
+               let match = regex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+               let range = Range(match.range(at: 1), in: details) {
+                feedingAmountOz = Double(String(details[range])) ?? 4.0
+            }
+            
+            if details.contains("bottle") {
+                feedingType = .bottle
+            } else if details.contains("breastfeeding") {
+                feedingType = .breastfeeding
+            } else if details.contains("solid") {
+                feedingType = .solid
+            }
+            
+        case .diaper:
+            if details.contains("wet") {
+                diaperType = .wet
+            } else if details.contains("dirty") {
+                diaperType = .dirty
+            } else if details.contains("mixed") {
+                diaperType = .mixed
+            }
+            
+        case .sleep:
+            // Parse sleep duration from details like "Slept for 1.5 hours"
+            let hourPattern = #"(\d+(?:\.\d+)?)\s*hours?"#
+            if let regex = try? NSRegularExpression(pattern: hourPattern),
+               let match = regex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+               let range = Range(match.range(at: 1), in: details) {
+                sleepDuration = Double(String(details[range])) ?? 1.5
+            }
+            
+        case .play:
+            // Parse tummy time duration from details like "Tummy time - 15m 30s"
+            if let duration = activity.duration {
+                tummyTimeElapsed = TimeInterval(duration * 60) // Convert minutes to seconds
+            }
+            
+        default:
+            break
+        }
     }
     
     private func getDuration() -> Int? {
@@ -590,6 +771,8 @@ struct AddActivityView: View {
             return Int(sleepDuration * 60) // Convert hours to minutes
         case .feeding:
             return feedingType == .breastfeeding ? 15 : nil
+        case .play:
+            return Int(tummyTimeElapsed / 60) // Convert seconds to minutes
         default:
             return nil
         }
