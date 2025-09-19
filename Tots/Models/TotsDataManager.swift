@@ -23,7 +23,7 @@ class TotsDataManager: ObservableObject {
     // CloudKit
     @Published var familySharingEnabled: Bool = false
     @Published var babyProfileRecord: CKRecord?
-    private let cloudKitManager = CloudKitManager.shared
+    let cloudKitManager = CloudKitManager.shared
     private let schemaSetup = CloudKitSchemaSetup.shared
     
     // Live Activity
@@ -1110,7 +1110,62 @@ extension TotsDataManager {
     
     func shareBabyProfile() async throws -> CKShare? {
         guard let profileRecord = babyProfileRecord else { return nil }
-        return try await cloudKitManager.shareBabyProfile(profileRecord)
+        let share = try await cloudKitManager.shareBabyProfile(profileRecord)
+        
+        await cloudKitManager.setActiveShare(share)
+        
+        return share
+    }
+    
+    func stopSharingProfile() async throws {
+        guard let profileRecord = babyProfileRecord else { return }
+        try await cloudKitManager.stopSharingProfile(profileRecord)
+        
+        await cloudKitManager.setActiveShare(nil)
+    }
+    
+    func fetchFamilyMembers() async throws -> [FamilyMember] {
+        guard let share = await cloudKitManager.activeShare else { return [] }
+        return try await cloudKitManager.fetchFamilyMembers(for: share)
+    }
+    
+    // MARK: - Account Management
+    
+    func signOut() async {
+        await cloudKitManager.signOut()
+        
+        await MainActor.run {
+            // Reset all local data
+            self.recentActivities = []
+            self.milestones = []
+            self.growthData = []
+            self.babyName = "Baby"
+            self.babyBirthDate = Calendar.current.date(byAdding: .month, value: -8, to: Date()) ?? Date()
+            self.babyProfileRecord = nil
+            self.familySharingEnabled = false
+            
+            // Stop any running live activities
+            self.stopLiveActivity()
+        }
+    }
+    
+    func deleteAccount() async throws {
+        // Delete from CloudKit first
+        try await cloudKitManager.deleteAccount()
+        
+        await MainActor.run {
+            // Clear all local data
+            self.recentActivities = []
+            self.milestones = []
+            self.growthData = []
+            self.babyName = "Baby"
+            self.babyBirthDate = Calendar.current.date(byAdding: .month, value: -8, to: Date()) ?? Date()
+            self.babyProfileRecord = nil
+            self.familySharingEnabled = false
+            
+            // Stop any running live activities
+            self.stopLiveActivity()
+        }
     }
     
     func syncFromCloudKit() async {

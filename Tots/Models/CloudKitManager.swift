@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 class CloudKitManager: ObservableObject {
-    static let shared = CloudKitManager()
+    nonisolated static let shared = CloudKitManager()
     
     private let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
     private let privateDatabase: CKDatabase
@@ -19,7 +19,7 @@ class CloudKitManager: ObservableObject {
         case idle, syncing, success, error(String)
     }
     
-    private init() {
+    nonisolated private init() {
         privateDatabase = container.privateCloudDatabase
         sharedDatabase = container.sharedCloudDatabase
         
@@ -29,7 +29,9 @@ class CloudKitManager: ObservableObject {
         print("   Environment: Production (aps-environment=production)")
         print("   Database: Private CloudKit Database")
         
-        checkAccountStatus()
+        Task { @MainActor in
+            checkAccountStatus()
+        }
     }
     
     // MARK: - Account Management
@@ -206,6 +208,54 @@ class CloudKitManager: ObservableObject {
         }
     }
     
+    func fetchSharedProfiles() async throws -> [CKRecord] {
+        let query = CKQuery(recordType: "BabyProfile", predicate: NSPredicate(value: true))
+        query.sortDescriptors = [NSSortDescriptor(key: "birthDate", ascending: false)]
+        
+        let result = try await sharedDatabase.records(matching: query)
+        return result.matchResults.compactMap { try? $0.1.get() }
+    }
+    
+    func stopSharingProfile(_ profileRecord: CKRecord) async throws {
+        // Find the share record for this profile
+        let shareQuery = CKQuery(recordType: "cloudkit.share", predicate: NSPredicate(format: "rootRecord == %@", profileRecord.recordID))
+        let shareResult = try await privateDatabase.records(matching: shareQuery)
+        
+        if let shareRecord = shareResult.matchResults.first?.1 {
+            let share = try shareRecord.get()
+            try await privateDatabase.deleteRecord(withID: share.recordID)
+        }
+    }
+    
+    func fetchFamilyMembers(for share: CKShare) async throws -> [FamilyMember] {
+        var members: [FamilyMember] = []
+        
+        // Add owner
+        let ownerParticipant = share.owner
+        let member = FamilyMember(
+            name: ownerParticipant.userIdentity.nameComponents?.formatted() ?? "Owner",
+            email: ownerParticipant.userIdentity.lookupInfo?.emailAddress ?? "",
+            role: .owner,
+            permission: .readWrite
+        )
+        members.append(member)
+        
+        // Add participants
+        for participant in share.participants {
+            if participant != ownerParticipant {
+                let member = FamilyMember(
+                    name: participant.userIdentity.nameComponents?.formatted() ?? "Family Member",
+                    email: participant.userIdentity.lookupInfo?.emailAddress ?? "",
+                    role: participant.role,
+                    permission: participant.permission
+                )
+                members.append(member)
+            }
+        }
+        
+        return members
+    }
+    
     func acceptShare(_ metadata: CKShare.Metadata) async throws {
         let operation = CKAcceptSharesOperation(shareMetadatas: [metadata])
         operation.qualityOfService = .userInitiated
@@ -233,10 +283,71 @@ class CloudKitManager: ObservableObject {
         if let firstShare = result.matchResults.first?.1 {
             let shareRecord = try firstShare.get()
             if let share = shareRecord as? CKShare {
-                await MainActor.run {
-                    self.activeShare = share
+                await setActiveShare(share)
+            }
+        }
+    }
+    
+    func setActiveShare(_ share: CKShare?) async {
+        self.activeShare = share
+    }
+    
+    // MARK: - Account Management
+    
+    func signOut() async {
+        await MainActor.run {
+            self.isSignedIn = false
+            self.familyMembers = []
+            self.activeShare = nil
+            self.syncStatus = .idle
+        }
+        
+        // Clear local storage
+        UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
+        UserDefaults.standard.removeObject(forKey: "family_sharing_enabled")
+        UserDefaults.standard.set(false, forKey: "onboarding_completed")
+        
+        // Notify app to show onboarding
+        await MainActor.run {
+            NotificationCenter.default.post(name: .init("user_signed_out"), object: nil)
+        }
+    }
+    
+    func deleteAccount() async throws {
+        // Fetch all user's records and delete them
+        let userRecord = try await getOrCreateUserRecord()
+        
+        // Delete all baby profiles
+        let profiles = try await fetchBabyProfiles()
+        for profile in profiles {
+            // Stop sharing first
+            try await stopSharingProfile(profile)
+            // Then delete the profile
+            try await privateDatabase.deleteRecord(withID: profile.recordID)
+            
+            // Delete all activities for this profile
+            let activities = try await fetchActivities(for: profile.recordID)
+            for activity in activities {
+                if let activityRecord = try? await privateDatabase.record(for: CKRecord.ID(recordName: activity.id.uuidString)) {
+                    try await privateDatabase.deleteRecord(withID: activityRecord.recordID)
                 }
             }
+        }
+        
+        // Delete user record
+        try await privateDatabase.deleteRecord(withID: userRecord.recordID)
+        
+        // Clear local data
+        await signOut()
+        
+        // Clear all local data
+        let domain = Bundle.main.bundleIdentifier!
+        UserDefaults.standard.removePersistentDomain(forName: domain)
+        UserDefaults.standard.synchronize()
+        
+        // Notify app to show onboarding
+        await MainActor.run {
+            NotificationCenter.default.post(name: .init("user_signed_out"), object: nil)
         }
     }
 }

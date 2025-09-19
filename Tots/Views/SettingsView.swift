@@ -1,4 +1,5 @@
 import SwiftUI
+import CloudKit
 
 struct SettingsView: View {
     @EnvironmentObject var dataManager: TotsDataManager
@@ -7,6 +8,10 @@ struct SettingsView: View {
     @State private var isSettingUpCloudKit = false
     @State private var cloudKitSetupMessage = ""
     @State private var showingCloudKitShare = false
+    @State private var showingFamilyManager = false
+    @State private var showingDeleteConfirmation = false
+    @State private var showingLogoutConfirmation = false
+    @State private var familyMembers: [FamilyMember] = []
     
     var body: some View {
         ScrollView {
@@ -35,6 +40,30 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingPersonalDetails) {
             PersonalDetailsView()
+        }
+        .sheet(isPresented: $showingFamilyManager) {
+            FamilyManagerView(familyMembers: $familyMembers)
+                .environmentObject(dataManager)
+        }
+        .confirmationDialog("Delete Account", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete Account", role: .destructive) {
+                Task {
+                    try await dataManager.deleteAccount()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently delete all your data from CloudKit and cannot be undone.")
+        }
+        .confirmationDialog("Sign Out", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
+            Button("Sign Out", role: .destructive) {
+                Task {
+                    await dataManager.signOut()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will sign you out and clear all local data. Your CloudKit data will remain safe.")
         }
     }
     
@@ -117,7 +146,7 @@ struct SettingsView: View {
                         Spacer()
                         
                         if isSettingUpCloudKit {
-                            ProgressView()
+                            SwiftUI.ProgressView()
                                 .scaleEffect(0.8)
                         } else {
                             Image(systemName: "chevron.right")
@@ -138,16 +167,49 @@ struct SettingsView: View {
                         .padding(.horizontal)
                 }
             } else {
-                // Share Button (when CloudKit is enabled)
+                // Family Management (when CloudKit is enabled)
+                Button(action: {
+                    showingFamilyManager = true
+                    Task {
+                        familyMembers = try await dataManager.fetchFamilyMembers()
+                    }
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.3.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.green)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Manage Family Sharing")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                            
+                            Text("\(familyMembers.count) member\(familyMembers.count == 1 ? "" : "s")")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(16)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                
+                // Share Button
                 Button(action: {
                     self.shareWithFamily()
                 }) {
                     HStack(spacing: 12) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.green)
+                            .foregroundColor(.blue)
                         
-                        Text("Share with Family")
+                        Text("Invite New Family Member")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.primary)
                         
@@ -348,13 +410,13 @@ struct SettingsView: View {
                 icon: "trash.fill",
                 title: "Delete Account",
                 titleColor: .red,
-                action: { /* Delete account */ }
+                action: { showingDeleteConfirmation = true }
             )
             
             SettingsRow(
                 icon: "rectangle.portrait.and.arrow.right.fill",
-                title: "Logout",
-                action: { /* Logout */ }
+                title: "Sign Out",
+                action: { showingLogoutConfirmation = true }
             )
         }
     }
@@ -397,8 +459,8 @@ struct SettingsView: View {
             do {
                 if let share = try await dataManager.shareBabyProfile() {
                     await MainActor.run {
-                        // Present sharing UI
-                        showingCloudKitShare = true
+                        // Present CloudKit sharing controller
+                        presentCloudKitShareController(share: share)
                     }
                 }
             } catch {
@@ -407,6 +469,26 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+    
+    private func presentCloudKitShareController(share: CKShare) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first,
+              let rootViewController = window.rootViewController else {
+            return
+        }
+        
+        let shareController = UICloudSharingController(share: share, container: CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB"))
+        shareController.availablePermissions = [.allowPublic, .allowPrivate, .allowReadOnly, .allowReadWrite]
+        shareController.delegate = UIApplication.shared.delegate as? UICloudSharingControllerDelegate
+        
+        // Find the top-most view controller
+        var topController = rootViewController
+        while let presentedController = topController.presentedViewController {
+            topController = presentedController
+        }
+        
+        topController.present(shareController, animated: true)
     }
 }
 
@@ -612,6 +694,194 @@ struct PersonalDetailsView: View {
         dataManager.growthData = []
         dataManager.babyName = "Baby"
         dataManager.babyBirthDate = Calendar.current.date(byAdding: .month, value: -8, to: Date()) ?? Date()
+    }
+}
+
+struct FamilyManagerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: TotsDataManager
+    @Binding var familyMembers: [FamilyMember]
+    @State private var isLoading = true
+    @State private var hasActiveShare = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                if isLoading {
+                    VStack {
+                        SwiftUI.ProgressView()
+                        Text("Loading family members...")
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                } else {
+                    if familyMembers.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "person.3.sequence.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(.secondary)
+                            
+                            Text("No Family Members Yet")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            
+                            Text("Invite family members to share baby tracking duties!")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        .padding(.top, 40)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(familyMembers) { member in
+                                    FamilyMemberRow(member: member)
+                                }
+                            }
+                            .padding()
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            Task {
+                                if let share = try await dataManager.shareBabyProfile() {
+                                    await MainActor.run {
+                                        presentCloudKitShareController(share: share)
+                                    }
+                                }
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Invite Family Member")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                        }
+                        
+                        if hasActiveShare {
+                            Button(action: {
+                                Task {
+                                    try await dataManager.stopSharingProfile()
+                                    await MainActor.run {
+                                        familyMembers = []
+                                        dismiss()
+                                    }
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "stop.circle.fill")
+                                    Text("Stop Sharing")
+                                }
+                                .font(.headline)
+                                .foregroundColor(.red)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(12)
+                            }
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Family Members")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .task {
+            do {
+                familyMembers = try await dataManager.fetchFamilyMembers()
+                hasActiveShare = await dataManager.cloudKitManager.activeShare != nil
+                isLoading = false
+            } catch {
+                print("Failed to fetch family members: \(error)")
+                isLoading = false
+            }
+        }
+    }
+    
+    private func presentCloudKitShareController(share: CKShare) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first,
+              let rootViewController = window.rootViewController else {
+            return
+        }
+        
+        let shareController = UICloudSharingController(share: share, container: CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB"))
+        shareController.availablePermissions = [.allowPublic, .allowPrivate, .allowReadOnly, .allowReadWrite]
+        
+        var topController = rootViewController
+        while let presentedController = topController.presentedViewController {
+            topController = presentedController
+        }
+        
+        topController.present(shareController, animated: true)
+    }
+}
+
+struct FamilyMemberRow: View {
+    let member: FamilyMember
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Color.blue.opacity(0.2))
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Text(String(member.name.prefix(1)).uppercased())
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(member.name)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                HStack(spacing: 8) {
+                    Text(member.email)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text(member.role == .owner ? "Owner" : "Member")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(member.role == .owner ? Color.green.opacity(0.2) : Color.blue.opacity(0.2))
+                        .foregroundColor(member.role == .owner ? .green : .blue)
+                        .cornerRadius(8)
+                    
+                    Text(member.permission == .readWrite ? "Edit" : "View")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Color.gray.opacity(0.2))
+                        .foregroundColor(.secondary)
+                        .cornerRadius(8)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
     }
 }
 

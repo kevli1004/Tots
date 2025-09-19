@@ -24,16 +24,20 @@ struct TotsApp: App {
                         Text("Checking for your data...")
                             .foregroundColor(.secondary)
                         
-                        ProgressView()
+                        SwiftUI.ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .purple))
                     }
                     .environmentObject(dataManager)
                 } else if showOnboarding {
                     OnboardingView()
                         .environmentObject(dataManager)
-                        .onReceive(NotificationCenter.default.publisher(for: .init("onboarding_completed"))) { _ in
-                            showOnboarding = false
-                        }
+                    .onReceive(NotificationCenter.default.publisher(for: .init("onboarding_completed"))) { _ in
+                        showOnboarding = false
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_out"))) { _ in
+                        showOnboarding = true
+                        isCheckingExistingData = true
+                    }
                 } else {
                     ContentView()
                         .environmentObject(dataManager)
