@@ -7,7 +7,7 @@ class CloudKitManager: ObservableObject {
     nonisolated static let shared = CloudKitManager()
     
     private let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
-    private let privateDatabase: CKDatabase
+    let privateDatabase: CKDatabase
     private let sharedDatabase: CKDatabase
     
     @Published var isSignedIn = false
@@ -195,20 +195,29 @@ class CloudKitManager: ObservableObject {
     // MARK: - Family Sharing
     
     func shareBabyProfile(_ profileRecord: CKRecord) async throws -> CKShare {
-        // Ensure the profile record is saved first
-        let savedProfile = try await privateDatabase.save(profileRecord)
+        print("🔄 Creating CloudKit share for profile: \(profileRecord.recordID.recordName)")
         
-        // Create the share
-        let share = CKShare(rootRecord: savedProfile)
-        share[CKShare.SystemFieldKey.title] = "Baby Profile: \(savedProfile["name"] as? String ?? "Unknown")"
+        // Check if already shared first
+        let shareQuery = CKQuery(recordType: "cloudkit.share", predicate: NSPredicate(format: "rootRecord == %@", profileRecord.recordID))
+        let shareResult = try await privateDatabase.records(matching: shareQuery)
+        
+        if let existingShareResult = shareResult.matchResults.first?.1,
+           case .success(let existingShare) = existingShareResult,
+           let share = existingShare as? CKShare {
+            print("ℹ️ Profile already shared, returning existing share")
+            return share
+        }
+        
+        // Create new share
+        print("🔄 Creating new share...")
+        let share = CKShare(rootRecord: profileRecord)
         share.publicPermission = .none
         
-        // Note: Participant permissions are set when users accept the share
-        
         // Save the share
-        _ = try await privateDatabase.save(share)
+        let savedShare = try await privateDatabase.save(share) as! CKShare
+        print("✅ Share created successfully")
         
-        return share
+        return savedShare
     }
     
     func fetchSharedProfiles() async throws -> [CKRecord] {

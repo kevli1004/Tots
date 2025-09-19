@@ -1112,12 +1112,30 @@ extension TotsDataManager {
     }
     
     func shareBabyProfile() async throws -> CKShare? {
-        guard let profileRecord = babyProfileRecord else { return nil }
-        let share = try await cloudKitManager.shareBabyProfile(profileRecord)
+        guard let profileRecord = babyProfileRecord else { 
+            print("❌ No baby profile record found to share")
+            return nil 
+        }
         
-        await cloudKitManager.setActiveShare(share)
+        print("🔄 Attempting to share profile: \(profileRecord.recordID.recordName)")
         
-        return share
+        do {
+            let share = try await cloudKitManager.shareBabyProfile(profileRecord)
+            print("✅ Share created successfully")
+            
+            await cloudKitManager.setActiveShare(share)
+            
+            // Enable family sharing
+            await MainActor.run {
+                self.familySharingEnabled = true
+                UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+            }
+            
+            return share
+        } catch {
+            print("❌ Failed to share profile: \(error)")
+            throw error
+        }
     }
     
     func stopSharingProfile() async throws {

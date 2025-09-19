@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var familyMembers: [FamilyMember] = []
     @State private var showingDebugAlert = false
     @State private var debugMessage = ""
+    @State private var shareDelegate: ShareControllerDelegate?
     
     var body: some View {
         ScrollView {
@@ -219,15 +220,15 @@ struct SettingsView: View {
                 // Single Share Button
                 Button(action: {
                     Task {
-                        await shareWithFamily()
+                        await manageFamilySharing()
                     }
                 }) {
                     HStack(spacing: 12) {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: "person.3.fill")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundColor(.white)
                         
-                        Text("Share with Family")
+                        Text(dataManager.familySharingEnabled ? "Manage Family Sharing" : "Enable Family Sharing")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
                         
@@ -421,6 +422,43 @@ struct SettingsView: View {
     
     // MARK: - CloudKit Setup Methods
     
+    private func manageFamilySharing() async {
+        do {
+            if let share = try await dataManager.shareBabyProfile() {
+                await MainActor.run {
+                    // Show the native CloudKit sharing controller
+                    presentCloudKitSharingController(share: share)
+                }
+            }
+        } catch {
+            await MainActor.run {
+                debugMessage = "❌ Sharing failed:\n\(error.localizedDescription)\n\nTry again or check your internet connection."
+                showingDebugAlert = true
+            }
+        }
+    }
+    
+    private func presentCloudKitSharingController(share: CKShare) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else {
+            return
+        }
+        
+        let shareController = UICloudSharingController(share: share, container: CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB"))
+        shareDelegate = ShareControllerDelegate()
+        shareController.delegate = shareDelegate
+        shareController.availablePermissions = [.allowReadWrite, .allowPrivate]
+        shareController.modalPresentationStyle = .formSheet
+        
+        // Find the root view controller
+        var rootViewController = window.rootViewController
+        while let presented = rootViewController?.presentedViewController {
+            rootViewController = presented
+        }
+        
+        rootViewController?.present(shareController, animated: true)
+    }
+    
     private func setupCloudKitSharing() {
         self.isSettingUpCloudKit = true
         cloudKitSetupMessage = "Setting up CloudKit..."
@@ -452,42 +490,7 @@ struct SettingsView: View {
         }
     }
     
-    private func shareWithFamily() {
-        Task {
-            do {
-                if let share = try await dataManager.shareBabyProfile() {
-                    await MainActor.run {
-                        // Present CloudKit sharing controller
-                        presentCloudKitShareController(share: share)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    cloudKitSetupMessage = "❌ Sharing failed: \(error.localizedDescription)"
-                }
-            }
-        }
-    }
     
-    private func presentCloudKitShareController(share: CKShare) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first,
-              let rootViewController = window.rootViewController else {
-            return
-        }
-        
-        let shareController = UICloudSharingController(share: share, container: CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB"))
-        shareController.availablePermissions = [.allowPublic, .allowPrivate, .allowReadOnly, .allowReadWrite]
-        shareController.delegate = UIApplication.shared.delegate as? UICloudSharingControllerDelegate
-        
-        // Find the top-most view controller
-        var topController = rootViewController
-        while let presentedController = topController.presentedViewController {
-            topController = presentedController
-        }
-        
-        topController.present(shareController, animated: true)
-    }
 }
 
 struct SettingsRow: View {
@@ -746,16 +749,19 @@ struct FamilyManagerView: View {
                     VStack(spacing: 12) {
                         Button(action: {
                             Task {
-                                if let share = try await dataManager.shareBabyProfile() {
-                                    await MainActor.run {
-                                        presentCloudKitShareController(share: share)
+                                do {
+                                    if let share = try await dataManager.shareBabyProfile() {
+                                        // The sharing controller will be presented automatically
+                                        print("✅ Family sharing enabled successfully")
                                     }
+                                } catch {
+                                    print("❌ Family sharing failed: \(error)")
                                 }
                             }
                         }) {
                             HStack {
-                                Image(systemName: "plus.circle.fill")
-                                Text("Invite Family Member")
+                                Image(systemName: "person.3.fill")
+                                Text("Enable Family Sharing")
                             }
                             .font(.headline)
                             .foregroundColor(.white)
@@ -811,39 +817,6 @@ struct FamilyManagerView: View {
                 isLoading = false
             }
         }
-    }
-    
-    private func shareWithFamily() async {
-        do {
-            if let share = try await dataManager.shareBabyProfile() {
-                await MainActor.run {
-                    self.presentCloudKitShareController(share: share)
-                }
-            }
-        } catch {
-            await MainActor.run {
-                print("❌ Sharing failed: \(error.localizedDescription)")
-                // TODO: Show user-friendly error message
-            }
-        }
-    }
-    
-    private func presentCloudKitShareController(share: CKShare) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first,
-              let rootViewController = window.rootViewController else {
-            return
-        }
-        
-        let shareController = UICloudSharingController(share: share, container: CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB"))
-        shareController.availablePermissions = [.allowPublic, .allowPrivate, .allowReadOnly, .allowReadWrite]
-        
-        var topController = rootViewController
-        while let presentedController = topController.presentedViewController {
-            topController = presentedController
-        }
-        
-        topController.present(shareController, animated: true)
     }
     
     
@@ -926,6 +899,34 @@ struct FamilyMemberRow: View {
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(12)
+    }
+}
+
+// CloudKit sharing delegate
+class ShareControllerDelegate: NSObject, UICloudSharingControllerDelegate {
+    func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: Error) {
+        print("❌ Failed to save share: \(error)")
+    }
+    
+    func itemTitle(for csc: UICloudSharingController) -> String? {
+        return "Baby Profile"
+    }
+    
+    func itemThumbnailData(for csc: UICloudSharingController) -> Data? {
+        // Return thumbnail data for the baby profile if you have one
+        return nil
+    }
+    
+    func itemType(for csc: UICloudSharingController) -> String? {
+        return "Baby Tracking Profile"
+    }
+    
+    func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {
+        print("✅ Share saved successfully")
+    }
+    
+    func cloudSharingControllerDidStopSharing(_ csc: UICloudSharingController) {
+        print("ℹ️ Sharing stopped")
     }
 }
 
