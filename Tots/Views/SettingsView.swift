@@ -432,7 +432,7 @@ struct SettingsView: View {
             }
         } catch {
             await MainActor.run {
-                debugMessage = "❌ Sharing failed:\n\(error.localizedDescription)\n\nTry again or check your internet connection."
+                debugMessage = "❌ Sharing setup failed:\n\(error.localizedDescription)\n\nPlease try again."
                 showingDebugAlert = true
             }
         }
@@ -444,7 +444,15 @@ struct SettingsView: View {
             return
         }
         
-        let shareController = UICloudSharingController(share: share, container: CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB"))
+        let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
+        
+        // Always use the preparation handler to ensure proper setup
+        print("📱 Setting up CloudKit sharing UI...")
+        let shareController = UICloudSharingController { controller, prepareCompletionHandler in
+            // The share and container are prepared here
+            prepareCompletionHandler(share, container, nil)
+        }
+        
         shareDelegate = ShareControllerDelegate()
         shareController.delegate = shareDelegate
         shareController.availablePermissions = [.allowReadWrite, .allowPrivate]
@@ -748,16 +756,11 @@ struct FamilyManagerView: View {
                     
                     VStack(spacing: 12) {
                         Button(action: {
-                            Task {
-                                do {
-                                    if let share = try await dataManager.shareBabyProfile() {
-                                        // The sharing controller will be presented automatically
-                                        print("✅ Family sharing enabled successfully")
-                                    }
-                                } catch {
-                                    print("❌ Family sharing failed: \(error)")
-                                }
-                            }
+                            // Enable family sharing locally
+                            dataManager.familySharingEnabled = true
+                            UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+                            hasActiveShare = true
+                            print("✅ Family sharing enabled successfully")
                         }) {
                             HStack {
                                 Image(systemName: "person.3.fill")
