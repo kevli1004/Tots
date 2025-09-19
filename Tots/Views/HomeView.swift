@@ -1675,46 +1675,48 @@ struct ActivityButtonStyle: ButtonStyle {
 
 struct MilestonesView: View {
     @EnvironmentObject var dataManager: TotsDataManager
-    @State private var selectedCategory: FilterCategory = .all
+    @State private var selectedAgeGroup: AgeGroup = .all
     @State private var showingAddMilestone = false
     @State private var searchText = ""
     
-    enum FilterCategory: String, CaseIterable {
+    enum AgeGroup: String, CaseIterable {
         case all = "All"
-        case motor = "Motor Skills"
-        case language = "Language & Communication"
-        case social = "Social & Emotional"
-        case cognitive = "Cognitive & Learning"
-        case physical = "Physical Growth"
-        case feeding = "Feeding & Eating"
-        case sleep = "Sleep & Routine"
-        case sensory = "Sensory Development"
+        case newborn = "0-3 months"
+        case infant = "3-6 months"
+        case mobileBaby = "6-12 months"
+        case toddler = "12-24 months"
+        case preschooler = "2+ years"
         
         var icon: String {
             switch self {
             case .all: return "list.bullet"
-            case .motor: return "figure.walk"
-            case .language: return "bubble.left.and.text.bubble.right.fill"
-            case .social: return "heart.2.fill"
-            case .cognitive: return "brain.head.profile.fill"
-            case .physical: return "ruler.fill"
-            case .feeding: return "fork.knife"
-            case .sleep: return "moon.zzz.fill"
-            case .sensory: return "eye.fill"
+            case .newborn: return "heart.fill"
+            case .infant: return "face.smiling.fill"
+            case .mobileBaby: return "figure.crawl"
+            case .toddler: return "figure.walk"
+            case .preschooler: return "figure.run"
             }
         }
         
         var color: Color {
             switch self {
             case .all: return .blue
-            case .motor: return .blue
-            case .language: return .green
-            case .social: return .pink
-            case .cognitive: return .purple
-            case .physical: return .orange
-            case .feeding: return .red
-            case .sleep: return .indigo
-            case .sensory: return .yellow
+            case .newborn: return .pink
+            case .infant: return .green
+            case .mobileBaby: return .orange
+            case .toddler: return .purple
+            case .preschooler: return .red
+            }
+        }
+        
+        var ageRange: (min: Int, max: Int) {
+            switch self {
+            case .all: return (0, 999)
+            case .newborn: return (0, 12)  // 0-3 months
+            case .infant: return (12, 24)  // 3-6 months
+            case .mobileBaby: return (24, 52)  // 6-12 months
+            case .toddler: return (52, 104)  // 12-24 months
+            case .preschooler: return (104, 999)  // 2+ years
             }
         }
     }
@@ -1722,26 +1724,17 @@ struct MilestonesView: View {
     var filteredMilestones: [Milestone] {
         let relevantMilestones = dataManager.getRelevantMilestones()
         
-        let categoryFiltered = selectedCategory == .all ? 
+        let ageFiltered = selectedAgeGroup == .all ? 
             relevantMilestones : 
             relevantMilestones.filter { milestone in
-                switch selectedCategory {
-                case .motor: return milestone.category == .motor
-                case .language: return milestone.category == .language
-                case .social: return milestone.category == .social
-                case .cognitive: return milestone.category == .cognitive
-                case .physical: return milestone.category == .physical
-                case .feeding: return milestone.category == .feeding
-                case .sleep: return milestone.category == .sleep
-                case .sensory: return milestone.category == .sensory
-                case .all: return true
-                }
+                let ageRange = selectedAgeGroup.ageRange
+                return milestone.minAgeWeeks >= ageRange.min && milestone.maxAgeWeeks <= ageRange.max
             }
         
         if searchText.isEmpty {
-            return categoryFiltered
+            return ageFiltered
         } else {
-            return categoryFiltered.filter { 
+            return ageFiltered.filter { 
                 $0.title.localizedCaseInsensitiveContains(searchText) ||
                 $0.description.localizedCaseInsensitiveContains(searchText)
             }
@@ -1762,8 +1755,8 @@ struct MilestonesView: View {
                     // Header with stats
                     headerView
                     
-                    // Category selector
-                    categorySelector
+                    // Age group selector
+                    ageGroupSelector
                     
                     // Search bar
                     searchBar
@@ -1776,14 +1769,15 @@ struct MilestonesView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add") {
+                    Button("Add Custom") {
                         showingAddMilestone = true
                     }
                     .fontWeight(.semibold)
                 }
             }
             .sheet(isPresented: $showingAddMilestone) {
-                AddMilestoneView()
+                ImprovedAddMilestoneView()
+                    .environmentObject(dataManager)
             }
         }
     }
@@ -1792,14 +1786,15 @@ struct MilestonesView: View {
         VStack(spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(completedCount) of \(filteredMilestones.count)")
+                    Text("Your baby is \(dataManager.getBabyAgeInWeeks()) weeks old")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white.opacity(0.9))
+                    
+                    Text("\(completedCount) of \(filteredMilestones.count) milestones")
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                    
-                    Text("milestones completed")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
                 }
                 
                 Spacer()
@@ -1836,16 +1831,16 @@ struct MilestonesView: View {
         }
     }
     
-    private var categorySelector: some View {
+    private var ageGroupSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(FilterCategory.allCases, id: \.self) { category in
-                    MilestoneCategoryChip(
-                        category: category,
-                        isSelected: selectedCategory == category
+                ForEach(AgeGroup.allCases, id: \.self) { ageGroup in
+                    AgeGroupChip(
+                        ageGroup: ageGroup,
+                        isSelected: selectedAgeGroup == ageGroup
                     ) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedCategory = category
+                            selectedAgeGroup = ageGroup
                         }
                     }
                 }
@@ -1881,10 +1876,88 @@ struct MilestonesView: View {
     
     private var milestonesList: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(filteredMilestones) { milestone in
-                    MilestoneCard(milestone: milestone) {
-                        dataManager.completeMilestone(milestone)
+            LazyVStack(spacing: 16) {
+                if filteredMilestones.isEmpty {
+                    // Empty state
+                    VStack(spacing: 16) {
+                        Image(systemName: "star.circle")
+                            .font(.system(size: 60))
+                            .foregroundColor(.secondary.opacity(0.5))
+                        
+                        VStack(spacing: 8) {
+                            Text("No milestones yet")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                            
+                            Text("Add custom milestones to track your baby's development")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                        }
+                        
+                        Button("Add First Milestone") {
+                            showingAddMilestone = true
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(20)
+                    }
+                    .padding(.vertical, 60)
+                } else {
+                    // Group milestones by age ranges for better organization
+                    let groupedMilestones = Dictionary(grouping: filteredMilestones) { milestone in
+                        getAgeGroupForMilestone(milestone)
+                    }
+                    
+                    ForEach(AgeGroup.allCases.filter { ageGroup in
+                        groupedMilestones[ageGroup] != nil && !groupedMilestones[ageGroup]!.isEmpty
+                    }, id: \.self) { ageGroup in
+                        VStack(alignment: .leading, spacing: 12) {
+                            // Age group header
+                            HStack {
+                                Image(systemName: ageGroup.icon)
+                                    .font(.headline)
+                                    .foregroundColor(ageGroup.color)
+                                
+                                Text(ageGroup.rawValue)
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                let milestones = groupedMilestones[ageGroup] ?? []
+                                let completed = milestones.filter { $0.isCompleted }.count
+                                
+                                Text("\(completed)/\(milestones.count)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color(.systemGray5))
+                                    .clipShape(Capsule())
+                            }
+                            .padding(.horizontal, 16)
+                            
+                            // Milestones in this age group
+                            ForEach(groupedMilestones[ageGroup] ?? []) { milestone in
+                                MilestoneCard(
+                                    milestone: milestone,
+                                    onComplete: {
+                                        dataManager.completeMilestone(milestone)
+                                    },
+                                    onUncomplete: {
+                                        dataManager.uncompleteMilestone(milestone)
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1892,32 +1965,42 @@ struct MilestonesView: View {
             .padding(.bottom, 20)
         }
     }
+    
+    private func getAgeGroupForMilestone(_ milestone: Milestone) -> AgeGroup {
+        let midWeek = (milestone.minAgeWeeks + milestone.maxAgeWeeks) / 2
+        
+        if midWeek <= 12 { return .newborn }
+        else if midWeek <= 24 { return .infant }
+        else if midWeek <= 52 { return .mobileBaby }
+        else if midWeek <= 104 { return .toddler }
+        else { return .preschooler }
+    }
 }
 
-struct MilestoneCategoryChip: View {
-    let category: MilestonesView.FilterCategory
+struct AgeGroupChip: View {
+    let ageGroup: MilestonesView.AgeGroup
     let isSelected: Bool
     let onTap: () -> Void
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 6) {
-                Image(systemName: category.icon)
+                Image(systemName: ageGroup.icon)
                     .font(.caption)
-                Text(category.rawValue)
+                Text(ageGroup.rawValue)
                     .font(.subheadline)
                     .fontWeight(.medium)
             }
-            .foregroundColor(isSelected ? .white : category.color)
+            .foregroundColor(isSelected ? .white : ageGroup.color)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? category.color : category.color.opacity(0.1))
+                    .fill(isSelected ? ageGroup.color : ageGroup.color.opacity(0.1))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(category.color, lineWidth: isSelected ? 0 : 1)
+                    .stroke(ageGroup.color, lineWidth: isSelected ? 0 : 2)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -1927,6 +2010,8 @@ struct MilestoneCategoryChip: View {
 struct MilestoneCard: View {
     let milestone: Milestone
     let onComplete: () -> Void
+    let onUncomplete: () -> Void
+    @State private var isPressed = false
     
     var body: some View {
         HStack(spacing: 16) {
@@ -1934,10 +2019,18 @@ struct MilestoneCard: View {
             VStack {
                 Image(systemName: milestone.category.icon)
                     .font(.title2)
-                    .foregroundColor(milestone.category.color)
-                    .frame(width: 40, height: 40)
-                    .background(milestone.category.color.opacity(0.1))
-                    .clipShape(Circle())
+                    .foregroundColor(milestone.isCompleted ? .white : milestone.category.color)
+                    .frame(width: 50, height: 50)
+                    .background(
+                        Circle()
+                            .fill(milestone.isCompleted ? 
+                                  milestone.category.color : 
+                                  milestone.category.color.opacity(0.1))
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(milestone.category.color, lineWidth: milestone.isCompleted ? 0 : 2)
+                    )
                 
                 Spacer()
             }
@@ -1948,35 +2041,43 @@ struct MilestoneCard: View {
                     Text(milestone.title)
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .foregroundColor(milestone.isCompleted ? .secondary : .primary)
+                        .strikethrough(milestone.isCompleted)
                     
                     Spacer()
                     
                     Text(milestone.expectedAgeRange)
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.systemGray5))
-                        .clipShape(Capsule())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(milestone.category.color.opacity(0.8))
+                        )
                 }
                 
                 Text(milestone.description)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                    .lineLimit(3)
+                    .lineLimit(milestone.isCompleted ? 2 : 3)
                 
                 if milestone.isCompleted, let completedDate = milestone.completedDate {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
+                    HStack(spacing: 6) {
+                        Image(systemName: "party.popper.fill")
                             .foregroundColor(.green)
                             .font(.caption)
                         
                         Text("Completed \(completedDate, style: .date)")
                             .font(.caption)
+                            .fontWeight(.medium)
                             .foregroundColor(.green)
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.green.opacity(0.1))
+                    .clipShape(Capsule())
                 }
             }
             
@@ -1985,274 +2086,278 @@ struct MilestoneCard: View {
                 Spacer()
                 
                 if milestone.isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.green)
-                } else {
-                    Button(action: onComplete) {
-                        Image(systemName: "circle")
-                            .font(.title2)
-                            .foregroundColor(.gray)
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                            onUncomplete()
+                        }
+                    }) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title)
+                            .foregroundColor(.green)
                     }
                     .buttonStyle(PlainButtonStyle())
+                } else {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                            onComplete()
+                        }
+                    }) {
+                        Image(systemName: isPressed ? "checkmark.circle.fill" : "circle")
+                            .font(.title)
+                            .foregroundColor(isPressed ? .green : milestone.category.color)
+                            .scaleEffect(isPressed ? 1.2 : 1.0)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .onLongPressGesture(minimumDuration: 0.1, maximumDistance: 50, pressing: { pressing in
+                        withAnimation(.easeInOut(duration: 0.1)) {
+                            isPressed = pressing
+                        }
+                    }, perform: {})
                 }
             }
         }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(milestone.isCompleted ? 
+                      Color(.systemGray6) : 
+                      Color(.systemBackground))
+                .shadow(
+                    color: milestone.isCompleted ? .clear : .black.opacity(0.08), 
+                    radius: milestone.isCompleted ? 0 : 12, 
+                    x: 0, 
+                    y: milestone.isCompleted ? 0 : 4
+                )
+        )
+        .scaleEffect(milestone.isCompleted ? 0.98 : 1.0)
+        .opacity(milestone.isCompleted ? 0.8 : 1.0)
     }
 }
 
-struct AddMilestoneView: View {
+// MARK: - Improved Add Milestone View
+
+struct ImprovedAddMilestoneView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var selectedCategory: MilestoneCategory = .motor
     @State private var customTitle = ""
     @State private var customDescription = ""
-    @State private var expectedAge = ""
-    @State private var showingCustomForm = false
-    
-    // Predefined milestones by category
-    let predefinedMilestones: [MilestoneCategory: [PredefinedMilestone]] = [
-        .motor: [
-            PredefinedMilestone(title: "Holds Head Up", description: "Can hold head steady when upright", expectedAge: "2-4 months"),
-            PredefinedMilestone(title: "Rolls Over", description: "Rolls from tummy to back or back to tummy", expectedAge: "4-6 months"),
-            PredefinedMilestone(title: "Sits Without Support", description: "Can sit upright without falling over", expectedAge: "6-8 months"),
-            PredefinedMilestone(title: "Crawls", description: "Moves forward on hands and knees", expectedAge: "7-10 months"),
-            PredefinedMilestone(title: "Pulls to Stand", description: "Pulls themselves up to standing position", expectedAge: "9-12 months"),
-            PredefinedMilestone(title: "First Steps", description: "Takes first independent steps", expectedAge: "9-15 months"),
-            PredefinedMilestone(title: "Walks Independently", description: "Walks without support", expectedAge: "12-18 months"),
-        ],
-        .language: [
-            PredefinedMilestone(title: "First Sounds", description: "Makes cooing and gurgling sounds", expectedAge: "2-4 months"),
-            PredefinedMilestone(title: "Babbles", description: "Says 'ba-ba-ba' or 'ma-ma-ma'", expectedAge: "4-6 months"),
-            PredefinedMilestone(title: "Says First Word", description: "First recognizable word like 'mama' or 'dada'", expectedAge: "8-12 months"),
-            PredefinedMilestone(title: "Says 2-3 Words", description: "Uses 2-3 words consistently", expectedAge: "12-15 months"),
-            PredefinedMilestone(title: "Points to Objects", description: "Points to things when asked 'where is...'", expectedAge: "12-18 months"),
-            PredefinedMilestone(title: "Says 10+ Words", description: "Uses 10 or more words regularly", expectedAge: "15-18 months"),
-        ],
-        .social: [
-            PredefinedMilestone(title: "First Smile", description: "First genuine social smile", expectedAge: "6-8 weeks"),
-            PredefinedMilestone(title: "Laughs", description: "Laughs out loud", expectedAge: "3-5 months"),
-            PredefinedMilestone(title: "Recognizes Name", description: "Responds when name is called", expectedAge: "5-7 months"),
-            PredefinedMilestone(title: "Stranger Anxiety", description: "Shows wariness around strangers", expectedAge: "6-12 months"),
-            PredefinedMilestone(title: "Waves Bye-Bye", description: "Waves goodbye when prompted", expectedAge: "8-12 months"),
-            PredefinedMilestone(title: "Plays Peek-a-Boo", description: "Enjoys and participates in peek-a-boo", expectedAge: "6-10 months"),
-        ],
-        .cognitive: [
-            PredefinedMilestone(title: "Tracks Objects", description: "Follows objects with eyes", expectedAge: "2-4 months"),
-            PredefinedMilestone(title: "Reaches for Toys", description: "Reaches for and grasps toys", expectedAge: "4-6 months"),
-            PredefinedMilestone(title: "Object Permanence", description: "Looks for hidden objects", expectedAge: "8-12 months"),
-            PredefinedMilestone(title: "Cause and Effect", description: "Understands actions have consequences", expectedAge: "9-12 months"),
-            PredefinedMilestone(title: "Imitates Actions", description: "Copies simple actions", expectedAge: "9-15 months"),
-            PredefinedMilestone(title: "Follows Simple Commands", description: "Follows one-step instructions", expectedAge: "12-18 months"),
-        ],
-        .physical: [
-            PredefinedMilestone(title: "First Tooth", description: "First tooth has broken through", expectedAge: "6-10 months"),
-            PredefinedMilestone(title: "Pincer Grasp", description: "Picks up small objects with thumb and finger", expectedAge: "8-12 months"),
-            PredefinedMilestone(title: "Drinks from Cup", description: "Drinks from a sippy cup or regular cup", expectedAge: "6-12 months"),
-            PredefinedMilestone(title: "Eats Finger Foods", description: "Self-feeds with finger foods", expectedAge: "8-12 months"),
-            PredefinedMilestone(title: "Uses Spoon", description: "Attempts to use a spoon", expectedAge: "12-18 months"),
-            PredefinedMilestone(title: "Sleeps Through Night", description: "Sleeps 6+ hours without waking", expectedAge: "3-6 months"),
-        ]
-    ]
+    @State private var minAgeWeeks = 4
+    @State private var maxAgeWeeks = 8
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Category selector
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(Array(predefinedMilestones.keys.sorted(by: { $0.rawValue < $1.rawValue })), id: \.self) { category in
-                            MilestoneCategoryChip(
-                                category: MilestonesView.FilterCategory(rawValue: category.rawValue) ?? .motor,
-                                isSelected: selectedCategory.rawValue == category.rawValue
-                            ) {
-                                selectedCategory = category
-                            }
+            ZStack {
+                // Background
+                LiquidBackground()
+                
+                    VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "star.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.blue)
+                        
+                        VStack(spacing: 8) {
+                            Text("Add Custom Milestone")
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            
+                            Text("Track special moments unique to your baby's journey")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
                         }
                     }
-                    .padding(.horizontal, 16)
-                }
-                .padding(.vertical, 16)
-                
-                // Milestones list
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(predefinedMilestones[selectedCategory] ?? [], id: \.title) { milestone in
-                            PredefinedMilestoneRow(milestone: milestone) {
-                                addPredefinedMilestone(milestone)
+                    .padding(.top, 20)
+                    
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // Category Selection
+                            VStack(alignment: .leading, spacing: 16) {
+                                HStack {
+                                    Image(systemName: "tag.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Choose Category")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                }
+                                
+                                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
+                                    ForEach(MilestoneCategory.allCases, id: \.self) { category in
+                                        Button(action: {
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                selectedCategory = category
+                                            }
+                                        }) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: category.icon)
+                                                    .font(.title2)
+                                                    .foregroundColor(selectedCategory == category ? .white : category.color)
+                                                
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(category.rawValue)
+                                                        .font(.subheadline)
+                                                        .fontWeight(.semibold)
+                                                        .foregroundColor(selectedCategory == category ? .white : .primary)
+                                                        .multilineTextAlignment(.leading)
+                                                }
+                                                
+                                                Spacer()
+                                            }
+                                            .padding(16)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .fill(selectedCategory == category ? 
+                                                          category.color : 
+                                                          category.color.opacity(0.1))
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(category.color, lineWidth: selectedCategory == category ? 0 : 2)
+                                            )
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
                             }
+                            .liquidGlassCard()
+                            
+                            // Milestone Details
+                            VStack(alignment: .leading, spacing: 16) {
+                                HStack {
+                                    Image(systemName: "pencil.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("Milestone Details")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                }
+                                
+                                VStack(spacing: 16) {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Title")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.secondary)
+                                        TextField("e.g., 'First giggle', 'Loves peek-a-boo'", text: $customTitle)
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                            .font(.body)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Description (Optional)")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.secondary)
+                                        TextField("Add more details about this milestone...", text: $customDescription, axis: .vertical)
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                            .lineLimit(2...4)
+                                            .font(.body)
+                                    }
+                                }
+                            }
+                            .liquidGlassCard()
+                            
+                            // Age Range
+                            VStack(alignment: .leading, spacing: 16) {
+                                HStack {
+                                    Image(systemName: "calendar.circle.fill")
+                                        .foregroundColor(.orange)
+                                    Text("Expected Age Range")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                }
+                                
+                                VStack(spacing: 16) {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("From: \(minAgeWeeks) weeks")
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                            Spacer()
+                                            Text("(\(minAgeWeeks/4) months)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        Slider(value: Binding(
+                                            get: { Double(minAgeWeeks) },
+                                            set: { minAgeWeeks = Int($0) }
+                                        ), in: 0...104, step: 1)
+                                        .accentColor(selectedCategory.color)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("To: \(maxAgeWeeks) weeks")
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                            Spacer()
+                                            Text("(\(maxAgeWeeks/4) months)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        Slider(value: Binding(
+                                            get: { Double(maxAgeWeeks) },
+                                            set: { maxAgeWeeks = Int($0) }
+                                        ), in: 0...104, step: 1)
+                                        .accentColor(selectedCategory.color)
+                                    }
+                                }
+                            }
+                            .liquidGlassCard()
                         }
+                        .padding(.horizontal, 16)
+                    }
+                    
+                    // Action Buttons
+                    HStack(spacing: 16) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(16)
                         
-                        // Custom milestone option
-                        Button(action: { showingCustomForm = true }) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.blue)
-                                
-                                Text("Add Custom Milestone")
-                                    .font(.headline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.blue)
-                                
-                                Spacer()
-                            }
-                            .padding(16)
-                            .background(Color.blue.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        Button("Add Milestone") {
+                            let milestone = Milestone(
+                                title: customTitle,
+                                minAgeWeeks: minAgeWeeks,
+                                maxAgeWeeks: max(minAgeWeeks, maxAgeWeeks),
+                                category: selectedCategory,
+                                description: customDescription.isEmpty ? "Custom milestone" : customDescription
+                            )
+                            
+                            dataManager.addMilestone(milestone)
+                            dismiss()
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [selectedCategory.color, selectedCategory.color.opacity(0.8)]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(16)
+                        .disabled(customTitle.isEmpty)
+                        .opacity(customTitle.isEmpty ? 0.6 : 1.0)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                 }
             }
-            .navigationTitle("Add Milestone")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-            .sheet(isPresented: $showingCustomForm) {
-                CustomMilestoneForm(
-                    category: selectedCategory,
-                    title: $customTitle,
-                    description: $customDescription
-                ) { milestone in
-                    dataManager.addMilestone(milestone)
-                    dismiss()
-                }
-            }
-        }
-    }
-    
-    private func addPredefinedMilestone(_ predefined: PredefinedMilestone) {
-        // This function is no longer needed since we use the comprehensive predefined milestones
-        // from the data manager. Users can complete milestones directly from the main view.
-        dismiss()
-    }
-}
-
-struct PredefinedMilestone {
-    let title: String
-    let description: String
-    let expectedAge: String
-}
-
-struct PredefinedMilestoneRow: View {
-    let milestone: PredefinedMilestone
-    let onAdd: () -> Void
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(milestone.title)
-                    .font(.headline)
-                    .fontWeight(.medium)
-                
-                Text(milestone.description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-                
-                Text(milestone.expectedAge)
-                    .font(.caption)
-                    .foregroundColor(.blue)
-                    .fontWeight(.medium)
-            }
-            
-            Spacer()
-            
-            Button(action: onAdd) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.blue)
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-    }
-}
-
-struct CustomMilestoneForm: View {
-    @Environment(\.dismiss) private var dismiss
-    let category: MilestoneCategory
-    @Binding var title: String
-    @Binding var description: String
-    @State private var minAgeWeeks: Int = 4
-    @State private var maxAgeWeeks: Int = 8
-    let onSave: (Milestone) -> Void
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section("Milestone Details") {
-                    TextField("Title", text: $title)
-                    TextField("Description", text: $description, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-                
-                Section("Expected Age Range") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Minimum Age: \(minAgeWeeks) weeks")
-                            .font(.subheadline)
-                        Slider(value: Binding(
-                            get: { Double(minAgeWeeks) },
-                            set: { minAgeWeeks = Int($0) }
-                        ), in: 0...208, step: 1)
-                        
-                        Text("Maximum Age: \(maxAgeWeeks) weeks")
-                            .font(.subheadline)
-                        Slider(value: Binding(
-                            get: { Double(maxAgeWeeks) },
-                            set: { maxAgeWeeks = Int($0) }
-                        ), in: 0...208, step: 1)
-                    }
-                }
-                
-                Section("Category") {
-                    HStack {
-                        Image(systemName: category.icon)
-                            .foregroundColor(category.color)
-                        Text(category.rawValue)
-                        Spacer()
-                    }
-                }
-            }
-            .navigationTitle("Custom Milestone")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        let milestone = Milestone(
-                            title: title,
-                            minAgeWeeks: minAgeWeeks,
-                            maxAgeWeeks: max(minAgeWeeks, maxAgeWeeks),
-                            category: category,
-                            description: description
-                        )
-                        onSave(milestone)
-                        dismiss()
-                    }
-                    .disabled(title.isEmpty)
-                }
-            }
+            .navigationBarHidden(true)
         }
     }
 }

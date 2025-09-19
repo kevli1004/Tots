@@ -66,7 +66,10 @@ class TotsDataManager: ObservableObject {
             UserDefaults.standard.set(babyName, forKey: babyNameKey)
         }
     }
-    @Published var babyBirthDate: Date = Date() {
+    @Published var babyBirthDate: Date = {
+        // Default to 8 weeks ago for demo purposes
+        Calendar.current.date(byAdding: .weekOfYear, value: -8, to: Date()) ?? Date()
+    }() {
         didSet {
             UserDefaults.standard.set(babyBirthDate, forKey: babyBirthDateKey)
         }
@@ -118,61 +121,118 @@ class TotsDataManager: ObservableObject {
         }
     }
     
-    // Predefined milestones for different age groups
+    // Comprehensive predefined milestones based on AAP, CDC, and WHO guidelines
     private let predefinedMilestones: [Milestone] = [
-        // 0-3 months (Newborn)
-        Milestone(title: "First smile", minAgeWeeks: 4, maxAgeWeeks: 8, category: .social, description: "Baby shows their first social smile in response to you", isPredefined: true),
-        Milestone(title: "Holds head up briefly", minAgeWeeks: 2, maxAgeWeeks: 6, category: .motor, description: "Can lift head for short periods during tummy time", isPredefined: true),
-        Milestone(title: "Follows objects with eyes", minAgeWeeks: 3, maxAgeWeeks: 8, category: .sensory, description: "Tracks moving objects or faces with their eyes", isPredefined: true),
-        Milestone(title: "Makes cooing sounds", minAgeWeeks: 6, maxAgeWeeks: 12, category: .language, description: "Makes soft cooing or gurgling sounds", isPredefined: true),
-        Milestone(title: "Startles at loud sounds", minAgeWeeks: 0, maxAgeWeeks: 4, category: .sensory, description: "Shows startle reflex to sudden noises", isPredefined: true),
+        // BIRTH TO 2 MONTHS
+        Milestone(title: "Lifts head briefly", minAgeWeeks: 0, maxAgeWeeks: 4, category: .motor, description: "Lifts head briefly during tummy time", isPredefined: true),
+        Milestone(title: "Startles at loud sounds", minAgeWeeks: 0, maxAgeWeeks: 2, category: .sensory, description: "Shows startle reflex to sudden noises", isPredefined: true),
+        Milestone(title: "Focuses on faces", minAgeWeeks: 0, maxAgeWeeks: 4, category: .sensory, description: "Looks at faces, especially parent's face", isPredefined: true),
+        Milestone(title: "Makes quiet sounds", minAgeWeeks: 2, maxAgeWeeks: 6, category: .language, description: "Makes soft grunting or cooing sounds", isPredefined: true),
+        Milestone(title: "Calms when comforted", minAgeWeeks: 0, maxAgeWeeks: 4, category: .social, description: "Calms down when picked up or spoken to", isPredefined: true),
+        Milestone(title: "Sleeps 14-17 hours daily", minAgeWeeks: 0, maxAgeWeeks: 8, category: .sleep, description: "Sleeps in short periods throughout day and night", isPredefined: true),
         
-        // 3-6 months
+        // 2-4 MONTHS
+        Milestone(title: "First social smile", minAgeWeeks: 4, maxAgeWeeks: 10, category: .social, description: "Smiles in response to your voice or face", isPredefined: true),
+        Milestone(title: "Holds head steady", minAgeWeeks: 6, maxAgeWeeks: 12, category: .motor, description: "Holds head steady when upright", isPredefined: true),
+        Milestone(title: "Follows objects with eyes", minAgeWeeks: 6, maxAgeWeeks: 12, category: .sensory, description: "Tracks moving objects with eyes", isPredefined: true),
+        Milestone(title: "Makes cooing sounds", minAgeWeeks: 6, maxAgeWeeks: 14, category: .language, description: "Makes happy cooing and gurgling sounds", isPredefined: true),
+        Milestone(title: "Brings hands to mouth", minAgeWeeks: 6, maxAgeWeeks: 12, category: .motor, description: "Brings hands to mouth and may suck on them", isPredefined: true),
+        Milestone(title: "Pushes up on forearms", minAgeWeeks: 8, maxAgeWeeks: 16, category: .motor, description: "Pushes up on forearms during tummy time", isPredefined: true),
+        
+        // 4-6 MONTHS
         Milestone(title: "Laughs out loud", minAgeWeeks: 12, maxAgeWeeks: 20, category: .social, description: "Giggles and laughs in response to play", isPredefined: true),
-        Milestone(title: "Sits with support", minAgeWeeks: 16, maxAgeWeeks: 24, category: .motor, description: "Can sit upright when supported by pillows or hands", isPredefined: true),
-        Milestone(title: "Reaches for toys", minAgeWeeks: 12, maxAgeWeeks: 20, category: .motor, description: "Deliberately reaches for and grasps objects", isPredefined: true),
-        Milestone(title: "Rolls over", minAgeWeeks: 16, maxAgeWeeks: 28, category: .motor, description: "Rolls from tummy to back or back to tummy", isPredefined: true),
-        Milestone(title: "Babbles consonants", minAgeWeeks: 20, maxAgeWeeks: 32, category: .language, description: "Makes sounds like 'ba-ba' or 'da-da'", isPredefined: true),
-        Milestone(title: "Puts everything in mouth", minAgeWeeks: 16, maxAgeWeeks: 24, category: .sensory, description: "Explores objects by putting them in mouth", isPredefined: true),
+        Milestone(title: "Reaches for toys", minAgeWeeks: 12, maxAgeWeeks: 20, category: .motor, description: "Reaches for and grasps toys", isPredefined: true),
+        Milestone(title: "Rolls from tummy to back", minAgeWeeks: 14, maxAgeWeeks: 24, category: .motor, description: "Rolls over from tummy to back", isPredefined: true),
+        Milestone(title: "Sits with support", minAgeWeeks: 16, maxAgeWeeks: 24, category: .motor, description: "Sits with support from pillows or hands", isPredefined: true),
+        Milestone(title: "Babbles with consonants", minAgeWeeks: 16, maxAgeWeeks: 28, category: .language, description: "Makes sounds like 'ba', 'ma', 'da'", isPredefined: true),
+        Milestone(title: "Puts everything in mouth", minAgeWeeks: 16, maxAgeWeeks: 32, category: .sensory, description: "Explores objects by mouthing them", isPredefined: true),
+        Milestone(title: "Shows curiosity", minAgeWeeks: 16, maxAgeWeeks: 24, category: .cognitive, description: "Shows interest in surroundings", isPredefined: true),
+        Milestone(title: "Ready for solid foods", minAgeWeeks: 17, maxAgeWeeks: 26, category: .feeding, description: "Shows signs of readiness for first foods", isPredefined: true),
         
-        // 6-9 months
-        Milestone(title: "Sits without support", minAgeWeeks: 24, maxAgeWeeks: 36, category: .motor, description: "Sits independently without falling over", isPredefined: true),
+        // 6-9 MONTHS
+        Milestone(title: "Sits without support", minAgeWeeks: 24, maxAgeWeeks: 36, category: .motor, description: "Sits independently without falling", isPredefined: true),
         Milestone(title: "Crawls or scoots", minAgeWeeks: 28, maxAgeWeeks: 40, category: .motor, description: "Moves around by crawling, scooting, or rolling", isPredefined: true),
-        Milestone(title: "Says 'mama' or 'dada'", minAgeWeeks: 28, maxAgeWeeks: 44, category: .language, description: "Says first words, may not be specific to parent yet", isPredefined: true),
-        Milestone(title: "Plays peek-a-boo", minAgeWeeks: 32, maxAgeWeeks: 44, category: .social, description: "Enjoys and participates in peek-a-boo games", isPredefined: true),
+        Milestone(title: "Transfers objects", minAgeWeeks: 24, maxAgeWeeks: 32, category: .motor, description: "Passes objects from one hand to the other", isPredefined: true),
+        Milestone(title: "Says 'mama' or 'dada'", minAgeWeeks: 28, maxAgeWeeks: 44, category: .language, description: "Says first words (may not be specific)", isPredefined: true),
+        Milestone(title: "Responds to name", minAgeWeeks: 24, maxAgeWeeks: 36, category: .language, description: "Looks when you call their name", isPredefined: true),
+        Milestone(title: "Shows stranger anxiety", minAgeWeeks: 24, maxAgeWeeks: 40, category: .social, description: "May be wary of strangers", isPredefined: true),
+        Milestone(title: "Plays peek-a-boo", minAgeWeeks: 28, maxAgeWeeks: 40, category: .social, description: "Enjoys and participates in peek-a-boo", isPredefined: true),
+        Milestone(title: "Looks for dropped objects", minAgeWeeks: 28, maxAgeWeeks: 40, category: .cognitive, description: "Understands object permanence", isPredefined: true),
+        Milestone(title: "Eats finger foods", minAgeWeeks: 32, maxAgeWeeks: 44, category: .feeding, description: "Self-feeds with finger foods", isPredefined: true),
+        
+        // 9-12 MONTHS
+        Milestone(title: "Pulls to standing", minAgeWeeks: 36, maxAgeWeeks: 48, category: .motor, description: "Pulls themselves up to standing", isPredefined: true),
+        Milestone(title: "Cruises along furniture", minAgeWeeks: 40, maxAgeWeeks: 52, category: .motor, description: "Walks holding onto furniture", isPredefined: true),
         Milestone(title: "Pincer grasp", minAgeWeeks: 36, maxAgeWeeks: 48, category: .motor, description: "Picks up small objects with thumb and finger", isPredefined: true),
-        Milestone(title: "Eats finger foods", minAgeWeeks: 32, maxAgeWeeks: 44, category: .feeding, description: "Self-feeds with small pieces of soft food", isPredefined: true),
-        
-        // 9-12 months
-        Milestone(title: "Pulls to standing", minAgeWeeks: 36, maxAgeWeeks: 48, category: .motor, description: "Pulls themselves up to standing position", isPredefined: true),
-        Milestone(title: "Cruises along furniture", minAgeWeeks: 40, maxAgeWeeks: 52, category: .motor, description: "Walks while holding onto furniture for support", isPredefined: true),
         Milestone(title: "Waves bye-bye", minAgeWeeks: 36, maxAgeWeeks: 48, category: .social, description: "Waves hand to say goodbye", isPredefined: true),
-        Milestone(title: "Responds to name", minAgeWeeks: 32, maxAgeWeeks: 44, category: .language, description: "Looks when you call their name", isPredefined: true),
-        Milestone(title: "Imitates sounds", minAgeWeeks: 36, maxAgeWeeks: 52, category: .language, description: "Copies sounds and gestures you make", isPredefined: true),
-        Milestone(title: "Drinks from cup", minAgeWeeks: 40, maxAgeWeeks: 60, category: .feeding, description: "Drinks from a sippy cup or regular cup with help", isPredefined: true),
+        Milestone(title: "Imitates sounds", minAgeWeeks: 36, maxAgeWeeks: 52, category: .language, description: "Copies sounds and simple words", isPredefined: true),
+        Milestone(title: "Understands 'no'", minAgeWeeks: 36, maxAgeWeeks: 48, category: .language, description: "Responds to the word 'no'", isPredefined: true),
+        Milestone(title: "Shows preferences", minAgeWeeks: 36, maxAgeWeeks: 52, category: .social, description: "Shows clear preferences for people and toys", isPredefined: true),
+        Milestone(title: "Drinks from cup", minAgeWeeks: 40, maxAgeWeeks: 60, category: .feeding, description: "Drinks from sippy cup with help", isPredefined: true),
         
-        // 12-18 months (Toddler)
+        // 12-15 MONTHS
         Milestone(title: "First steps", minAgeWeeks: 48, maxAgeWeeks: 72, category: .motor, description: "Takes first independent steps", isPredefined: true),
-        Milestone(title: "Says first words", minAgeWeeks: 44, maxAgeWeeks: 68, category: .language, description: "Uses words meaningfully (mama, dada, ball, etc.)", isPredefined: true),
-        Milestone(title: "Points at objects", minAgeWeeks: 48, maxAgeWeeks: 64, category: .language, description: "Points to show you things they want or find interesting", isPredefined: true),
-        Milestone(title: "Stacks blocks", minAgeWeeks: 52, maxAgeWeeks: 72, category: .cognitive, description: "Stacks 2-3 blocks on top of each other", isPredefined: true),
-        Milestone(title: "Shows affection", minAgeWeeks: 48, maxAgeWeeks: 68, category: .social, description: "Gives hugs, kisses, or shows other signs of affection", isPredefined: true),
-        Milestone(title: "Uses spoon", minAgeWeeks: 52, maxAgeWeeks: 78, category: .feeding, description: "Attempts to use a spoon to self-feed", isPredefined: true),
+        Milestone(title: "Says first words", minAgeWeeks: 44, maxAgeWeeks: 68, category: .language, description: "Uses words meaningfully (mama, dada, etc.)", isPredefined: true),
+        Milestone(title: "Points at objects", minAgeWeeks: 48, maxAgeWeeks: 64, category: .language, description: "Points to show you things", isPredefined: true),
+        Milestone(title: "Stacks 2 blocks", minAgeWeeks: 52, maxAgeWeeks: 68, category: .cognitive, description: "Stacks 2 blocks on top of each other", isPredefined: true),
+        Milestone(title: "Shows affection", minAgeWeeks: 48, maxAgeWeeks: 68, category: .social, description: "Gives hugs and kisses", isPredefined: true),
+        Milestone(title: "Uses spoon", minAgeWeeks: 52, maxAgeWeeks: 78, category: .feeding, description: "Attempts to use spoon to self-feed", isPredefined: true),
+        Milestone(title: "Sleeps through night", minAgeWeeks: 24, maxAgeWeeks: 78, category: .sleep, description: "Sleeps 6+ hours without waking", isPredefined: true),
         
-        // 18-24 months
+        // 15-18 MONTHS
+        Milestone(title: "Walks independently", minAgeWeeks: 52, maxAgeWeeks: 78, category: .motor, description: "Walks without support", isPredefined: true),
+        Milestone(title: "Climbs stairs with help", minAgeWeeks: 60, maxAgeWeeks: 84, category: .motor, description: "Climbs stairs with one hand held", isPredefined: true),
+        Milestone(title: "Says 3-5 words", minAgeWeeks: 60, maxAgeWeeks: 78, category: .language, description: "Uses 3-5 words regularly", isPredefined: true),
+        Milestone(title: "Follows simple commands", minAgeWeeks: 60, maxAgeWeeks: 78, category: .language, description: "Follows one-step instructions", isPredefined: true),
+        Milestone(title: "Imitates activities", minAgeWeeks: 60, maxAgeWeeks: 78, category: .cognitive, description: "Imitates household activities", isPredefined: true),
+        Milestone(title: "Shows independence", minAgeWeeks: 60, maxAgeWeeks: 84, category: .social, description: "Wants to do things independently", isPredefined: true),
+        
+        // 18-24 MONTHS
         Milestone(title: "Runs steadily", minAgeWeeks: 72, maxAgeWeeks: 96, category: .motor, description: "Runs without falling frequently", isPredefined: true),
-        Milestone(title: "Kicks a ball", minAgeWeeks: 78, maxAgeWeeks: 104, category: .motor, description: "Kicks a ball forward while walking", isPredefined: true),
-        Milestone(title: "Two-word phrases", minAgeWeeks: 78, maxAgeWeeks: 104, category: .language, description: "Combines words like 'more milk' or 'go car'", isPredefined: true),
-        Milestone(title: "Pretend play", minAgeWeeks: 72, maxAgeWeeks: 96, category: .cognitive, description: "Pretends to feed dolls, talk on phone, etc.", isPredefined: true),
-        Milestone(title: "Follows simple instructions", minAgeWeeks: 68, maxAgeWeeks: 88, category: .cognitive, description: "Follows one-step instructions like 'come here'", isPredefined: true),
-        Milestone(title: "Shows independence", minAgeWeeks: 78, maxAgeWeeks: 104, category: .social, description: "Wants to do things by themselves", isPredefined: true),
+        Milestone(title: "Kicks a ball", minAgeWeeks: 78, maxAgeWeeks: 104, category: .motor, description: "Kicks ball forward while walking", isPredefined: true),
+        Milestone(title: "Walks up stairs", minAgeWeeks: 78, maxAgeWeeks: 104, category: .motor, description: "Walks up stairs with support", isPredefined: true),
+        Milestone(title: "Says 50+ words", minAgeWeeks: 78, maxAgeWeeks: 104, category: .language, description: "Uses 50 or more words", isPredefined: true),
+        Milestone(title: "Two-word phrases", minAgeWeeks: 78, maxAgeWeeks: 104, category: .language, description: "Combines words like 'more milk'", isPredefined: true),
+        Milestone(title: "Pretend play", minAgeWeeks: 72, maxAgeWeeks: 96, category: .cognitive, description: "Pretends to feed dolls, talk on phone", isPredefined: true),
+        Milestone(title: "Sorts shapes", minAgeWeeks: 84, maxAgeWeeks: 104, category: .cognitive, description: "Sorts objects by shape or color", isPredefined: true),
+        Milestone(title: "Plays alongside others", minAgeWeeks: 78, maxAgeWeeks: 104, category: .social, description: "Plays near other children", isPredefined: true),
+        Milestone(title: "Uses fork", minAgeWeeks: 78, maxAgeWeeks: 104, category: .feeding, description: "Uses fork to eat", isPredefined: true),
         
-        // 2+ years
-        Milestone(title: "Jumps with both feet", minAgeWeeks: 96, maxAgeWeeks: 130, category: .motor, description: "Jumps off ground with both feet together", isPredefined: true),
+        // 2-3 YEARS
+        Milestone(title: "Jumps with both feet", minAgeWeeks: 96, maxAgeWeeks: 130, category: .motor, description: "Jumps off ground with both feet", isPredefined: true),
+        Milestone(title: "Pedals tricycle", minAgeWeeks: 104, maxAgeWeeks: 156, category: .motor, description: "Pedals tricycle or ride-on toy", isPredefined: true),
+        Milestone(title: "Throws ball overhand", minAgeWeeks: 104, maxAgeWeeks: 130, category: .motor, description: "Throws ball overhand", isPredefined: true),
         Milestone(title: "Three-word sentences", minAgeWeeks: 104, maxAgeWeeks: 130, category: .language, description: "Uses sentences with 3+ words", isPredefined: true),
-        Milestone(title: "Sorts shapes", minAgeWeeks: 104, maxAgeWeeks: 130, category: .cognitive, description: "Sorts objects by shape, color, or size", isPredefined: true),
-        Milestone(title: "Plays with other children", minAgeWeeks: 104, maxAgeWeeks: 156, category: .social, description: "Engages in parallel or cooperative play", isPredefined: true),
-        Milestone(title: "Potty training", minAgeWeeks: 104, maxAgeWeeks: 208, category: .physical, description: "Shows interest in or begins potty training", isPredefined: true),
+        Milestone(title: "Asks 'what' questions", minAgeWeeks: 104, maxAgeWeeks: 130, category: .language, description: "Asks simple questions", isPredefined: true),
+        Milestone(title: "Names body parts", minAgeWeeks: 104, maxAgeWeeks: 130, category: .language, description: "Names several body parts", isPredefined: true),
+        Milestone(title: "Counts to 3", minAgeWeeks: 104, maxAgeWeeks: 156, category: .cognitive, description: "Can count to 3", isPredefined: true),
+        Milestone(title: "Plays with other children", minAgeWeeks: 104, maxAgeWeeks: 156, category: .social, description: "Engages in cooperative play", isPredefined: true),
+        Milestone(title: "Shows potty interest", minAgeWeeks: 104, maxAgeWeeks: 208, category: .physical, description: "Shows interest in potty training", isPredefined: true),
+        Milestone(title: "Brushes teeth with help", minAgeWeeks: 104, maxAgeWeeks: 156, category: .physical, description: "Brushes teeth with assistance", isPredefined: true),
+        
+        // PHYSICAL MILESTONES
+        Milestone(title: "First tooth", minAgeWeeks: 24, maxAgeWeeks: 52, category: .physical, description: "First tooth appears", isPredefined: true),
+        Milestone(title: "8 teeth", minAgeWeeks: 40, maxAgeWeeks: 78, category: .physical, description: "Has about 8 teeth", isPredefined: true),
+        Milestone(title: "16 teeth", minAgeWeeks: 78, maxAgeWeeks: 130, category: .physical, description: "Has about 16 teeth", isPredefined: true),
+        Milestone(title: "Doubles birth weight", minAgeWeeks: 20, maxAgeWeeks: 32, category: .physical, description: "Weight doubles from birth", isPredefined: true),
+        Milestone(title: "Triples birth weight", minAgeWeeks: 48, maxAgeWeeks: 68, category: .physical, description: "Weight triples from birth", isPredefined: true),
+        
+        // SENSORY MILESTONES
+        Milestone(title: "Sees in color", minAgeWeeks: 8, maxAgeWeeks: 16, category: .sensory, description: "Can see colors clearly", isPredefined: true),
+        Milestone(title: "Depth perception", minAgeWeeks: 20, maxAgeWeeks: 32, category: .sensory, description: "Develops depth perception", isPredefined: true),
+        Milestone(title: "Recognizes familiar sounds", minAgeWeeks: 12, maxAgeWeeks: 24, category: .sensory, description: "Recognizes familiar voices and sounds", isPredefined: true),
+        
+        // FEEDING MILESTONES
+        Milestone(title: "Breastfeeds effectively", minAgeWeeks: 1, maxAgeWeeks: 4, category: .feeding, description: "Latches and feeds well", isPredefined: true),
+        Milestone(title: "Shows hunger cues", minAgeWeeks: 2, maxAgeWeeks: 8, category: .feeding, description: "Shows clear hunger and fullness cues", isPredefined: true),
+        Milestone(title: "Sits in high chair", minAgeWeeks: 20, maxAgeWeeks: 32, category: .feeding, description: "Sits supported in high chair", isPredefined: true),
+        Milestone(title: "Chews soft foods", minAgeWeeks: 32, maxAgeWeeks: 52, category: .feeding, description: "Chews soft table foods", isPredefined: true),
+        Milestone(title: "Self-feeds with utensils", minAgeWeeks: 78, maxAgeWeeks: 130, category: .feeding, description: "Uses utensils independently", isPredefined: true),
+        
+        // SLEEP MILESTONES
+        Milestone(title: "Day/night confusion resolves", minAgeWeeks: 6, maxAgeWeeks: 16, category: .sleep, description: "Sleeps longer at night", isPredefined: true),
+        Milestone(title: "Naps regularly", minAgeWeeks: 12, maxAgeWeeks: 104, category: .sleep, description: "Takes predictable naps", isPredefined: true),
+        Milestone(title: "Transitions to toddler bed", minAgeWeeks: 104, maxAgeWeeks: 208, category: .sleep, description: "Ready for toddler bed", isPredefined: true),
     ]
     
     // Word tracking - loaded from storage
@@ -768,12 +828,20 @@ class TotsDataManager: ObservableObject {
     
     func getBabyAgeInWeeks() -> Int {
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.weekOfYear], from: babyBirthDate, to: Date())
-        return max(0, components.weekOfYear ?? 0)
+        let components = calendar.dateComponents([.day], from: babyBirthDate, to: Date())
+        let days = components.day ?? 0
+        return max(0, days / 7)
     }
     
     func addMilestone(_ milestone: Milestone) {
         milestones.append(milestone)
+    }
+    
+    func uncompleteMilestone(_ milestone: Milestone) {
+        if let index = milestones.firstIndex(where: { $0.id == milestone.id }) {
+            milestones[index].isCompleted = false
+            milestones[index].completedDate = nil
+        }
     }
     
     
