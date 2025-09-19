@@ -861,8 +861,9 @@ struct DatePickerHistoryView: View {
         var dates: [Date] = []
         
         for i in 0..<30 {
-            if let date = calendar.date(byAdding: .day, value: -i, to: Date()) {
-                dates.append(date)
+            if let date = calendar.date(byAdding: .day, value: -i, to: Date()),
+               let normalizedDate = calendar.dateInterval(of: .day, for: date)?.start {
+                dates.append(normalizedDate)
             }
         }
         
@@ -896,9 +897,9 @@ struct DatePickerHistoryView: View {
                     .onAppear {
                         // Scroll to selected date
                         if let scrollDate = scrollToDate {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                 withAnimation(.easeInOut(duration: 0.5)) {
-                                    proxy.scrollTo(scrollDate, anchor: .top)
+                                    proxy.scrollTo(scrollDate, anchor: .center)
                                 }
                             }
                         }
