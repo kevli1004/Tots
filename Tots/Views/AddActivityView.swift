@@ -195,7 +195,7 @@ struct AddActivityView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                                 .foregroundColor(feedingType == type ? .white : .primary)
-                                .background(feedingType == type ? Color.black : Color(.systemBackground))
+                                .background(feedingType == type ? Color.blue.opacity(0.8) : Color(.systemBackground))
                         }
                         .buttonStyle(PlainButtonStyle())
                         .overlay(
@@ -236,7 +236,7 @@ struct AddActivityView: View {
                         }
                         
                         Slider(value: $feedingAmountOz, in: 0...12, step: 0.5)
-                            .accentColor(.black)
+                            .accentColor(.pink)
                     }
                     .padding()
                     .background(Color(.systemBackground))
@@ -279,7 +279,7 @@ struct AddActivityView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                             .foregroundColor(diaperType == type ? .white : .primary)
-                            .background(diaperType == type ? Color.black : Color(.systemBackground))
+                            .background(diaperType == type ? Color.orange.opacity(0.8) : Color(.systemBackground))
                     }
                     .buttonStyle(PlainButtonStyle())
                     .overlay(
@@ -320,7 +320,7 @@ struct AddActivityView: View {
                 }
                 
                 Slider(value: $sleepDuration, in: 0.5...12.0, step: 0.5)
-                    .accentColor(.black)
+                    .accentColor(.purple)
             }
             .padding()
             .background(Color(.systemBackground))
@@ -392,7 +392,7 @@ struct AddActivityView: View {
                             Spacer()
                         }
                         Slider(value: $selectedWeightLbs, in: 4...20, step: 0.1)
-                            .accentColor(.black)
+                            .accentColor(.blue)
                         
                         HStack {
                             Text("Ounces")
@@ -401,7 +401,7 @@ struct AddActivityView: View {
                             Spacer()
                         }
                         Slider(value: $selectedWeightOz, in: 0...15, step: 0.5)
-                            .accentColor(.black)
+                            .accentColor(.blue)
                     }
                 }
                 .padding()
@@ -443,7 +443,7 @@ struct AddActivityView: View {
                             get: { Double(selectedHeightFt) },
                             set: { selectedHeightFt = Int($0) }
                         ), in: 1...3, step: 1)
-                            .accentColor(.black)
+                            .accentColor(.blue)
                         
                         HStack {
                             Text("Inches")
@@ -452,7 +452,7 @@ struct AddActivityView: View {
                             Spacer()
                         }
                         Slider(value: $selectedHeightIn, in: 0...11.5, step: 0.5)
-                            .accentColor(.black)
+                            .accentColor(.blue)
                     }
                 }
                 .padding()
@@ -515,10 +515,9 @@ struct AddActivityView: View {
             Text("Save Activity")
                 .font(.headline)
                 .fontWeight(.semibold)
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(isFormValid ? Color.black : Color(.systemGray4))
                 .liquidGlassCard()
         }
         .disabled(!isFormValid)

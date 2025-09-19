@@ -1216,21 +1216,10 @@ struct GoalSettingInt: View {
                 set: { value = Int($0) }
             ), in: Double(range.lowerBound)...Double(range.upperBound), step: 1)
                 .accentColor(.purple)
-                .background(
-                    Capsule()
-                        .fill(Color(.systemGray5))
-                        .frame(height: 8)
-                )
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color(.systemGray4), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        .liquidGlassCard()
     }
 }
 
@@ -1275,21 +1264,10 @@ struct GoalSettingDouble: View {
             
             Slider(value: $value, in: range, step: 1)
                 .accentColor(.purple)
-                .background(
-                    Capsule()
-                        .fill(Color(.systemGray5))
-                        .frame(height: 8)
-                )
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color(.systemGray4), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        .liquidGlassCard()
     }
 }
 
