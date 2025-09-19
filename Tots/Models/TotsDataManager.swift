@@ -8,6 +8,7 @@ class TotsDataManager: ObservableObject {
     private let activitiesKey = "tots_activities"
     private let milestonesKey = "tots_milestones"
     private let growthDataKey = "tots_growth_data"
+    private let wordsKey = "tots_words"
     private let babyNameKey = "tots_baby_name"
     private let babyBirthDateKey = "tots_baby_birth_date"
     private let weeklyGoalsKey = "tots_weekly_goals"
@@ -98,6 +99,13 @@ class TotsDataManager: ObservableObject {
     @Published var growthData: [GrowthEntry] = [] {
         didSet {
             saveGrowthData()
+        }
+    }
+    
+    // Word tracking - loaded from storage
+    @Published var words: [BabyWord] = [] {
+        didSet {
+            saveWords()
         }
     }
     
@@ -198,6 +206,12 @@ class TotsDataManager: ObservableObject {
             growthData = growth
         }
         
+        // Load words
+        if let data = UserDefaults.standard.data(forKey: wordsKey),
+           let words = try? JSONDecoder().decode([BabyWord].self, from: data) {
+            self.words = words.sorted { $0.dateFirstSaid < $1.dateFirstSaid }
+        }
+        
         // Load CloudKit settings
         familySharingEnabled = UserDefaults.standard.bool(forKey: "family_sharing_enabled")
         
@@ -226,6 +240,12 @@ class TotsDataManager: ObservableObject {
     private func saveGrowthData() {
         if let data = try? JSONEncoder().encode(growthData) {
             UserDefaults.standard.set(data, forKey: growthDataKey)
+        }
+    }
+    
+    private func saveWords() {
+        if let data = try? JSONEncoder().encode(words) {
+            UserDefaults.standard.set(data, forKey: wordsKey)
         }
     }
     
@@ -466,6 +486,66 @@ class TotsDataManager: ObservableObject {
             updateDevelopmentScore()
             generateAIInsights()
         }
+    }
+    
+    // MARK: - Word Tracking
+    
+    func addWord(_ word: String, category: WordCategory = .other, notes: String = "") {
+        // Check if word already exists
+        if !words.contains(where: { $0.word.lowercased() == word.lowercased() }) {
+            let newWord = BabyWord(
+                word: word,
+                category: category,
+                dateFirstSaid: Date(),
+                notes: notes
+            )
+            words.append(newWord)
+            words.sort { $0.dateFirstSaid < $1.dateFirstSaid }
+            
+            // Add milestone activity for first words
+            if words.count == 1 {
+                let activity = TotsActivity(
+                    type: .milestone,
+                    time: Date(),
+                    details: "First Word: \(word)",
+                    mood: .happy,
+                    notes: "Said their very first word!"
+                )
+                addActivity(activity)
+            } else if words.count == 10 {
+                let activity = TotsActivity(
+                    type: .milestone,
+                    time: Date(),
+                    details: "10 Words Milestone",
+                    mood: .happy,
+                    notes: "Now knows 10 words!"
+                )
+                addActivity(activity)
+            }
+            
+            updateDevelopmentScore()
+            generateAIInsights()
+        }
+    }
+    
+    func deleteWord(_ word: BabyWord) {
+        words.removeAll { $0.id == word.id }
+    }
+    
+    func updateWord(_ word: BabyWord, newWord: String, category: WordCategory, notes: String) {
+        if let index = words.firstIndex(where: { $0.id == word.id }) {
+            words[index].word = newWord
+            words[index].category = category
+            words[index].notes = notes
+        }
+    }
+    
+    var wordCount: Int {
+        return words.count
+    }
+    
+    var wordsByCategory: [WordCategory: [BabyWord]] {
+        return Dictionary(grouping: words) { $0.category }
     }
     
     // MARK: - AI & Smart Features
@@ -1032,6 +1112,58 @@ struct GrowthEntry: Identifiable, Codable {
     let weight: Double // kg
     let height: Double // cm
     let headCircumference: Double // cm
+}
+
+struct BabyWord: Identifiable, Codable {
+    let id = UUID()
+    var word: String
+    var category: WordCategory
+    let dateFirstSaid: Date
+    var notes: String
+    
+    init(word: String, category: WordCategory = .other, dateFirstSaid: Date = Date(), notes: String = "") {
+        self.word = word
+        self.category = category
+        self.dateFirstSaid = dateFirstSaid
+        self.notes = notes
+    }
+}
+
+enum WordCategory: String, CaseIterable, Codable {
+    case people = "People"
+    case animals = "Animals"
+    case food = "Food"
+    case actions = "Actions"
+    case objects = "Objects"
+    case feelings = "Feelings"
+    case sounds = "Sounds"
+    case other = "Other"
+    
+    var icon: String {
+        switch self {
+        case .people: return "person.2.fill"
+        case .animals: return "pawprint.fill"
+        case .food: return "fork.knife"
+        case .actions: return "figure.run"
+        case .objects: return "cube.box.fill"
+        case .feelings: return "heart.fill"
+        case .sounds: return "speaker.wave.2.fill"
+        case .other: return "questionmark.circle.fill"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .people: return .blue
+        case .animals: return .brown
+        case .food: return .green
+        case .actions: return .orange
+        case .objects: return .gray
+        case .feelings: return .pink
+        case .sounds: return .purple
+        case .other: return .secondary
+        }
+    }
 }
 
 // MARK: - Live Activity Attributes

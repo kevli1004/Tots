@@ -176,7 +176,7 @@ struct HomeView: View {
                             
                             // Activity options
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                                ForEach([ActivityType.feeding, .diaper, .sleep, .play, .milestone, .growth], id: \.self) { type in
+                                ForEach([ActivityType.feeding, .diaper, .sleep, .play, .growth], id: \.self) { type in
                                     Button(action: {
                                         selectedActivityType = type
                                         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
@@ -1668,6 +1668,931 @@ struct ActivityButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Milestones View
+
+struct MilestonesView: View {
+    @EnvironmentObject var dataManager: TotsDataManager
+    @State private var selectedCategory: FilterCategory = .all
+    @State private var showingAddMilestone = false
+    @State private var searchText = ""
+    
+    enum FilterCategory: String, CaseIterable {
+        case all = "All"
+        case motor = "Motor Skills"
+        case language = "Language"
+        case social = "Social"
+        case cognitive = "Cognitive"
+        case physical = "Physical"
+        
+        var icon: String {
+            switch self {
+            case .all: return "list.bullet"
+            case .motor: return "figure.walk"
+            case .language: return "bubble.left"
+            case .social: return "heart"
+            case .cognitive: return "brain.head.profile"
+            case .physical: return "figure.child"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .all: return .blue
+            case .motor: return .green
+            case .language: return .orange
+            case .social: return .pink
+            case .cognitive: return .purple
+            case .physical: return .cyan
+            }
+        }
+    }
+    
+    var filteredMilestones: [Milestone] {
+        let categoryFiltered = selectedCategory == .all ? 
+            dataManager.milestones : 
+            dataManager.milestones.filter { milestone in
+                switch selectedCategory {
+                case .motor: return milestone.category == .motor
+                case .language: return milestone.category == .language
+                case .social: return milestone.category == .social
+                case .cognitive: return milestone.category == .cognitive
+                case .physical: return milestone.category == .physical
+                case .all: return true
+                }
+            }
+        
+        if searchText.isEmpty {
+            return categoryFiltered
+        } else {
+            return categoryFiltered.filter { 
+                $0.title.localizedCaseInsensitiveContains(searchText) ||
+                $0.description.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
+    
+    var completedCount: Int {
+        filteredMilestones.filter { $0.isCompleted }.count
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                VStack(spacing: 0) {
+                    // Header with stats
+                    headerView
+                    
+                    // Category selector
+                    categorySelector
+                    
+                    // Search bar
+                    searchBar
+                    
+                    // Milestones list
+                    milestonesList
+                }
+            }
+            .navigationTitle("Milestones")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add") {
+                        showingAddMilestone = true
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .sheet(isPresented: $showingAddMilestone) {
+                AddMilestoneView()
+            }
+        }
+    }
+    
+    private var headerView: some View {
+        VStack(spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(completedCount) of \(filteredMilestones.count)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text("milestones completed")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+                
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.3), lineWidth: 6)
+                        .frame(width: 60, height: 60)
+                    
+                    Circle()
+                        .trim(from: 0, to: filteredMilestones.isEmpty ? 0 : Double(completedCount) / Double(filteredMilestones.count))
+                        .stroke(.white, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                        .frame(width: 60, height: 60)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeInOut(duration: 0.5), value: completedCount)
+                    
+                    Text("\(Int((filteredMilestones.isEmpty ? 0 : Double(completedCount) / Double(filteredMilestones.count)) * 100))%")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [.blue.opacity(0.3), .purple.opacity(0.2)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 16)
+        }
+    }
+    
+    private var categorySelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(FilterCategory.allCases, id: \.self) { category in
+                    MilestoneCategoryChip(
+                        category: category,
+                        isSelected: selectedCategory == category
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedCategory = category
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 12)
+    }
+    
+    private var searchBar: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            
+            TextField("Search milestones...", text: $searchText)
+                .textFieldStyle(PlainTextFieldStyle())
+            
+            if !searchText.isEmpty {
+                Button("Clear") {
+                    searchText = ""
+                }
+                .font(.caption)
+                .foregroundColor(.blue)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+    
+    private var milestonesList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(filteredMilestones) { milestone in
+                    MilestoneCard(milestone: milestone) {
+                        dataManager.completeMilestone(milestone)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 20)
+        }
+    }
+}
+
+struct MilestoneCategoryChip: View {
+    let category: MilestonesView.FilterCategory
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: category.icon)
+                    .font(.caption)
+                Text(category.rawValue)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .foregroundColor(isSelected ? .white : category.color)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isSelected ? category.color : category.color.opacity(0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(category.color, lineWidth: isSelected ? 0 : 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct MilestoneCard: View {
+    let milestone: Milestone
+    let onComplete: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Category icon
+            VStack {
+                Image(systemName: milestone.category.icon)
+                    .font(.title2)
+                    .foregroundColor(milestone.category.color)
+                    .frame(width: 40, height: 40)
+                    .background(milestone.category.color.opacity(0.1))
+                    .clipShape(Circle())
+                
+                Spacer()
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(milestone.title)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Text(milestone.expectedAge)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.systemGray5))
+                        .clipShape(Capsule())
+                }
+                
+                Text(milestone.description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
+                
+                if milestone.isCompleted, let completedDate = milestone.completedDate {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                        
+                        Text("Completed \(completedDate, style: .date)")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+                }
+            }
+            
+            // Action button
+            VStack {
+                Spacer()
+                
+                if milestone.isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.green)
+                } else {
+                    Button(action: onComplete) {
+                        Image(systemName: "circle")
+                            .font(.title2)
+                            .foregroundColor(.gray)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+}
+
+struct AddMilestoneView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: TotsDataManager
+    @State private var selectedCategory: MilestoneCategory = .motor
+    @State private var customTitle = ""
+    @State private var customDescription = ""
+    @State private var expectedAge = ""
+    @State private var showingCustomForm = false
+    
+    // Predefined milestones by category
+    let predefinedMilestones: [MilestoneCategory: [PredefinedMilestone]] = [
+        .motor: [
+            PredefinedMilestone(title: "Holds Head Up", description: "Can hold head steady when upright", expectedAge: "2-4 months"),
+            PredefinedMilestone(title: "Rolls Over", description: "Rolls from tummy to back or back to tummy", expectedAge: "4-6 months"),
+            PredefinedMilestone(title: "Sits Without Support", description: "Can sit upright without falling over", expectedAge: "6-8 months"),
+            PredefinedMilestone(title: "Crawls", description: "Moves forward on hands and knees", expectedAge: "7-10 months"),
+            PredefinedMilestone(title: "Pulls to Stand", description: "Pulls themselves up to standing position", expectedAge: "9-12 months"),
+            PredefinedMilestone(title: "First Steps", description: "Takes first independent steps", expectedAge: "9-15 months"),
+            PredefinedMilestone(title: "Walks Independently", description: "Walks without support", expectedAge: "12-18 months"),
+        ],
+        .language: [
+            PredefinedMilestone(title: "First Sounds", description: "Makes cooing and gurgling sounds", expectedAge: "2-4 months"),
+            PredefinedMilestone(title: "Babbles", description: "Says 'ba-ba-ba' or 'ma-ma-ma'", expectedAge: "4-6 months"),
+            PredefinedMilestone(title: "Says First Word", description: "First recognizable word like 'mama' or 'dada'", expectedAge: "8-12 months"),
+            PredefinedMilestone(title: "Says 2-3 Words", description: "Uses 2-3 words consistently", expectedAge: "12-15 months"),
+            PredefinedMilestone(title: "Points to Objects", description: "Points to things when asked 'where is...'", expectedAge: "12-18 months"),
+            PredefinedMilestone(title: "Says 10+ Words", description: "Uses 10 or more words regularly", expectedAge: "15-18 months"),
+        ],
+        .social: [
+            PredefinedMilestone(title: "First Smile", description: "First genuine social smile", expectedAge: "6-8 weeks"),
+            PredefinedMilestone(title: "Laughs", description: "Laughs out loud", expectedAge: "3-5 months"),
+            PredefinedMilestone(title: "Recognizes Name", description: "Responds when name is called", expectedAge: "5-7 months"),
+            PredefinedMilestone(title: "Stranger Anxiety", description: "Shows wariness around strangers", expectedAge: "6-12 months"),
+            PredefinedMilestone(title: "Waves Bye-Bye", description: "Waves goodbye when prompted", expectedAge: "8-12 months"),
+            PredefinedMilestone(title: "Plays Peek-a-Boo", description: "Enjoys and participates in peek-a-boo", expectedAge: "6-10 months"),
+        ],
+        .cognitive: [
+            PredefinedMilestone(title: "Tracks Objects", description: "Follows objects with eyes", expectedAge: "2-4 months"),
+            PredefinedMilestone(title: "Reaches for Toys", description: "Reaches for and grasps toys", expectedAge: "4-6 months"),
+            PredefinedMilestone(title: "Object Permanence", description: "Looks for hidden objects", expectedAge: "8-12 months"),
+            PredefinedMilestone(title: "Cause and Effect", description: "Understands actions have consequences", expectedAge: "9-12 months"),
+            PredefinedMilestone(title: "Imitates Actions", description: "Copies simple actions", expectedAge: "9-15 months"),
+            PredefinedMilestone(title: "Follows Simple Commands", description: "Follows one-step instructions", expectedAge: "12-18 months"),
+        ],
+        .physical: [
+            PredefinedMilestone(title: "First Tooth", description: "First tooth has broken through", expectedAge: "6-10 months"),
+            PredefinedMilestone(title: "Pincer Grasp", description: "Picks up small objects with thumb and finger", expectedAge: "8-12 months"),
+            PredefinedMilestone(title: "Drinks from Cup", description: "Drinks from a sippy cup or regular cup", expectedAge: "6-12 months"),
+            PredefinedMilestone(title: "Eats Finger Foods", description: "Self-feeds with finger foods", expectedAge: "8-12 months"),
+            PredefinedMilestone(title: "Uses Spoon", description: "Attempts to use a spoon", expectedAge: "12-18 months"),
+            PredefinedMilestone(title: "Sleeps Through Night", description: "Sleeps 6+ hours without waking", expectedAge: "3-6 months"),
+        ]
+    ]
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Category selector
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Array(predefinedMilestones.keys.sorted(by: { $0.rawValue < $1.rawValue })), id: \.self) { category in
+                            MilestoneCategoryChip(
+                                category: MilestonesView.FilterCategory(rawValue: category.rawValue) ?? .motor,
+                                isSelected: selectedCategory.rawValue == category.rawValue
+                            ) {
+                                selectedCategory = category
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .padding(.vertical, 16)
+                
+                // Milestones list
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(predefinedMilestones[selectedCategory] ?? [], id: \.title) { milestone in
+                            PredefinedMilestoneRow(milestone: milestone) {
+                                addPredefinedMilestone(milestone)
+                            }
+                        }
+                        
+                        // Custom milestone option
+                        Button(action: { showingCustomForm = true }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.blue)
+                                
+                                Text("Add Custom Milestone")
+                                    .font(.headline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                                
+                                Spacer()
+                            }
+                            .padding(16)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
+                }
+            }
+            .navigationTitle("Add Milestone")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingCustomForm) {
+                CustomMilestoneForm(
+                    category: selectedCategory,
+                    title: $customTitle,
+                    description: $customDescription,
+                    expectedAge: $expectedAge
+                ) { milestone in
+                    dataManager.milestones.append(milestone)
+                    dismiss()
+                }
+            }
+        }
+    }
+    
+    private func addPredefinedMilestone(_ predefined: PredefinedMilestone) {
+        let milestone = Milestone(
+            title: predefined.title,
+            expectedAge: predefined.expectedAge,
+            category: selectedCategory,
+            description: predefined.description
+        )
+        dataManager.milestones.append(milestone)
+        dismiss()
+    }
+}
+
+struct PredefinedMilestone {
+    let title: String
+    let description: String
+    let expectedAge: String
+}
+
+struct PredefinedMilestoneRow: View {
+    let milestone: PredefinedMilestone
+    let onAdd: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(milestone.title)
+                    .font(.headline)
+                    .fontWeight(.medium)
+                
+                Text(milestone.description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                
+                Text(milestone.expectedAge)
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                    .fontWeight(.medium)
+            }
+            
+            Spacer()
+            
+            Button(action: onAdd) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+struct CustomMilestoneForm: View {
+    @Environment(\.dismiss) private var dismiss
+    let category: MilestoneCategory
+    @Binding var title: String
+    @Binding var description: String
+    @Binding var expectedAge: String
+    let onSave: (Milestone) -> Void
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Milestone Details") {
+                    TextField("Title", text: $title)
+                    TextField("Description", text: $description, axis: .vertical)
+                        .lineLimit(3...6)
+                    TextField("Expected Age (e.g., '6-8 months')", text: $expectedAge)
+                }
+                
+                Section("Category") {
+                    HStack {
+                        Image(systemName: category.icon)
+                            .foregroundColor(category.color)
+                        Text(category.rawValue)
+                        Spacer()
+                    }
+                }
+            }
+            .navigationTitle("Custom Milestone")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        let milestone = Milestone(
+                            title: title,
+                            expectedAge: expectedAge,
+                            category: category,
+                            description: description
+                        )
+                        onSave(milestone)
+                    }
+                    .disabled(title.isEmpty || expectedAge.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Word Tracker View
+
+struct WordTrackerView: View {
+    @EnvironmentObject var dataManager: TotsDataManager
+    @State private var selectedCategory: WordCategory = .people
+    @State private var showingAddWord = false
+    @State private var searchText = ""
+    
+    var filteredWords: [BabyWord] {
+        let categoryFiltered = dataManager.words.filter { word in
+            selectedCategory == .other ? true : word.category == selectedCategory
+        }
+        
+        if searchText.isEmpty {
+            return categoryFiltered
+        } else {
+            return categoryFiltered.filter { 
+                $0.word.localizedCaseInsensitiveContains(searchText) ||
+                $0.notes.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                VStack(spacing: 0) {
+                    // Header with stats
+                    headerView
+                    
+                    // Category selector
+                    categorySelector
+                    
+                    // Search bar
+                    searchBar
+                    
+                    // Words list
+                    wordsList
+                }
+            }
+            .navigationTitle("Word Tracker")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add Word") {
+                        showingAddWord = true
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .sheet(isPresented: $showingAddWord) {
+                AddWordView()
+            }
+        }
+    }
+    
+    private var headerView: some View {
+        VStack(spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(dataManager.wordCount) words")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text("vocabulary learned")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+                
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.3), lineWidth: 6)
+                        .frame(width: 60, height: 60)
+                    
+                    Circle()
+                        .trim(from: 0, to: min(Double(dataManager.wordCount) / 50.0, 1.0)) // Goal of 50 words
+                        .stroke(.white, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                        .frame(width: 60, height: 60)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeInOut(duration: 0.5), value: dataManager.wordCount)
+                    
+                    Text("\(dataManager.wordCount)")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [.green.opacity(0.3), .blue.opacity(0.2)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 16)
+        }
+    }
+    
+    private var categorySelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(WordCategory.allCases, id: \.self) { category in
+                    WordCategoryChip(
+                        category: category,
+                        isSelected: selectedCategory == category,
+                        count: dataManager.wordsByCategory[category]?.count ?? 0
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedCategory = category
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 12)
+    }
+    
+    private var searchBar: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            
+            TextField("Search words...", text: $searchText)
+                .textFieldStyle(PlainTextFieldStyle())
+            
+            if !searchText.isEmpty {
+                Button("Clear") {
+                    searchText = ""
+                }
+                .font(.caption)
+                .foregroundColor(.blue)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+    
+    private var wordsList: some View {
+        ScrollView {
+            if filteredWords.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    
+                    Text("No words yet")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Start tracking your baby's vocabulary by adding their first words!")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    
+                    Button("Add First Word") {
+                        showingAddWord = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(.top, 60)
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(filteredWords) { word in
+                        WordCard(word: word) {
+                            dataManager.deleteWord(word)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
+            }
+        }
+    }
+}
+
+struct WordCategoryChip: View {
+    let category: WordCategory
+    let isSelected: Bool
+    let count: Int
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: category.icon)
+                        .font(.caption)
+                    Text(category.rawValue)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(isSelected ? .white : category.color)
+                }
+            }
+            .foregroundColor(isSelected ? .white : category.color)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isSelected ? category.color : category.color.opacity(0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(category.color, lineWidth: isSelected ? 0 : 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct WordCard: View {
+    let word: BabyWord
+    let onDelete: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Category icon
+            VStack {
+                Image(systemName: word.category.icon)
+                    .font(.title2)
+                    .foregroundColor(word.category.color)
+                    .frame(width: 40, height: 40)
+                    .background(word.category.color.opacity(0.1))
+                    .clipShape(Circle())
+                
+                Spacer()
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(word.word)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Text(word.category.rawValue)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.systemGray5))
+                        .clipShape(Capsule())
+                }
+                
+                Text("First said \(word.dateFirstSaid, style: .date)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                if !word.notes.isEmpty {
+                    Text(word.notes)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
+        }
+    }
+}
+
+struct AddWordView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: TotsDataManager
+    @State private var word = ""
+    @State private var selectedCategory: WordCategory = .other
+    @State private var notes = ""
+    @State private var showingSuggestions = false
+    
+    // Common first words suggestions
+    let commonWords: [String: [String]] = [
+        "People": ["mama", "dada", "papa", "baby", "bye-bye", "hi"],
+        "Animals": ["dog", "cat", "cow", "duck", "fish", "bird"],
+        "Food": ["milk", "water", "cookie", "banana", "apple", "more"],
+        "Actions": ["go", "up", "down", "stop", "come", "sit"],
+        "Objects": ["ball", "book", "car", "cup", "shoe", "toy"],
+        "Feelings": ["happy", "sad", "mad", "love", "good", "bad"],
+        "Sounds": ["wow", "oh", "uh-oh", "shh", "boom", "beep"],
+        "Other": ["yes", "no", "please", "thank you", "help", "mine"]
+    ]
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Word Details") {
+                    TextField("Word", text: $word)
+                        .autocapitalization(.none)
+                    
+                    Picker("Category", selection: $selectedCategory) {
+                        ForEach(WordCategory.allCases, id: \.self) { category in
+                            HStack {
+                                Image(systemName: category.icon)
+                                Text(category.rawValue)
+                            }
+                            .tag(category)
+                        }
+                    }
+                    
+                    TextField("Notes (optional)", text: $notes, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+                
+                Section("Suggestions") {
+                    ForEach(commonWords[selectedCategory.rawValue] ?? [], id: \.self) { suggestion in
+                        Button(suggestion.capitalized) {
+                            word = suggestion
+                        }
+                        .foregroundColor(.primary)
+                    }
+                }
+            }
+            .navigationTitle("Add Word")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        dataManager.addWord(word.trimmingCharacters(in: .whitespacesAndNewlines), 
+                                          category: selectedCategory, 
+                                          notes: notes.trimmingCharacters(in: .whitespacesAndNewlines))
+                        dismiss()
+                    }
+                    .disabled(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .fontWeight(.semibold)
+                }
+            }
+        }
     }
 }
 

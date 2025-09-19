@@ -634,7 +634,7 @@ struct OnboardingView: View {
                 )
                 
                 GoalSettingDouble(
-                    icon: "😴",
+                    icon: "moon.zzz.fill",
                     title: "Sleep Goal",
                     description: "Hours per day (Recommended: \(String(format: "%.0f", getRecommendedSleep())))",
                     value: $sleepGoal,
@@ -642,7 +642,7 @@ struct OnboardingView: View {
                 )
                 
                 GoalSettingInt(
-                    icon: "🧷",
+                    icon: "DiaperIcon",
                     title: "Diaper Goal",
                     description: "Changes per day (Recommended: \(getRecommendedDiapers()))",
                     value: $diaperGoal,
@@ -726,7 +726,7 @@ struct OnboardingView: View {
                 )
                 
                 GoalSettingDouble(
-                    icon: "😴",
+                    icon: "moon.zzz.fill",
                     title: "Sleep Goal",
                     description: "Hours per day (Recommended: \(String(format: "%.0f", getRecommendedSleep())))",
                     value: $sleepGoal,
@@ -734,7 +734,7 @@ struct OnboardingView: View {
                 )
                 
                 GoalSettingInt(
-                    icon: "🧷",
+                    icon: "DiaperIcon",
                     title: "Diaper Goal",
                     description: "Changes per day (Recommended: \(getRecommendedDiapers()))",
                     value: $diaperGoal,
@@ -812,15 +812,23 @@ struct OnboardingView: View {
                         .shadow(color: Color.purple.opacity(0.3), radius: 12, x: 0, y: 6)
                     }
                     .buttonStyle(SleekButtonStyle())
-                    .disabled(babyName.isEmpty || primaryCaregiverName.isEmpty)
-                    .opacity(babyName.isEmpty || primaryCaregiverName.isEmpty ? 0.6 : 1.0)
-                    .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty || primaryCaregiverName.isEmpty)
+                    .disabled(babyName.isEmpty)
+                    .opacity(babyName.isEmpty ? 0.6 : 1.0)
+                    .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty)
                     
                     Text("You can change these settings anytime in the Settings tab")
                         .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
+                    
+                    // Debug info (remove in production)
+                    if babyName.isEmpty {
+                        Text("⚠️ Baby name is required to continue")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundColor(.red)
+                            .padding(.top, 8)
+                    }
                 }
                 .padding(.horizontal, 30)
                 
@@ -903,15 +911,23 @@ struct OnboardingView: View {
                     .cornerRadius(16)
                 }
                 .buttonStyle(SleekButtonStyle())
-                .disabled(babyName.isEmpty || primaryCaregiverName.isEmpty)
-                .opacity(babyName.isEmpty || primaryCaregiverName.isEmpty ? 0.6 : 1.0)
-                .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty || primaryCaregiverName.isEmpty)
+                .disabled(babyName.isEmpty)
+                .opacity(babyName.isEmpty ? 0.6 : 1.0)
+                .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty)
                 
                 Text("You can change these settings anytime in the Settings tab")
                     .font(.system(.caption, design: .rounded))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
+                
+                // Debug info (remove in production)
+                if babyName.isEmpty {
+                    Text("⚠️ Baby name is required to continue")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundColor(.red)
+                        .padding(.top, 8)
+                }
             }
             .padding(.horizontal, 30)
             
@@ -1097,11 +1113,14 @@ struct OnboardingView: View {
     
     private func completeOnboarding() {
         // Save all data to DataManager
-        dataManager.babyName = babyName
+        dataManager.babyName = babyName.isEmpty ? "Baby" : babyName
         dataManager.babyBirthDate = babyBirthDate
         
+        // Ensure we have a caregiver name fallback
+        let finalCaregiverName = primaryCaregiverName.isEmpty ? "Parent" : primaryCaregiverName
+        
         // Save caregiver info
-        UserDefaults.standard.set(primaryCaregiverName, forKey: "primary_caregiver_name")
+        UserDefaults.standard.set(finalCaregiverName, forKey: "primary_caregiver_name")
         UserDefaults.standard.set(caregiverEmail, forKey: "primary_caregiver_email")
         UserDefaults.standard.set(partnerName, forKey: "partner_name")
         UserDefaults.standard.set(partnerEmail, forKey: "partner_email")
@@ -1182,8 +1201,24 @@ struct GoalSettingInt: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Text(icon)
-                    .font(.system(size: 24))
+                if icon.contains(".") || icon == "DiaperIcon" {
+                    // SF Symbol or custom image
+                    if icon == "DiaperIcon" {
+                        Image(icon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 24, height: 24)
+                            .foregroundColor(.orange)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 24))
+                            .foregroundColor(.purple)
+                    }
+                } else {
+                    // Emoji
+                    Text(icon)
+                        .font(.system(size: 24))
+                }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -1233,8 +1268,24 @@ struct GoalSettingDouble: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Text(icon)
-                    .font(.system(size: 24))
+                if icon.contains(".") || icon == "DiaperIcon" {
+                    // SF Symbol or custom image
+                    if icon == "DiaperIcon" {
+                        Image(icon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 24, height: 24)
+                            .foregroundColor(.orange)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 24))
+                            .foregroundColor(.purple)
+                    }
+                } else {
+                    // Emoji
+                    Text(icon)
+                        .font(.system(size: 24))
+                }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)

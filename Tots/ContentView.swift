@@ -19,12 +19,26 @@ struct ContentView: View {
                 }
                 .tag(1)
             
-            SettingsView()
+            MilestonesView()
                 .tabItem {
-                    Image(systemName: selectedTab == 2 ? "gearshape.fill" : "gearshape")
-                    Text("Settings")
+                    Image(systemName: selectedTab == 2 ? "figure.child.circle.fill" : "figure.child.circle")
+                    Text("Milestones")
                 }
                 .tag(2)
+            
+            WordTrackerView()
+                .tabItem {
+                    Image(systemName: selectedTab == 3 ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")
+                    Text("Words")
+                }
+                .tag(3)
+            
+            SettingsView()
+                .tabItem {
+                    Image(systemName: selectedTab == 4 ? "gearshape.fill" : "gearshape")
+                    Text("Settings")
+                }
+                .tag(4)
         }
         .accentColor(.pink)
     }
