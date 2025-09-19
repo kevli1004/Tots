@@ -53,10 +53,8 @@ class TotsDataManager: ObservableObject {
     // MARK: - Countdown Timers
     @Published var nextFeedingCountdown: TimeInterval = 0
     @Published var nextDiaperCountdown: TimeInterval = 0
-    @Published var nextSleepCountdown: TimeInterval = 0
     @Published var nextFeedingTime: Date?
     @Published var nextDiaperTime: Date?
-    @Published var nextSleepTime: Date?
     
     // Today's tracking data
     @Published var todayFeedings: Int = 7
@@ -731,8 +729,10 @@ class TotsDataManager: ObservableObject {
             nextFeedingTime = nextFeeding
             nextFeedingCountdown = max(0, nextFeeding.timeIntervalSince(now))
         } else {
-            nextFeedingTime = now
-            nextFeedingCountdown = 0
+            // Default to 2 minutes from now for demo purposes to see seconds timer
+            let defaultNextFeeding = now.addingTimeInterval(2 * 60)
+            nextFeedingTime = defaultNextFeeding
+            nextFeedingCountdown = max(0, defaultNextFeeding.timeIntervalSince(now))
         }
         
         // Calculate next diaper change
@@ -742,25 +742,17 @@ class TotsDataManager: ObservableObject {
             nextDiaperTime = nextDiaper
             nextDiaperCountdown = max(0, nextDiaper.timeIntervalSince(now))
         } else {
-            nextDiaperTime = now
-            nextDiaperCountdown = 0
+            // Default to 3 minutes from now for demo purposes to see seconds timer
+            let defaultNextDiaper = now.addingTimeInterval(3 * 60)
+            nextDiaperTime = defaultNextDiaper
+            nextDiaperCountdown = max(0, defaultNextDiaper.timeIntervalSince(now))
         }
         
-        // Calculate next sleep time
-        if let lastSleep = recentActivities.first(where: { $0.type == .sleep }) {
-            let averageSleepInterval: TimeInterval = 2 * 3600 // 2 hours
-            let nextSleep = lastSleep.time.addingTimeInterval(averageSleepInterval)
-            nextSleepTime = nextSleep
-            nextSleepCountdown = max(0, nextSleep.timeIntervalSince(now))
-        } else {
-            nextSleepTime = now
-            nextSleepCountdown = 0
-        }
     }
     
     func startCountdownTimer() {
         countdownTimer?.invalidate()
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
                 self?.updateCountdowns()
             }
@@ -781,6 +773,24 @@ class TotsDataManager: ObservableObject {
             return "\(minutes)m"
         } else {
             return "Now"
+        }
+    }
+    
+    func formatCountdownWithSeconds(_ timeInterval: TimeInterval) -> String {
+        if timeInterval <= 0 {
+            return "DUE"
+        }
+        
+        let hours = Int(timeInterval) / 3600
+        let minutes = (Int(timeInterval) % 3600) / 60
+        let seconds = Int(timeInterval) % 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m \(seconds)s"
+        } else if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
         }
     }
 }
@@ -960,10 +970,9 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
         // Timer countdowns for next activities
         public var nextFeedingTime: Date?
         public var nextDiaperTime: Date?
-        public var nextSleepTime: Date?
         public var nextTummyTime: Date?
         
-        public init(todayFeedings: Int, todaySleepHours: Double, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextSleepTime: Date? = nil, nextTummyTime: Date? = nil) {
+        public init(todayFeedings: Int, todaySleepHours: Double, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextTummyTime: Date? = nil) {
             self.todayFeedings = todayFeedings
             self.todaySleepHours = todaySleepHours
             self.todayDiapers = todayDiapers
@@ -971,7 +980,6 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
             self.lastUpdateTime = lastUpdateTime
             self.nextFeedingTime = nextFeedingTime
             self.nextDiaperTime = nextDiaperTime
-            self.nextSleepTime = nextSleepTime
             self.nextTummyTime = nextTummyTime
         }
     }
@@ -1031,7 +1039,6 @@ extension TotsDataManager {
             lastUpdateTime: Date(),
             nextFeedingTime: nextFeedingTime,
             nextDiaperTime: nextDiaperTime,
-            nextSleepTime: nextSleepTime,
             nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
         )
         
@@ -1071,7 +1078,6 @@ extension TotsDataManager {
             lastUpdateTime: Date(),
             nextFeedingTime: nextFeedingTime,
             nextDiaperTime: nextDiaperTime,
-            nextSleepTime: nextSleepTime,
             nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
         )
         

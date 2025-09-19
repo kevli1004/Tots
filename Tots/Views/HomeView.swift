@@ -259,30 +259,24 @@ struct HomeView: View {
                 .font(.headline)
                 .fontWeight(.semibold)
             
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
                 CountdownCard(
                     icon: "🍼",
                     title: "Feed",
-                    countdown: dataManager.formatCountdown(dataManager.nextFeedingCountdown),
+                    countdownInterval: dataManager.nextFeedingCountdown,
                     time: dataManager.nextFeedingTime,
                     color: .pink
                 )
+                .environmentObject(dataManager)
                 
                 CountdownCard(
                     icon: "DiaperIcon",
                     title: "Diaper",
-                    countdown: dataManager.formatCountdown(dataManager.nextDiaperCountdown),
+                    countdownInterval: dataManager.nextDiaperCountdown,
                     time: dataManager.nextDiaperTime,
                     color: .orange
                 )
-                
-                CountdownCard(
-                    icon: "moon.zzz.fill",
-                    title: "Sleep",
-                    countdown: dataManager.formatCountdown(dataManager.nextSleepCountdown),
-                    time: dataManager.nextSleepTime,
-                    color: .indigo
-                )
+                .environmentObject(dataManager)
             }
         }
     }
@@ -507,9 +501,11 @@ struct HomeView: View {
 struct CountdownCard: View {
     let icon: String
     let title: String
-    let countdown: String
+    let countdownInterval: TimeInterval
     let time: Date?
     let color: Color
+    @EnvironmentObject var dataManager: TotsDataManager
+    @State private var isFlashing = false
     
     private var timeString: String {
         guard let time = time else { return "" }
@@ -522,26 +518,36 @@ struct CountdownCard: View {
         return icon == "DiaperIcon"
     }
     
+    private var countdownText: String {
+        return dataManager.formatCountdownWithSeconds(countdownInterval)
+    }
+    
+    private var isDue: Bool {
+        return countdownInterval <= 0
+    }
+    
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
+            // Icon section - larger and more prominent
             if icon.contains(".") {
                 // SF Symbol
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(.title)
                     .foregroundColor(color)
             } else if isDiaperIcon {
                 // Custom SVG diaper icon
                 Image(icon)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 32, height: 32)
                     .foregroundColor(.white)
             } else {
                 // Regular Emoji
                 Text(icon)
-                    .font(.title2)
+                    .font(.title)
             }
             
+            // Title
             Text(title)
                 .font(.caption)
                 .fontWeight(.medium)
@@ -549,22 +555,52 @@ struct CountdownCard: View {
                 .textCase(.uppercase)
                 .tracking(0.5)
             
-            Text(countdown)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(color)
+            // Main countdown display - larger and more prominent
+            VStack(spacing: 4) {
+                Text(countdownText)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(isDue ? .red : color)
+                    .opacity(isDue && isFlashing ? 0.3 : 1.0)
+                    .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isFlashing)
+                
+                // Show "until next" label for better context
+                if !isDue {
+                    Text("until next")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .fontWeight(.medium)
+                }
+            }
             
-            if !timeString.isEmpty {
-                Text(timeString)
-                    .font(.caption2)
-                    .foregroundColor(Color(.tertiaryLabel))
-                    .fontWeight(.medium)
+            // Target time display
+            if !timeString.isEmpty && !isDue {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text(timeString)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
+        .padding(.horizontal, 20)
         .liquidGlassCard(cornerRadius: 20, shadowRadius: 15)
+        .onChange(of: isDue) { newValue in
+            if newValue {
+                isFlashing = true
+            } else {
+                isFlashing = false
+            }
+        }
     }
 }
 
