@@ -34,11 +34,23 @@ struct AddActivityView: View {
     @State private var selectedHeightIn: Double = 8.0
     @State private var selectedHeightCm: Double = 50.8
     
-    // Tummy time stopwatch states
-    @State private var tummyTimeIsRunning = false
-    @State private var tummyTimeStartTime: Date?
-    @State private var tummyTimeElapsed: TimeInterval = 0
-    @State private var tummyTimeTimer: Timer?
+    // Activity stopwatch states
+    @State private var activityIsRunning = false
+    @State private var activityStartTime: Date?
+    @State private var activityElapsed: TimeInterval = 0
+    @State private var activityTimer: Timer?
+    @State private var selectedActivitySubType: ActivitySubType = .tummyTime
+    
+    // Pumping timer states
+    @State private var leftPumpingIsRunning = false
+    @State private var leftPumpingStartTime: Date?
+    @State private var leftPumpingElapsed: TimeInterval = 0
+    @State private var leftPumpingTimer: Timer?
+    
+    @State private var rightPumpingIsRunning = false
+    @State private var rightPumpingStartTime: Date?
+    @State private var rightPumpingElapsed: TimeInterval = 0
+    @State private var rightPumpingTimer: Timer?
     
     enum FeedingType: String, CaseIterable {
         case bottle = "Bottle"
@@ -115,9 +127,13 @@ struct AddActivityView: View {
             }
         }
         .onDisappear {
-            // Clean up timer when view disappears
-            tummyTimeTimer?.invalidate()
-            tummyTimeTimer = nil
+            // Clean up all timers when view disappears
+            activityTimer?.invalidate()
+            activityTimer = nil
+            leftPumpingTimer?.invalidate()
+            leftPumpingTimer = nil
+            rightPumpingTimer?.invalidate()
+            rightPumpingTimer = nil
         }
     }
     
@@ -190,8 +206,10 @@ struct AddActivityView: View {
             sleepDetailsView
         case .milestone:
             milestoneDetailsView
-        case .play:
-            tummyTimeDetailsView
+        case .activity:
+            activitySpecificDetailsView
+        case .pumping:
+            pumpingDetailsView
         case .growth:
             growthDetailsView
         }
@@ -666,10 +684,24 @@ struct AddActivityView: View {
             details = String(format: "Slept for %.1f hours", sleepDuration)
         case .milestone:
             details = milestoneDescription.isEmpty ? milestoneTitle : "\(milestoneTitle) - \(milestoneDescription)"
-        case .play:
-            let minutes = Int(tummyTimeElapsed / 60)
-            let seconds = Int(tummyTimeElapsed) % 60
-            details = "Tummy time - \(minutes)m \(seconds)s"
+        case .activity:
+            if selectedActivitySubType == .tummyTime || selectedActivitySubType == .screenTime {
+                // Timed activities include duration
+                let minutes = Int(activityElapsed / 60)
+                let seconds = Int(activityElapsed) % 60
+                details = "\(selectedActivitySubType.name) - \(minutes)m \(seconds)s"
+            } else {
+                // Quick log activities just include the activity name
+                details = selectedActivitySubType.name
+            }
+        case .pumping:
+            let leftMinutes = Int(leftPumpingElapsed / 60)
+            let leftSeconds = Int(leftPumpingElapsed) % 60
+            let rightMinutes = Int(rightPumpingElapsed / 60)
+            let rightSeconds = Int(rightPumpingElapsed) % 60
+            let totalMinutes = Int((leftPumpingElapsed + rightPumpingElapsed) / 60)
+            let totalSeconds = Int(leftPumpingElapsed + rightPumpingElapsed) % 60
+            details = "Left: \(leftMinutes)m \(leftSeconds)s, Right: \(rightMinutes)m \(rightSeconds)s, Total: \(totalMinutes)m \(totalSeconds)s"
         case .growth:
             if dataManager.useMetricUnits {
                 details = String(format: "Weight: %.1f kg, Height: %.1f cm", 
@@ -712,68 +744,268 @@ struct AddActivityView: View {
         dismiss()
     }
     
-    private var tummyTimeDetailsView: some View {
+    private var activitySpecificDetailsView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Tummy Time")
+            // Activity type selector
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Activity Type")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
+                    ForEach(ActivitySubType.allCases, id: \.self) { subType in
+                        Button(action: {
+                            selectedActivitySubType = subType
+                        }) {
+                            HStack {
+                                Text(subType.rawValue)
+                                    .font(.title2)
+                                Text(subType.name)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(selectedActivitySubType == subType ? subType.color.opacity(0.2) : Color(.systemGray6))
+                            .foregroundColor(selectedActivitySubType == subType ? subType.color : .primary)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            
+            // Only show timer for activities that need duration tracking
+            if selectedActivitySubType == .tummyTime || selectedActivitySubType == .screenTime {
+                VStack(spacing: 20) {
+                    // Stopwatch display
+                    VStack(spacing: 8) {
+                        Text(formatElapsedTime(activityElapsed))
+                            .font(.system(size: 48, weight: .bold, design: .monospaced))
+                            .foregroundColor(activityIsRunning ? .green : .primary)
+                        
+                        Text(activityIsRunning ? "Timer Running" : "Timer Stopped")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Start/Stop button (only show one at a time)
+                    if activityIsRunning {
+                        Button(action: stopActivity) {
+                            HStack {
+                                Image(systemName: "stop.fill")
+                                Text("Stop")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red)
+                            .cornerRadius(12)
+                        }
+                    } else {
+                        Button(action: startActivity) {
+                            HStack {
+                                Image(systemName: "play.fill")
+                                Text("Start")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(12)
+                        }
+                    }
+                    
+                    // Reset button
+                    Button(action: resetActivity) {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("Reset")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    }
+                    .disabled(activityIsRunning)
+                }
+            } else {
+                // For other activities, just show a note that it's a quick log
+                VStack(spacing: 12) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Quick Log Activity")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    
+                    Text("This activity will be logged with the current time. No timer needed.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                .padding()
+                .background(Color(.systemGray6).opacity(0.5))
+                .cornerRadius(8)
+            }
+        }
+        .padding()
+        .liquidGlassCard()
+    }
+    
+    private var pumpingDetailsView: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Pumping Session")
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
             
-            VStack(spacing: 20) {
-                // Stopwatch display
-                VStack(spacing: 8) {
-                    Text(formatElapsedTime(tummyTimeElapsed))
-                        .font(.system(size: 48, weight: .bold, design: .monospaced))
-                        .foregroundColor(tummyTimeIsRunning ? .green : .primary)
+            HStack(spacing: 20) {
+                // Left breast timer
+                VStack(spacing: 16) {
+                    Text("Left Breast")
+                        .font(.headline)
+                        .fontWeight(.semibold)
                     
-                    Text(tummyTimeIsRunning ? "Timer Running" : "Timer Stopped")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                // Start/Stop button (only show one at a time)
-                if tummyTimeIsRunning {
-                    Button(action: stopTummyTime) {
-                        HStack {
-                            Image(systemName: "stop.fill")
-                            Text("Stop")
+                    VStack(spacing: 8) {
+                        Text(formatElapsedTime(leftPumpingElapsed))
+                            .font(.system(size: 32, weight: .bold, design: .monospaced))
+                            .foregroundColor(leftPumpingIsRunning ? .cyan : .primary)
+                        
+                        Text(leftPumpingIsRunning ? "Running" : "Stopped")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Left timer controls
+                    VStack(spacing: 8) {
+                        if leftPumpingIsRunning {
+                            Button(action: stopLeftPumping) {
+                                HStack {
+                                    Image(systemName: "stop.fill")
+                                    Text("Stop")
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.red)
+                                .cornerRadius(8)
+                            }
+                        } else {
+                            Button(action: startLeftPumping) {
+                                HStack {
+                                    Image(systemName: "play.fill")
+                                    Text("Start")
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.cyan)
+                                .cornerRadius(8)
+                            }
                         }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red)
-                        .cornerRadius(12)
-                    }
-                } else {
-                    Button(action: startTummyTime) {
-                        HStack {
-                            Image(systemName: "play.fill")
-                            Text("Start")
+                        
+                        Button(action: resetLeftPumping) {
+                            HStack {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("Reset")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
                         }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .cornerRadius(12)
                     }
                 }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
                 
-                // Reset button
-                Button(action: resetTummyTime) {
-                    HStack {
-                        Image(systemName: "arrow.counterclockwise")
-                        Text("Reset")
+                // Right breast timer
+                VStack(spacing: 16) {
+                    Text("Right Breast")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    VStack(spacing: 8) {
+                        Text(formatElapsedTime(rightPumpingElapsed))
+                            .font(.system(size: 32, weight: .bold, design: .monospaced))
+                            .foregroundColor(rightPumpingIsRunning ? .cyan : .primary)
+                        
+                        Text(rightPumpingIsRunning ? "Running" : "Stopped")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    
+                    // Right timer controls
+                    VStack(spacing: 8) {
+                        if rightPumpingIsRunning {
+                            Button(action: stopRightPumping) {
+                                HStack {
+                                    Image(systemName: "stop.fill")
+                                    Text("Stop")
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.red)
+                                .cornerRadius(8)
+                            }
+                        } else {
+                            Button(action: startRightPumping) {
+                                HStack {
+                                    Image(systemName: "play.fill")
+                                    Text("Start")
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.cyan)
+                                .cornerRadius(8)
+                            }
+                        }
+                        
+                        Button(action: resetRightPumping) {
+                            HStack {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("Reset")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        }
+                    }
                 }
-                .disabled(tummyTimeIsRunning)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
             }
+            
+            // Total session time
+            VStack(spacing: 8) {
+                Text("Total Session Time")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Text(formatElapsedTime(leftPumpingElapsed + rightPumpingElapsed))
+                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .foregroundColor(.primary)
+            }
+            .frame(maxWidth: .infinity)
             .padding()
-            .liquidGlassCard()
+            .background(Color(.systemGray5))
+            .cornerRadius(12)
         }
+        .padding()
+        .liquidGlassCard()
     }
     
     private func formatElapsedTime(_ timeInterval: TimeInterval) -> String {
@@ -782,26 +1014,71 @@ struct AddActivityView: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
     
-    private func startTummyTime() {
-        tummyTimeIsRunning = true
-        tummyTimeStartTime = Date()
+    private func startActivity() {
+        activityIsRunning = true
+        activityStartTime = Date()
         
-        tummyTimeTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if let startTime = tummyTimeStartTime {
-                tummyTimeElapsed = Date().timeIntervalSince(startTime)
+        activityTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if let startTime = activityStartTime {
+                activityElapsed = Date().timeIntervalSince(startTime)
             }
         }
     }
     
-    private func stopTummyTime() {
-        tummyTimeIsRunning = false
-        tummyTimeTimer?.invalidate()
-        tummyTimeTimer = nil
+    private func stopActivity() {
+        activityIsRunning = false
+        activityTimer?.invalidate()
+        activityTimer = nil
     }
     
-    private func resetTummyTime() {
-        tummyTimeElapsed = 0
-        tummyTimeStartTime = nil
+    private func resetActivity() {
+        activityElapsed = 0
+        activityStartTime = nil
+    }
+    
+    // Pumping timer functions
+    private func startLeftPumping() {
+        leftPumpingStartTime = Date()
+        leftPumpingIsRunning = true
+        
+        leftPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if let startTime = leftPumpingStartTime {
+                leftPumpingElapsed = Date().timeIntervalSince(startTime)
+            }
+        }
+    }
+    
+    private func stopLeftPumping() {
+        leftPumpingIsRunning = false
+        leftPumpingTimer?.invalidate()
+        leftPumpingTimer = nil
+    }
+    
+    private func resetLeftPumping() {
+        leftPumpingElapsed = 0
+        leftPumpingStartTime = nil
+    }
+    
+    private func startRightPumping() {
+        rightPumpingStartTime = Date()
+        rightPumpingIsRunning = true
+        
+        rightPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if let startTime = rightPumpingStartTime {
+                rightPumpingElapsed = Date().timeIntervalSince(startTime)
+            }
+        }
+    }
+    
+    private func stopRightPumping() {
+        rightPumpingIsRunning = false
+        rightPumpingTimer?.invalidate()
+        rightPumpingTimer = nil
+    }
+    
+    private func resetRightPumping() {
+        rightPumpingElapsed = 0
+        rightPumpingStartTime = nil
     }
     
     private func parseActivityDetails(_ activity: TotsActivity) {
@@ -843,10 +1120,28 @@ struct AddActivityView: View {
                 sleepDuration = Double(String(details[range])) ?? 1.5
             }
             
-        case .play:
-            // Parse tummy time duration from details like "Tummy time - 15m 30s"
+        case .activity:
+            // Parse activity duration and type from details like "Tummy Time - 15m 30s"
             if let duration = activity.duration {
-                tummyTimeElapsed = TimeInterval(duration * 60) // Convert minutes to seconds
+                activityElapsed = TimeInterval(duration * 60) // Convert minutes to seconds
+            }
+            
+            // Parse activity subtype
+            for subType in ActivitySubType.allCases {
+                if details.contains(subType.name.lowercased()) {
+                    selectedActivitySubType = subType
+                    break
+                }
+            }
+            
+        case .pumping:
+            // Parse pumping session from details like "Left: 10m 30s, Right: 8m 45s, Total: 19m 15s"
+            if let duration = activity.duration {
+                // For now, split the total duration evenly between left and right
+                // In a real implementation, you'd parse the individual times
+                let totalSeconds = TimeInterval(duration * 60)
+                leftPumpingElapsed = totalSeconds / 2
+                rightPumpingElapsed = totalSeconds / 2
             }
             
         default:
@@ -860,8 +1155,15 @@ struct AddActivityView: View {
             return Int(sleepDuration * 60) // Convert hours to minutes
         case .feeding:
             return feedingType == .breastfeeding ? 15 : nil
-        case .play:
-            return Int(tummyTimeElapsed / 60) // Convert seconds to minutes
+        case .activity:
+            // Only return duration for activities that use timers
+            if selectedActivitySubType == .tummyTime || selectedActivitySubType == .screenTime {
+                return Int(activityElapsed / 60) // Convert seconds to minutes
+            } else {
+                return nil // Quick log activities don't have duration
+            }
+        case .pumping:
+            return Int((leftPumpingElapsed + rightPumpingElapsed) / 60) // Convert seconds to minutes
         default:
             return nil
         }

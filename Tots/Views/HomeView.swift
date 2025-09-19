@@ -176,7 +176,7 @@ struct HomeView: View {
                             
                             // Activity options
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                                ForEach([ActivityType.feeding, .diaper, .sleep, .play, .growth], id: \.self) { type in
+                                ForEach([ActivityType.feeding, .pumping, .diaper, .sleep, .activity, .growth], id: \.self) { type in
                                     Button(action: {
                                         selectedActivityType = type
                                         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
@@ -201,7 +201,7 @@ struct HomeView: View {
                                                     Image(systemName: "figure.child")
                                                         .font(.system(size: 24, weight: .medium))
                                                         .foregroundColor(type.color)
-                                                } else if type.rawValue == "DiaperIcon" {
+                                                } else if type.rawValue == "DiaperIcon" || type.rawValue == "PumpingIcon" {
                                                     Image(type.rawValue)
                                                         .resizable()
                                                         .aspectRatio(contentMode: .fit)
@@ -1132,8 +1132,8 @@ struct ActivityRow: View {
                 .frame(width: 40, height: 40)
                 .overlay(
                     Group {
-                        if activity.type.rawValue == "DiaperIcon" {
-                            // Custom SVG diaper icon
+                        if activity.type.rawValue == "DiaperIcon" || activity.type.rawValue == "PumpingIcon" {
+                            // Custom SVG icons
                             Image(activity.type.rawValue)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
@@ -1478,7 +1478,7 @@ struct TimelineActivityRow: View {
             // Activity content
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    if activity.type.rawValue == "DiaperIcon" {
+                    if activity.type.rawValue == "DiaperIcon" || activity.type.rawValue == "PumpingIcon" {
                         Image(activity.type.rawValue)
                             .resizable()
                             .aspectRatio(contentMode: .fit)

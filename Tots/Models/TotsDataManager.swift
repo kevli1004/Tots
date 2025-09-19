@@ -312,10 +312,10 @@ class TotsDataManager: ObservableObject {
         let sleepActivities = todayActivities.filter { $0.type == .sleep }
         todaySleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
         
-        let tummyActivities = todayActivities.filter { $0.type == .play && $0.details.lowercased().contains("tummy") }
+        let tummyActivities = todayActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
         todayTummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
         
-        let playActivities = todayActivities.filter { $0.type == .play && !$0.details.lowercased().contains("tummy") }
+        let playActivities = todayActivities.filter { $0.type == .activity && !$0.details.lowercased().contains("tummy") }
         todayPlayTime = playActivities.compactMap { $0.duration }.reduce(0, +)
         
         // Update weekly data based on real activities
@@ -339,10 +339,10 @@ class TotsDataManager: ObservableObject {
             let sleepActivities = dayActivities.filter { $0.type == .sleep }
             let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
             
-            let tummyActivities = dayActivities.filter { $0.type == .play && $0.details.lowercased().contains("tummy") }
+            let tummyActivities = dayActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
             let tummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
             
-            let playActivities = dayActivities.filter { $0.type == .play && !$0.details.lowercased().contains("tummy") }
+            let playActivities = dayActivities.filter { $0.type == .activity && !$0.details.lowercased().contains("tummy") }
             let playTime = playActivities.compactMap { $0.duration }.reduce(0, +)
             
             let formatter = DateFormatter()
@@ -402,10 +402,10 @@ class TotsDataManager: ObservableObject {
                     let sleepActivities = dayActivities.filter { $0.type == .sleep }
                     totalSleepHours += Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
                     
-                    let tummyActivities = dayActivities.filter { $0.type == .play && $0.details.lowercased().contains("tummy") }
+                    let tummyActivities = dayActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
                     totalTummyTime += tummyActivities.compactMap { $0.duration }.reduce(0, +)
                     
-                    let playActivities = dayActivities.filter { $0.type == .play && !$0.details.lowercased().contains("tummy") }
+                    let playActivities = dayActivities.filter { $0.type == .activity && !$0.details.lowercased().contains("tummy") }
                     totalPlayTime += playActivities.compactMap { $0.duration }.reduce(0, +)
                     
                     daysInWeek += 1
@@ -450,10 +450,10 @@ class TotsDataManager: ObservableObject {
         let sleepActivities = dayActivities.filter { $0.type == .sleep }
         let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
         
-        let tummyActivities = dayActivities.filter { $0.type == .play && $0.details.lowercased().contains("tummy") }
+        let tummyActivities = dayActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
         let tummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
         
-        let playActivities = dayActivities.filter { $0.type == .play && !$0.details.lowercased().contains("tummy") }
+        let playActivities = dayActivities.filter { $0.type == .activity && !$0.details.lowercased().contains("tummy") }
         let playTime = playActivities.compactMap { $0.duration }.reduce(0, +)
         
         let dateFormatter = DateFormatter()
@@ -581,13 +581,16 @@ class TotsDataManager: ObservableObject {
         switch activity.type {
         case .feeding:
             todayFeedings += 1
+        case .pumping:
+            // Pumping doesn't directly affect feeding count but could be tracked separately
+            break
         case .diaper:
             todayDiapers += 1
         case .sleep:
             todaySleepHours += Double(activity.duration ?? 90) / 60.0
         case .milestone:
             todayMilestones += 1
-        case .play:
+        case .activity:
             if activity.details.lowercased().contains("tummy") {
                 todayTummyTime += activity.duration ?? 15
             } else {
@@ -1077,20 +1080,24 @@ class TotsDataManager: ObservableObject {
             if timeSinceLastActivity > 2.5 {
                 return .diaper
             }
+        case .pumping:
+            if timeSinceLastActivity > 1 {
+                return .feeding // After pumping, suggest feeding
+            }
         case .diaper:
             if timeSinceLastActivity > 1 {
-                return .play
+                return .activity
             }
         case .sleep:
             if timeSinceLastActivity > 0.5 {
                 return .feeding
             }
-        case .play:
+        case .activity:
             if timeSinceLastActivity > 1.5 {
                 return .feeding
             }
         case .milestone:
-            return .play // Celebrate with play time
+            return .activity // Celebrate with activity time
         case .growth:
             return .feeding // After growth tracking, suggest feeding
         }
@@ -1099,7 +1106,7 @@ class TotsDataManager: ObservableObject {
         let hour = Calendar.current.component(.hour, from: now)
         switch hour {
         case 6...9, 12...13, 17...18: return .feeding
-        case 10...11, 14...16: return .play
+        case 10...11, 14...16: return .activity
         case 19...22: return .sleep
         default: return .diaper
         }
@@ -1128,7 +1135,7 @@ class TotsDataManager: ObservableObject {
             }
             
             // Tummy time suggestion
-            let lastTummyTime = recentActivities.first { $0.type == .play && $0.details.lowercased().contains("tummy") }
+            let lastTummyTime = recentActivities.first { $0.type == .activity && $0.details.lowercased().contains("tummy") }
             if let lastTummy = lastTummyTime {
                 let timeSinceTummy = now.timeIntervalSince(lastTummy.time) / 3600
                 if timeSinceTummy > 3 {
@@ -1192,7 +1199,7 @@ class TotsDataManager: ObservableObject {
         let sleepActivities = activities.filter { $0.type == .sleep }
         let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
         
-        let tummyTimeActivities = activities.filter { $0.type == .play && $0.details.contains("Tummy") }
+        let tummyTimeActivities = activities.filter { $0.type == .activity && $0.details.contains("Tummy") }
         let tummyTime = tummyTimeActivities.compactMap { $0.duration }.reduce(0, +)
         
         return DayStats(
@@ -1306,19 +1313,21 @@ struct TotsActivity: Identifiable, Codable {
 
 enum ActivityType: String, CaseIterable, Codable {
     case feeding = "🍼"
+    case pumping = "PumpingIcon"
     case diaper = "DiaperIcon"
     case sleep = "moon.zzz.fill"
     case milestone = "🎉"
-    case play = "🧸"
+    case activity = "🧸"
     case growth = "📏"
     
     var name: String {
         switch self {
         case .feeding: return "Feeding"
+        case .pumping: return "Pumping"
         case .diaper: return "Diaper"
         case .sleep: return "Sleep"
         case .milestone: return "Milestone"
-        case .play: return "Tummy Time"
+        case .activity: return "Activity"
         case .growth: return "Growth"
         }
     }
@@ -1326,10 +1335,11 @@ enum ActivityType: String, CaseIterable, Codable {
         var color: Color {
             switch self {
             case .feeding: return .pink
+            case .pumping: return .cyan
             case .diaper: return .orange
             case .sleep: return .purple
             case .milestone: return .purple
-            case .play: return .green
+            case .activity: return .green
             case .growth: return .blue
             }
         }
@@ -1337,11 +1347,49 @@ enum ActivityType: String, CaseIterable, Codable {
     var gradientColors: [Color] {
         switch self {
         case .feeding: return [.pink, .red]
+        case .pumping: return [.cyan, .blue]
         case .diaper: return [.orange, .yellow]
         case .sleep: return [.indigo, .blue]
         case .milestone: return [.purple, .pink]
-        case .play: return [.green, .mint]
+        case .activity: return [.green, .mint]
         case .growth: return [.blue, .cyan]
+        }
+    }
+}
+
+enum ActivitySubType: String, CaseIterable, Codable {
+    case tummyTime = "🤸‍♂️"
+    case bathTime = "🛁"
+    case storyTime = "📖"
+    case screenTime = "📱"
+    case outdoorTime = "🌳"
+    case playTime = "🧸"
+    case musicTime = "🎵"
+    case artTime = "🎨"
+    
+    var name: String {
+        switch self {
+        case .tummyTime: return "Tummy Time"
+        case .bathTime: return "Bath Time"
+        case .storyTime: return "Story Time"
+        case .screenTime: return "Screen Time"
+        case .outdoorTime: return "Outdoor Time"
+        case .playTime: return "Play Time"
+        case .musicTime: return "Music Time"
+        case .artTime: return "Art Time"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .tummyTime: return .green
+        case .bathTime: return .blue
+        case .storyTime: return .purple
+        case .screenTime: return .orange
+        case .outdoorTime: return .green
+        case .playTime: return .yellow
+        case .musicTime: return .pink
+        case .artTime: return .red
         }
     }
 }

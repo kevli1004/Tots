@@ -39,11 +39,27 @@ struct ActivityCard: View {
     var body: some View {
         HStack(spacing: 12) {
             // Activity icon
-            Text(activity.type.rawValue)
-                .font(.system(size: 24))
-                .frame(width: 40, height: 40)
-                .background(activity.type.color.opacity(0.2))
-                .clipShape(Circle())
+            ZStack {
+                Circle()
+                    .fill(activity.type.color.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                
+                if activity.type.rawValue == "DiaperIcon" || activity.type.rawValue == "PumpingIcon" {
+                    Image(activity.type.rawValue)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
+                        .foregroundColor(activity.type.color)
+                } else if activity.type.rawValue == "moon.zzz.fill" {
+                    Image(systemName: activity.type.rawValue)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(activity.type.color)
+                } else {
+                    Text(activity.type.rawValue)
+                        .font(.system(size: 24))
+                        .foregroundColor(activity.type.color)
+                }
+            }
             
             // Activity details
             VStack(alignment: .leading, spacing: 4) {
