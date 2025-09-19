@@ -817,7 +817,7 @@ enum ActivityType: String, CaseIterable, Codable {
         case .diaper: return "Diaper"
         case .sleep: return "Sleep"
         case .milestone: return "Milestone"
-        case .play: return "Play & Tummy Time"
+        case .play: return "Tummy Time"
         case .growth: return "Growth"
         }
     }
@@ -825,7 +825,7 @@ enum ActivityType: String, CaseIterable, Codable {
         var color: Color {
             switch self {
             case .feeding: return .pink
-            case .diaper: return .white
+            case .diaper: return .orange
             case .sleep: return .purple
             case .milestone: return .purple
             case .play: return .green

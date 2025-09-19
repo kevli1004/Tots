@@ -204,15 +204,9 @@ struct HomeView: View {
                                             }
                                             
                                             VStack(spacing: 4) {
-                                                Text(type.name.components(separatedBy: " ").first ?? type.name)
+                                                Text(type.name)
                                                     .font(.system(size: 16, weight: .semibold))
                                                     .foregroundColor(.primary)
-                                                
-                                                if type.name.contains(" ") {
-                                                    Text(type.name.components(separatedBy: " ").dropFirst().joined(separator: " "))
-                                                        .font(.system(size: 12, weight: .medium))
-                                                        .foregroundColor(.secondary)
-                                                }
                                             }
                                             .multilineTextAlignment(.center)
                                         }
@@ -279,7 +273,7 @@ struct HomeView: View {
                     title: "Diaper",
                     countdown: dataManager.formatCountdown(dataManager.nextDiaperCountdown),
                     time: dataManager.nextDiaperTime,
-                    color: .white
+                    color: .orange
                 )
                 
                 CountdownCard(
