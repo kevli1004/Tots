@@ -48,6 +48,137 @@ struct HomeView: View {
     @State private var showingAddActivity = false
     @State private var selectedActivityType: ActivityType = .feeding
     @State private var editingActivity: TotsActivity?
+    @State private var selectedSummaryPeriod: SummaryPeriod = .today
+    
+    // MARK: - Computed Properties for Weekly Data
+    private var weeklyFeedings: Int {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.feedings }
+    }
+    
+    private var weeklySleepHours: Double {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.sleepHours }
+    }
+    
+    private var weeklyDiapers: Int {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.diapers }
+    }
+    
+    private var weeklyTummyTime: Int {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.tummyTime }
+    }
+    
+    // MARK: - Computed Properties for Monthly Data
+    private var monthlyFeedings: Int {
+        let calendar = Calendar.current
+        let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let monthlyActivities = dataManager.recentActivities.filter { 
+            $0.time >= thirtyDaysAgo && $0.type == .feeding 
+        }
+        return monthlyActivities.count
+    }
+    
+    private var monthlySleepHours: Double {
+        let calendar = Calendar.current
+        let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let sleepActivities = dataManager.recentActivities.filter { 
+            $0.time >= thirtyDaysAgo && $0.type == .sleep 
+        }
+        return Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
+    }
+    
+    private var monthlyDiapers: Int {
+        let calendar = Calendar.current
+        let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let monthlyActivities = dataManager.recentActivities.filter { 
+            $0.time >= thirtyDaysAgo && $0.type == .diaper 
+        }
+        return monthlyActivities.count
+    }
+    
+    private var monthlyTummyTime: Int {
+        let calendar = Calendar.current
+        let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let tummyActivities = dataManager.recentActivities.filter { 
+            $0.time >= thirtyDaysAgo && $0.type == .activity && $0.details.lowercased().contains("tummy")
+        }
+        return tummyActivities.compactMap { $0.duration }.reduce(0, +)
+    }
+    
+    // Monthly goals (calculated based on daily goals * 30)
+    private var monthlyFeedingGoal: Int { 8 * 30 }
+    private var monthlySleepGoal: Double { 15.0 * 30 }
+    private var monthlyDiaperGoal: Int { 6 * 30 }
+    private var monthlyTummyTimeGoal: Int { 60 * 30 }
+    
+    // MARK: - Daily Data for Weekly View
+    private var dailyDataForWeek: [DayProgressData] {
+        let calendar = Calendar.current
+        let today = calendar.dateInterval(of: .day, for: Date())?.start ?? Date()
+        
+        return (0..<7).map { dayOffset in
+            let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
+            let dayActivities = dataManager.recentActivities.filter { calendar.isDate($0.time, inSameDayAs: date) }
+            
+            let feedings = dayActivities.filter { $0.type == .feeding }.count
+            let diapers = dayActivities.filter { $0.type == .diaper }.count
+            let sleepActivities = dayActivities.filter { $0.type == .sleep }
+            let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
+            let tummyActivities = dayActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
+            let tummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
+            
+            let formatter = DateFormatter()
+            formatter.dateFormat = "E"
+            let dayString = formatter.string(from: date)
+            
+            return DayProgressData(
+                day: dayString,
+                date: date,
+                feedings: feedings,
+                diapers: diapers,
+                sleepHours: sleepHours,
+                tummyTime: tummyTime
+            )
+        }.reversed()
+    }
+    
+    // MARK: - Weekly Data for Monthly View
+    private var weeklyDataForMonth: [WeekProgressData] {
+        let calendar = Calendar.current
+        let today = Date()
+        
+        // Get the past 4 weeks of data
+        return (0..<4).compactMap { weekOffset in
+            // Calculate the start and end of each week
+            let weekStartDate = calendar.date(byAdding: .weekOfYear, value: -weekOffset, to: calendar.startOfDay(for: today))!
+            let weekInterval = calendar.dateInterval(of: .weekOfYear, for: weekStartDate)
+            
+            guard let interval = weekInterval else { return nil }
+            
+            let weekActivities = dataManager.recentActivities.filter { activity in
+                interval.contains(activity.time)
+            }
+            
+            let feedings = weekActivities.filter { $0.type == .feeding }.count
+            let diapers = weekActivities.filter { $0.type == .diaper }.count
+            let sleepActivities = weekActivities.filter { $0.type == .sleep }
+            let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
+            let tummyActivities = weekActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
+            let tummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
+            
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d"
+            let weekLabel = "Week of \(formatter.string(from: interval.start))"
+            
+            return WeekProgressData(
+                weekLabel: weekLabel,
+                startDate: interval.start,
+                feedings: feedings,
+                diapers: diapers,
+                sleepHours: sleepHours,
+                tummyTime: tummyTime
+            )
+        }.reversed()
+    }
     
     var body: some View {
         NavigationView {
@@ -327,48 +458,124 @@ struct HomeView: View {
     }
     
     private var todaySummaryWithGoalsView: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Today's Summary & Goals")
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Summary & Goals")
                 .font(.headline)
                 .fontWeight(.semibold)
             
-            // Summary cards with progress
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                SummaryGoalCard(
-                    icon: "🍼",
-                    title: "Feedings",
-                    current: dataManager.todayFeedings,
-                    goal: 8,
-                    color: .pink
-                )
+            // Swipeable TabView for different summary layouts
+            TabView(selection: $selectedSummaryPeriod) {
+                todaySummaryContent
+                    .tag(SummaryPeriod.today)
+                    .padding(.horizontal, 8) // Add padding to prevent cutoff
                 
-                SummaryGoalCard(
-                    icon: "moon.zzz.fill",
-                    title: "Sleep",
-                    current: dataManager.todaySleepHours,
-                    goal: 15.0,
-                    color: .purple,
-                    unit: "h"
-                )
+                weeklySummaryContent
+                    .tag(SummaryPeriod.week)
+                    .padding(.horizontal, 8)
                 
-                SummaryGoalCard(
-                    icon: "DiaperIcon",
-                    title: "Diapers",
-                    current: dataManager.todayDiapers,
-                    goal: 6,
-                    color: .white
+                monthlySummaryContent
+                    .tag(SummaryPeriod.month)
+                    .padding(.horizontal, 8)
+            }
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            .frame(height: 320) // Increased height significantly for better content display
+            
+            // Centered dots indicator at bottom
+            HStack {
+                Spacer()
+                HStack(spacing: 8) {
+                    ForEach(Array(SummaryPeriod.allCases.enumerated()), id: \.offset) { index, period in
+                        Circle()
+                            .fill(selectedSummaryPeriod == period ? Color.blue : Color.gray.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                            .animation(.easeInOut(duration: 0.3), value: selectedSummaryPeriod)
+                    }
+                }
+                Spacer()
+            }
+        }
+    }
+    
+    
+    private var todaySummaryContent: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
+            SummaryGoalCard(
+                icon: "🍼",
+                title: "Feedings",
+                current: dataManager.todayFeedings,
+                goal: 8,
+                color: .pink
+            )
+            
+            SummaryGoalCard(
+                icon: "moon.zzz.fill",
+                title: "Sleep",
+                current: dataManager.todaySleepHours,
+                goal: 15.0,
+                color: .purple,
+                unit: "h"
+            )
+            
+            SummaryGoalCard(
+                icon: "DiaperIcon",
+                title: "Diapers",
+                current: dataManager.todayDiapers,
+                goal: 6,
+                color: .white
+            )
+            
+            SummaryGoalCard(
+                icon: "🧸",
+                title: "Tummy Time",
+                current: dataManager.todayTummyTime,
+                goal: 60,
+                color: .green,
+                unit: "m"
+            )
+        }
+    }
+    
+    private var weeklySummaryContent: some View {
+        VStack(spacing: 12) {
+            SimpleBarChart(
+                title: "Daily Activity This Week",
+                data: dailyDataForWeek,
+                isWeekly: true
+            )
+        }
+        .padding(.vertical, 8)
+    }
+    
+    private var monthlySummaryContent: some View {
+        VStack(spacing: 12) {
+            if weeklyDataForMonth.isEmpty || weeklyDataForMonth.allSatisfy({ $0.feedings == 0 && $0.diapers == 0 && $0.sleepHours == 0 && $0.tummyTime == 0 }) {
+                VStack(spacing: 8) {
+                    Text("No Data Available")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Start tracking activities to see monthly trends")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.regularMaterial)
+                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
                 )
-                
-                SummaryGoalCard(
-                    icon: "🧸",
-                    title: "Tummy Time",
-                    current: dataManager.todayTummyTime,
-                    goal: 60,
-                    color: .green,
-                    unit: "m"
+            } else {
+                SimpleBarChart(
+                    title: "Weekly Activity This Month",
+                    data: weeklyDataForMonth,
+                    isWeekly: false
                 )
             }
         }
+        .padding(.vertical, 8)
     }
     
     
@@ -890,6 +1097,102 @@ struct CountdownCard: View {
                    (details.contains("💩") && details.contains("💧")))
         }.count
     }
+    
+    // MARK: - Weekly Data Computed Properties
+    
+    private var weeklyFeedings: Int {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.feedings }
+    }
+    
+    private var weeklyDiapers: Int {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.diapers }
+    }
+    
+    private var weeklySleepHours: Double {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.sleepHours }
+    }
+    
+    private var weeklyTummyTime: Int {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.tummyTime }
+    }
+    
+    // MARK: - Monthly Data Computed Properties
+    
+    private var monthlyFeedings: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
+        
+        return dataManager.recentActivities.filter { activity in
+            activity.type == .feeding && activity.time >= startOfMonth
+        }.count
+    }
+    
+    private var monthlyDiapers: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
+        
+        return dataManager.recentActivities.filter { activity in
+            activity.type == .diaper && activity.time >= startOfMonth
+        }.count
+    }
+    
+    private var monthlySleepHours: Double {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
+        
+        let sleepActivities = dataManager.recentActivities.filter { activity in
+            activity.type == .sleep && activity.time >= startOfMonth
+        }
+        
+        return Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
+    }
+    
+    private var monthlyTummyTime: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
+        
+        let tummyActivities = dataManager.recentActivities.filter { activity in
+            activity.type == .activity && 
+            activity.details.lowercased().contains("tummy") && 
+            activity.time >= startOfMonth
+        }
+        
+        return tummyActivities.compactMap { $0.duration }.reduce(0, +)
+    }
+    
+    // MARK: - Monthly Goals Computed Properties
+    
+    private var monthlyFeedingGoal: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let daysInMonth = calendar.range(of: .day, in: .month, for: now)?.count ?? 30
+        return daysInMonth * 8 // 8 feedings per day
+    }
+    
+    private var monthlyDiaperGoal: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let daysInMonth = calendar.range(of: .day, in: .month, for: now)?.count ?? 30
+        return daysInMonth * 6 // 6 diapers per day
+    }
+    
+    private var monthlySleepGoal: Double {
+        let calendar = Calendar.current
+        let now = Date()
+        let daysInMonth = calendar.range(of: .day, in: .month, for: now)?.count ?? 30
+        return Double(daysInMonth) * 15.0 // 15 hours per day
+    }
+    
+    private var monthlyTummyTimeGoal: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let daysInMonth = calendar.range(of: .day, in: .month, for: now)?.count ?? 30
+        return daysInMonth * 60 // 60 minutes per day
+    }
 }
 
 struct SummaryCard: View {
@@ -1388,7 +1691,7 @@ struct DayHistoryCard: View {
                 if !activities.isEmpty {
                     HStack(spacing: 16) {
                         if dayStats.feedings > 0 {
-                            StatPill(icon: "🍼", value: "\(dayStats.feedings)")
+                            StatPill(icon: "bottle.fill", value: "\(dayStats.feedings)")
                         }
                         if dayStats.sleepHours > 0 {
                             StatPill(icon: "moon.zzz", value: "\(String(format: "%.1f", dayStats.sleepHours))h")
@@ -1430,6 +1733,10 @@ struct StatPill: View {
         return icon == "DiaperIcon"
     }
     
+    private var isSFSymbol: Bool {
+        return icon.contains(".")
+    }
+    
     var body: some View {
         HStack(spacing: 4) {
             if isDiaperIcon {
@@ -1438,6 +1745,10 @@ struct StatPill: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 12, height: 12)
+                    .foregroundColor(.white)
+            } else if isSFSymbol {
+                Image(systemName: icon)
+                    .font(.caption2)
                     .foregroundColor(.white)
             } else {
                 Text(icon)
@@ -2888,6 +3199,329 @@ struct AddWordView: View {
             suggestions = dataManager.getWordSuggestions(for: trimmedInput)
             // Show suggestions if we have some, we're focused, and not selecting
             showingSuggestions = !suggestions.isEmpty && isTextFieldFocused && !isSelectingSuggestion
+        }
+    }
+}
+
+enum SummaryPeriod: String, CaseIterable {
+    case today = "Today"
+    case week = "This Week"
+    case month = "This Month"
+}
+
+// MARK: - Data Models for New Views
+
+struct DayProgressData: Identifiable {
+    let id = UUID()
+    let day: String
+    let date: Date
+    let feedings: Int
+    let diapers: Int
+    let sleepHours: Double
+    let tummyTime: Int
+}
+
+struct WeekProgressData: Identifiable {
+    let id = UUID()
+    let weekLabel: String
+    let startDate: Date
+    let feedings: Int
+    let diapers: Int
+    let sleepHours: Double
+    let tummyTime: Int
+}
+
+// MARK: - Simple Bar Chart
+
+struct SimpleBarChart: View {
+    let title: String
+    let data: Any
+    let isWeekly: Bool
+    
+    private var dailyData: [DayProgressData] {
+        return data as? [DayProgressData] ?? []
+    }
+    
+    private var weeklyData: [WeekProgressData] {
+        return data as? [WeekProgressData] ?? []
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+            
+            if isWeekly {
+                dailyBarChart
+            } else {
+                weeklyBarChart
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.regularMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        )
+    }
+    
+    private var dailyBarChart: some View {
+        VStack(spacing: 16) {
+            // Activity rows
+            VStack(spacing: 12) {
+                DailyActivityRow(
+                    icon: "🍼",
+                    title: "Feedings",
+                    color: .pink,
+                    dailyData: dailyData,
+                    maxValue: 8,
+                    getValue: { $0.feedings }
+                )
+                
+                DailyActivityRow(
+                    icon: "moon.zzz.fill",
+                    title: "Sleep",
+                    color: .purple,
+                    dailyData: dailyData,
+                    maxValue: 15,
+                    getValue: { Int($0.sleepHours) }
+                )
+                
+                DailyActivityRow(
+                    icon: "DiaperIcon",
+                    title: "Diapers",
+                    color: .orange,
+                    dailyData: dailyData,
+                    maxValue: 6,
+                    getValue: { $0.diapers }
+                )
+                
+                DailyActivityRow(
+                    icon: "🧸",
+                    title: "Tummy Time",
+                    color: .green,
+                    dailyData: dailyData,
+                    maxValue: 60,
+                    getValue: { $0.tummyTime }
+                )
+            }
+            
+            // Day labels
+            HStack {
+                ForEach(Array(dailyData.enumerated()), id: \.offset) { index, dayData in
+                    Text(dayData.day)
+                        .font(.caption2)
+                        .fontWeight(Calendar.current.isDateInToday(dayData.date) ? .bold : .regular)
+                        .foregroundColor(Calendar.current.isDateInToday(dayData.date) ? .blue : .secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+    
+    private var weeklyBarChart: some View {
+        VStack(spacing: 16) {
+            // Activity rows
+            VStack(spacing: 12) {
+                WeeklyActivityRow(
+                    icon: "🍼",
+                    title: "Feedings",
+                    color: .pink,
+                    weeklyData: weeklyData,
+                    maxValue: 56,
+                    getValue: { $0.feedings }
+                )
+                
+                WeeklyActivityRow(
+                    icon: "moon.zzz.fill",
+                    title: "Sleep",
+                    color: .purple,
+                    weeklyData: weeklyData,
+                    maxValue: 105,
+                    getValue: { Int($0.sleepHours) }
+                )
+                
+                WeeklyActivityRow(
+                    icon: "DiaperIcon",
+                    title: "Diapers",
+                    color: .orange,
+                    weeklyData: weeklyData,
+                    maxValue: 42,
+                    getValue: { $0.diapers }
+                )
+                
+                WeeklyActivityRow(
+                    icon: "🧸",
+                    title: "Tummy Time",
+                    color: .green,
+                    weeklyData: weeklyData,
+                    maxValue: 420,
+                    getValue: { $0.tummyTime }
+                )
+            }
+            
+            // Week labels
+            HStack {
+                ForEach(Array(weeklyData.enumerated()), id: \.offset) { index, weekData in
+                    Text("W\(index + 1)")
+                        .font(.caption2)
+                        .fontWeight(index == weeklyData.count - 1 ? .bold : .regular)
+                        .foregroundColor(index == weeklyData.count - 1 ? .blue : .secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+}
+
+struct DailyActivityRow: View {
+    let icon: String
+    let title: String
+    let color: Color
+    let dailyData: [DayProgressData]
+    let maxValue: Int
+    let getValue: (DayProgressData) -> Int
+    
+    private var isDiaperIcon: Bool {
+        return icon == "DiaperIcon"
+    }
+    
+    private var isSFSymbol: Bool {
+        return icon.contains(".")
+    }
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            // Icon and title
+            HStack(spacing: 6) {
+                if isDiaperIcon {
+                    Image(icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 12, height: 12)
+                        .foregroundColor(color)
+                } else if isSFSymbol {
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundColor(color)
+                } else {
+                    Text(icon)
+                        .font(.caption)
+                }
+                Text(title)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
+            .frame(width: 70, alignment: .leading)
+            
+            // Progress bars for each day
+            HStack(spacing: 4) {
+                ForEach(Array(dailyData.enumerated()), id: \.offset) { index, dayData in
+                    let value = getValue(dayData)
+                    let progress = min(Double(value) / Double(maxValue), 1.0)
+                    let isToday = Calendar.current.isDateInToday(dayData.date)
+                    
+                    VStack(spacing: 2) {
+                        // Progress bar
+                        ZStack(alignment: .bottom) {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 30)
+                            
+                            Rectangle()
+                                .fill(color.opacity(isToday ? 1.0 : 0.7))
+                                .frame(height: 30 * progress)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                        
+                        // Value annotation
+                        Text("\(value)")
+                            .font(.caption2)
+                            .fontWeight(isToday ? .semibold : .regular)
+                            .foregroundColor(isToday ? color : .secondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct WeeklyActivityRow: View {
+    let icon: String
+    let title: String
+    let color: Color
+    let weeklyData: [WeekProgressData]
+    let maxValue: Int
+    let getValue: (WeekProgressData) -> Int
+    
+    private var isDiaperIcon: Bool {
+        return icon == "DiaperIcon"
+    }
+    
+    private var isSFSymbol: Bool {
+        return icon.contains(".")
+    }
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            // Icon and title
+            HStack(spacing: 6) {
+                if isDiaperIcon {
+                    Image(icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 12, height: 12)
+                        .foregroundColor(color)
+                } else if isSFSymbol {
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundColor(color)
+                } else {
+                    Text(icon)
+                        .font(.caption)
+                }
+                Text(title)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
+            .frame(width: 70, alignment: .leading)
+            
+            // Progress bars for each week
+            HStack(spacing: 4) {
+                ForEach(Array(weeklyData.enumerated()), id: \.offset) { index, weekData in
+                    let value = getValue(weekData)
+                    let progress = min(Double(value) / Double(maxValue), 1.0)
+                    let isCurrentWeek = index == weeklyData.count - 1
+                    
+                    VStack(spacing: 2) {
+                        // Progress bar
+                        ZStack(alignment: .bottom) {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 30)
+                            
+                            Rectangle()
+                                .fill(color.opacity(isCurrentWeek ? 1.0 : 0.7))
+                                .frame(height: 30 * progress)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                        
+                        // Value annotation
+                        Text("\(value)")
+                            .font(.caption2)
+                            .fontWeight(isCurrentWeek ? .semibold : .regular)
+                            .foregroundColor(isCurrentWeek ? color : .secondary)
+                    }
+                }
+            }
         }
     }
 }

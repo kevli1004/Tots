@@ -711,13 +711,39 @@ class TotsDataManager: ObservableObject {
                 duration: newActivity.duration,
                 notes: newActivity.notes,
                 weight: newActivity.weight,
-                height: newActivity.height
+                height: newActivity.height,
+                headCircumference: newActivity.headCircumference
             )
             
             recentActivities[index] = updatedActivity
+            
+            // If this was a growth activity, also update the corresponding growth entry
+            if oldActivity.type == .growth {
+                updateGrowthEntry(for: oldActivity, with: newActivity)
+            }
+            
             updateCountdowns()
             updateLiveActivity()
             calculateStats()
+            saveGrowthData() // Save growth data changes
+        }
+    }
+    
+    private func updateGrowthEntry(for oldActivity: TotsActivity, with newActivity: TotsActivity) {
+        // Find the corresponding growth entry
+        if let index = growthData.firstIndex(where: { entry in
+            Calendar.current.isDate(entry.date, equalTo: oldActivity.time, toGranularity: .minute)
+        }) {
+            // Update the growth entry with new values
+            if let weight = newActivity.weight, let height = newActivity.height, let headCircumference = newActivity.headCircumference {
+                let updatedEntry = GrowthEntry(
+                    date: newActivity.time,
+                    weight: weight,
+                    height: height,
+                    headCircumference: headCircumference
+                )
+                growthData[index] = updatedEntry
+            }
         }
     }
     

@@ -49,15 +49,12 @@ struct ProgressView: View {
                 }
             }
         }
-        .sheet(item: $editingGrowthEntry) { entry in
-            AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: entry)
-                .environmentObject(dataManager)
-        }
         .sheet(isPresented: $showingAddGrowth) {
-            if editingGrowthEntry == nil {
-                AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: nil)
-                    .environmentObject(dataManager)
-            }
+            AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: editingGrowthEntry)
+                .environmentObject(dataManager)
+                .onDisappear {
+                    editingGrowthEntry = nil
+                }
         }
     }
     
@@ -284,7 +281,8 @@ struct ProgressView: View {
                     }
                     
                     VStack(spacing: 8) {
-                        let displayedEntries = showAllHistory ? dataManager.growthData : Array(dataManager.growthData.prefix(5))
+                        let sortedGrowthData = dataManager.growthData.sorted { $0.date > $1.date }
+                        let displayedEntries = showAllHistory ? sortedGrowthData : Array(sortedGrowthData.prefix(5))
                         
                         ForEach(Array(displayedEntries.enumerated()), id: \.offset) { index, entry in
                             GrowthHistoryRow(
@@ -292,6 +290,7 @@ struct ProgressView: View {
                                 useMetricUnits: dataManager.useMetricUnits,
                                 onTap: {
                                     editingGrowthEntry = entry
+                                    showingAddGrowth = true
                                 },
                                 onDelete: {
                                     deleteGrowthEntry(entry)
@@ -299,8 +298,8 @@ struct ProgressView: View {
                             )
                         }
                         
-                        if !showAllHistory && dataManager.growthData.count > 5 {
-                            Text("+ \(dataManager.growthData.count - 5) more entries")
+                        if !showAllHistory && sortedGrowthData.count > 5 {
+                            Text("+ \(sortedGrowthData.count - 5) more entries")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .padding(.top, 8)

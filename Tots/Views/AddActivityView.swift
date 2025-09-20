@@ -161,14 +161,15 @@ struct AddActivityView: View {
                 activityTime = editingGrowthEntry.date
                 
                 // Populate growth-specific fields
-                selectedWeightLbs = editingGrowthEntry.weight
-                selectedWeightKg = editingGrowthEntry.weight * 0.453592
+                // GrowthEntry stores weight in kg, height in cm, head circumference in cm
+                selectedWeightKg = editingGrowthEntry.weight
+                selectedWeightLbs = editingGrowthEntry.weight / 0.453592 // Convert kg to lbs
                 
-                // Convert height to feet and inches
-                let totalInches = editingGrowthEntry.height
+                // Convert height from cm to feet and inches
+                let totalInches = editingGrowthEntry.height / 2.54 // Convert cm to inches
                 selectedHeightFt = Int(totalInches / 12)
                 selectedHeightIn = totalInches.truncatingRemainder(dividingBy: 12)
-                selectedHeightCm = editingGrowthEntry.height * 2.54
+                selectedHeightCm = editingGrowthEntry.height // Already in cm
                 
                 selectedHeadCircumferenceCm = editingGrowthEntry.headCircumference
                 selectedHeadCircumferenceIn = editingGrowthEntry.headCircumference / 2.54
