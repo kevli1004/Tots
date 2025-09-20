@@ -4,6 +4,7 @@ import SwiftUI
 struct ProgressView: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var showingAddGrowth = false
+    @State private var editingGrowthEntry: GrowthEntry? = nil
     
     var body: some View {
         NavigationView {
@@ -23,7 +24,7 @@ struct ProgressView: View {
             .navigationBarTitleDisplayMode(.large)
         }
         .sheet(isPresented: $showingAddGrowth) {
-            AddActivityView(preselectedType: .growth)
+            AddActivityView(preselectedType: .growth, editingGrowthEntry: editingGrowthEntry)
                 .environmentObject(dataManager)
         }
     }
@@ -31,43 +32,51 @@ struct ProgressView: View {
     
     private var growthView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Growth Tracking")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                // Add growth entry button
-                if !dataManager.growthData.isEmpty {
-                    Button(action: {
-                        showingAddGrowth = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.blue)
+            VStack(spacing: 12) {
+                // Title and Add Button Row
+                HStack {
+                    Text("Growth Tracking")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Spacer()
+                    
+                    // Add growth entry button
+                    if !dataManager.growthData.isEmpty {
+                        Button(action: {
+                            editingGrowthEntry = dataManager.growthData.first
+                            showingAddGrowth = true
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.blue)
+                        }
                     }
                 }
                 
-                // Unit toggle
-                HStack(spacing: 8) {
-                    Text("cm/kg")
-                        .font(.caption)
-                        .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
-                        .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
+                // Unit toggle row
+                HStack {
+                    Spacer()
                     
-                    Toggle("", isOn: Binding(
-                        get: { !dataManager.useMetricUnits },
-                        set: { dataManager.useMetricUnits = !$0 }
-                    ))
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
-                    .scaleEffect(0.8)
-                    
-                    Text("in/lb")
-                        .font(.caption)
-                        .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
-                        .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
+                    HStack(spacing: 8) {
+                        Text("cm/kg")
+                            .font(.caption)
+                            .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
+                            .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
+                        
+                        Toggle("", isOn: Binding(
+                            get: { !dataManager.useMetricUnits },
+                            set: { dataManager.useMetricUnits = !$0 }
+                        ))
+                        .toggleStyle(SwitchToggleStyle(tint: .blue))
+                        .scaleEffect(0.8)
+                        
+                        Text("in/lb")
+                            .font(.caption)
+                            .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
+                            .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
+                    }
                 }
             }
             
@@ -88,6 +97,7 @@ struct ProgressView: View {
                         .multilineTextAlignment(.center)
                     
                     Button("Add Measurement") {
+                        editingGrowthEntry = nil
                         showingAddGrowth = true
                     }
                     .font(.headline)
@@ -110,14 +120,26 @@ struct ProgressView: View {
                             title: "Weight",
                             value: dataManager.formatWeight(dataManager.currentWeight),
                             subtitle: "\(dataManager.getWeightPercentile())th percentile",
-                            color: .green
+                            color: .green,
+                            onTap: {
+                                if let latestEntry = dataManager.growthData.first {
+                                    editingGrowthEntry = latestEntry
+                                    showingAddGrowth = true
+                                }
+                            }
                         )
                         
                         GrowthCard(
                             title: "Height",
                             value: dataManager.formatHeight(dataManager.currentHeight),
                             subtitle: "\(dataManager.getHeightPercentile())th percentile",
-                            color: .blue
+                            color: .blue,
+                            onTap: {
+                                if let latestEntry = dataManager.growthData.first {
+                                    editingGrowthEntry = latestEntry
+                                    showingAddGrowth = true
+                                }
+                            }
                         )
                     }
                     
@@ -126,14 +148,26 @@ struct ProgressView: View {
                             title: "BMI",
                             value: String(format: "%.1f", dataManager.currentBMI),
                             subtitle: "\(dataManager.getBMIPercentile())th percentile for age",
-                            color: .purple
+                            color: .purple,
+                            onTap: {
+                                if let latestEntry = dataManager.growthData.first {
+                                    editingGrowthEntry = latestEntry
+                                    showingAddGrowth = true
+                                }
+                            }
                         )
                         
                         GrowthCard(
                             title: "Head Circumference",
                             value: dataManager.formatHeadCircumference(dataManager.currentHeadCircumference),
                             subtitle: "Latest measurement",
-                            color: .orange
+                            color: .orange,
+                            onTap: {
+                                if let latestEntry = dataManager.growthData.first {
+                                    editingGrowthEntry = latestEntry
+                                    showingAddGrowth = true
+                                }
+                            }
                         )
                     }
                 }
@@ -186,6 +220,7 @@ struct ProgressView: View {
                         .multilineTextAlignment(.center)
                     
                     Button("Add Measurement") {
+                        editingGrowthEntry = nil
                         showingAddGrowth = true
                     }
                     .font(.headline)
@@ -214,41 +249,46 @@ struct GrowthCard: View {
     let value: String
     let subtitle: String
     let color: Color
+    let onTap: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(color)
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(color)
+                    
+                    Spacer()
+                    
+                    Image(systemName: getIcon())
+                        .foregroundColor(color)
+                        .font(.title3)
+                }
                 
-                Spacer()
+                Text(value)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
                 
-                Image(systemName: getIcon())
-                    .foregroundColor(color)
-                    .font(.title3)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text(subtitle)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.regularMaterial)
+            )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.regularMaterial)
-        )
+        .buttonStyle(PlainButtonStyle())
     }
     
     private func getIcon() -> String {
         switch title {
-        case "Weight": return "scalemass.fill"
+        case "Weight": return "scale.3d"
         case "Height": return "ruler.fill"
         case "BMI": return "figure.child"
         case "Head Circumference": return "circle.dotted"

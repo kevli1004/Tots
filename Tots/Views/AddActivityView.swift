@@ -8,10 +8,12 @@ struct AddActivityView: View {
     
     let preselectedType: ActivityType?
     let editingActivity: TotsActivity?
+    let editingGrowthEntry: GrowthEntry?
     
-    init(preselectedType: ActivityType? = nil, editingActivity: TotsActivity? = nil) {
+    init(preselectedType: ActivityType? = nil, editingActivity: TotsActivity? = nil, editingGrowthEntry: GrowthEntry? = nil) {
         self.preselectedType = preselectedType
         self.editingActivity = editingActivity
+        self.editingGrowthEntry = editingGrowthEntry
     }
     @State private var activityTime = Date()
     @State private var selectedMood: BabyMood = .content
@@ -124,6 +126,23 @@ struct AddActivityView: View {
                 
                 // Parse activity-specific data from details
                 parseActivityDetails(editingActivity)
+            } else if let editingGrowthEntry = editingGrowthEntry {
+                // Populate fields for editing growth entry
+                selectedActivityType = .growth
+                activityTime = editingGrowthEntry.date
+                
+                // Populate growth-specific fields
+                selectedWeightLbs = editingGrowthEntry.weight
+                selectedWeightKg = editingGrowthEntry.weight * 0.453592
+                
+                // Convert height to feet and inches
+                let totalInches = editingGrowthEntry.height
+                selectedHeightFt = Int(totalInches / 12)
+                selectedHeightIn = totalInches.truncatingRemainder(dividingBy: 12)
+                selectedHeightCm = editingGrowthEntry.height * 2.54
+                
+                selectedHeadCircumferenceCm = editingGrowthEntry.headCircumference
+                selectedHeadCircumferenceIn = editingGrowthEntry.headCircumference / 2.54
             } else if let preselectedType = preselectedType {
                 selectedActivityType = preselectedType
             }
@@ -786,6 +805,39 @@ struct AddActivityView: View {
                 height: selectedActivityType == .growth ? getHeight() : nil,
                 headCircumference: selectedActivityType == .growth ? getHeadCircumference() : nil
             ))
+        } else if let editingGrowthEntry = editingGrowthEntry {
+            // Find and update the corresponding activity for this growth entry
+            if let correspondingActivity = dataManager.recentActivities.first(where: { 
+                $0.type == .growth && 
+                Calendar.current.isDate($0.time, equalTo: editingGrowthEntry.date, toGranularity: .minute)
+            }) {
+                dataManager.updateActivity(correspondingActivity, with: TotsActivity(
+                    type: selectedActivityType,
+                    time: activityTime,
+                    details: details,
+                    mood: .content,
+                    duration: getDuration(),
+                    notes: notes.isEmpty ? nil : notes,
+                    weight: selectedActivityType == .growth ? getWeight() : nil,
+                    height: selectedActivityType == .growth ? getHeight() : nil,
+                    headCircumference: selectedActivityType == .growth ? getHeadCircumference() : nil
+                ))
+            } else {
+                // If no corresponding activity found, create a new one
+                let activity = TotsActivity(
+                    type: selectedActivityType,
+                    time: activityTime,
+                    details: details,
+                    mood: .content,
+                    duration: getDuration(),
+                    notes: notes.isEmpty ? nil : notes,
+                    weight: selectedActivityType == .growth ? getWeight() : nil,
+                    height: selectedActivityType == .growth ? getHeight() : nil,
+                    headCircumference: selectedActivityType == .growth ? getHeadCircumference() : nil
+                )
+                
+                dataManager.addActivity(activity)
+            }
         } else {
             // Create new activity
             let activity = TotsActivity(
