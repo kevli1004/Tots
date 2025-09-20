@@ -596,9 +596,6 @@ struct GrowthPercentileChart: View {
     let title: String
     let useMetricUnits: Bool
     
-    @State private var zoomScale: CGFloat = 1.0
-    @State private var panOffset: CGSize = .zero
-    @State private var lastPanOffset: CGSize = .zero
     
     
     private var childDataLine: some ChartContent {
@@ -629,10 +626,10 @@ struct GrowthPercentileChart: View {
     }
     
     private var focusedDomain: ClosedRange<Double> {
-        let dataMaxMonth = data.map { Double($0.month) }.max() ?? 0
-        let startMonth = max(0, dataMaxMonth - 12) // Show 12 months before latest data
-        let endMonth = min(36, dataMaxMonth + 6) // Show 6 months after latest data, up to 36 months
-        return startMonth...endMonth
+        // Force wider domain to spread out the data points
+        let maxMonth = data.map { Double($0.month) }.max() ?? 36.0
+        let extendedMax = max(36.0, maxMonth * 1.5) // Extend the domain by 50%
+        return 0...extendedMax
     }
     
     private var yAxisDomain: ClosedRange<Double> {
@@ -658,14 +655,39 @@ struct GrowthPercentileChart: View {
     }
     
     var body: some View {
-                    ZStack {
-            // Fixed y-axis that never moves
+        ScrollView(.horizontal, showsIndicators: false) {
             Chart {
-                // Empty chart just for the y-axis
+                childDataLine
+                childDataPoints
             }
             .frame(height: 300)
+            .frame(width: 36 * 30) // Always show full 36 months (1080 points wide - 0.5cm spacing)
+            .chartXAxis {
+                AxisMarks(values: .stride(by: 1)) { value in
+                    AxisGridLine()
+                        .foregroundStyle(.gray.opacity(0.2))
+                    AxisValueLabel {
+                        if let month = value.as(Int.self) {
+                            VStack(spacing: 1) {
+                                Text("\(month)")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                                Text("mo")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .opacity(0.8)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 1)
+                        }
+                    }
+                }
+            }
             .chartYAxis {
                 AxisMarks(position: .leading) { value in
+                    AxisGridLine()
+                        .foregroundStyle(.gray.opacity(0.3))
                     AxisValueLabel {
                         if let val = value.as(Double.self) {
                             Text("\(val, specifier: "%.1f")\(unitLabel)")
@@ -675,77 +697,14 @@ struct GrowthPercentileChart: View {
                     }
                 }
             }
+            .chartXScale(domain: 0...36) // Always show full 36-month range
             .chartYScale(domain: yAxisDomain)
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
-            
-            // Movable chart content
-            Chart {
-                childDataLine
-                childDataPoints
-            }
-            .frame(height: 300)
-            .frame(maxWidth: .infinity)
-            .scaleEffect(zoomScale)
-            .offset(panOffset)
-            .clipped()
-            .mask(
-                Rectangle()
-                    .inset(by: 40) // Hide content behind y-axis area
-            )
-            .clipped() // Ensure content doesn't go outside chart bounds
-            .gesture(
-                SimultaneousGesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            zoomScale = max(0.5, min(3.0, value))
-                        }
-                        .onEnded { value in
-                            zoomScale = max(0.5, min(3.0, value))
-                        },
-                    
-                    DragGesture()
-                        .onChanged { value in
-                            // Only allow horizontal movement
-                            let newWidth = lastPanOffset.width + value.translation.width
-                            let constrainedWidth = max(-200, min(200, newWidth))
-                            
-                            panOffset = CGSize(width: constrainedWidth, height: 0)
-                        }
-                        .onEnded { value in
-                            lastPanOffset = panOffset
-                        }
-                )
-            )
-            .chartXAxis {
-                AxisMarks(values: .stride(by: 1)) { value in
-                    AxisGridLine()
-                        .foregroundStyle(.gray.opacity(0.2))
-                    AxisValueLabel {
-                        if let month = value.as(Int.self) {
-                            VStack(spacing: 2) {
-                                Text("\(month)")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text("mo")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .opacity(0.7)
-                            }
-                        }
-                    }
-                }
-            }
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    AxisGridLine()
-                        .foregroundStyle(.gray.opacity(0.3))
-                }
-            }
-            .chartXScale(domain: focusedDomain)
-            .padding(.horizontal, 40)
-            .padding(.vertical, 10)
         }
+        .frame(height: 300)
+        .frame(maxWidth: .infinity) // Fixed viewport width
+        .clipped() // Clip the scrollable content to the viewport
     }
     
 }
