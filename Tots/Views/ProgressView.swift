@@ -14,11 +14,12 @@ struct ProgressView: View {
                 LiquidBackground()
                 
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 16) {
                         // Growth tracking content
                         growthViewContent
                     }
-                    .padding()
+                    .padding(.horizontal)
+                    .padding(.bottom)
                 }
             }
             .navigationTitle("")

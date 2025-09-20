@@ -1879,17 +1879,17 @@ enum WordCategory: String, CaseIterable, Codable {
         case .animals: return .brown
         case .food: return .green
         case .actions: return .orange
-        case .objects: return .gray
+        case .objects: return .purple
         case .feelings: return .pink
-        case .sounds: return .purple
+        case .sounds: return .indigo
         case .colors: return .red
-        case .shapes: return .indigo
-        case .numbers: return .cyan
-        case .bodyParts: return .mint
-        case .clothes: return .teal
-        case .places: return .yellow
+        case .shapes: return .cyan
+        case .numbers: return .mint
+        case .bodyParts: return .teal
+        case .clothes: return .yellow
+        case .places: return .orange
         case .transportation: return Color(.systemBlue)
-        case .other: return Color(.systemGray)
+        case .other: return Color(.systemGray2)
         }
     }
 }

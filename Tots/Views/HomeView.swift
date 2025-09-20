@@ -187,7 +187,7 @@ struct HomeView: View {
                 LiquidBackground()
                 
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 16) {
                         // Countdown timers
                         countdownView
                         
@@ -197,7 +197,8 @@ struct HomeView: View {
                         // Recent activities
                         recentActivitiesView
                     }
-                    .padding()
+                    .padding(.horizontal)
+                    .padding(.bottom)
                 }
             }
                 .navigationTitle("")
@@ -2932,7 +2933,7 @@ struct WordCard: View {
             // Content
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text(word.word)
+                    Text(word.word.capitalized)
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.primary)
