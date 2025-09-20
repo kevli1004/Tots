@@ -2071,8 +2071,13 @@ struct MilestonesView: View {
                     milestonesList
                 }
             }
-            .navigationTitle("Milestones")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    milestonesTitleView
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
@@ -2099,6 +2104,14 @@ struct MilestonesView: View {
                 // Dismiss keyboard when tapping outside search field
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
+        }
+    }
+    
+    private var milestonesTitleView: some View {
+        VStack(spacing: 2) {
+            Text("Milestones")
+                .font(.title2)
+                .fontWeight(.bold)
         }
     }
     
@@ -2671,8 +2684,13 @@ struct WordTrackerView: View {
                     wordsList
                 }
             }
-            .navigationTitle("Word Tracker")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    wordTrackerTitleView
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
@@ -2694,6 +2712,14 @@ struct WordTrackerView: View {
             .sheet(isPresented: $showingAddWord) {
                 AddWordView()
             }
+        }
+    }
+    
+    private var wordTrackerTitleView: some View {
+        VStack(spacing: 2) {
+            Text("Word Tracker")
+                .font(.title2)
+                .fontWeight(.bold)
         }
     }
     
