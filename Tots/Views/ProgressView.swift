@@ -666,14 +666,12 @@ struct GrowthPercentileChart: View {
             .frame(height: 300)
             .chartYAxis {
                 AxisMarks(position: .leading) { value in
-                    AxisGridLine()
-                        .foregroundStyle(.gray.opacity(0.3))
                     AxisValueLabel {
                         if let val = value.as(Double.self) {
                             Text("\(val, specifier: "%.1f")\(unitLabel)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             }
@@ -708,16 +706,11 @@ struct GrowthPercentileChart: View {
                     
                     DragGesture()
                         .onChanged { value in
-                            // Allow both horizontal and vertical movement
+                            // Only allow horizontal movement
                             let newWidth = lastPanOffset.width + value.translation.width
-                            let newHeight = lastPanOffset.height + value.translation.height
-                            
-                            // Constrain horizontal movement
                             let constrainedWidth = max(-200, min(200, newWidth))
-                            // Allow vertical movement within reasonable bounds
-                            let constrainedHeight = max(-100, min(100, newHeight))
                             
-                            panOffset = CGSize(width: constrainedWidth, height: constrainedHeight)
+                            panOffset = CGSize(width: constrainedWidth, height: 0)
                         }
                         .onEnded { value in
                             lastPanOffset = panOffset
@@ -732,15 +725,21 @@ struct GrowthPercentileChart: View {
                         if let month = value.as(Int.self) {
                             VStack(spacing: 2) {
                                 Text("\(month)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                                 Text("mo")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                                     .opacity(0.7)
                             }
                         }
                     }
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { value in
+                    AxisGridLine()
+                        .foregroundStyle(.gray.opacity(0.3))
                 }
             }
             .chartXScale(domain: focusedDomain)
