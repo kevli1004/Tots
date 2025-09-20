@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 
 struct ProgressView: View {
@@ -6,14 +7,32 @@ struct ProgressView: View {
     @State private var showingAddGrowth = false
     @State private var editingGrowthEntry: GrowthEntry? = nil
     @State private var showAllHistory = false
-    @State private var selectedGrowthTab: GrowthTab = .weight
     
-    enum GrowthTab: String, CaseIterable {
-        case weight = "Weight"
-        case height = "Height"
-        case bmi = "BMI"
-        case headCircumference = "Head Circumference"
+    // Chart data computed properties
+    private var weightChartData: [ChartDataPoint] {
+        dataManager.growthData.map { entry in
+            let monthsSinceBirth = Calendar.current.dateComponents([.month], from: dataManager.babyBirthDate, to: entry.date).month ?? 0
+            let weight = dataManager.useMetricUnits ? entry.weight : entry.weight * 2.20462
+            return ChartDataPoint(month: monthsSinceBirth, value: weight, date: entry.date)
+        }.filter { $0.value > 0 }.sorted { $0.month < $1.month }
     }
+    
+    private var heightChartData: [ChartDataPoint] {
+        dataManager.growthData.map { entry in
+            let monthsSinceBirth = Calendar.current.dateComponents([.month], from: dataManager.babyBirthDate, to: entry.date).month ?? 0
+            let height = dataManager.useMetricUnits ? entry.height : entry.height * 0.393701
+            return ChartDataPoint(month: monthsSinceBirth, value: height, date: entry.date)
+        }.filter { $0.value > 0 }.sorted { $0.month < $1.month }
+    }
+    
+    private var headCircumferenceChartData: [ChartDataPoint] {
+        dataManager.growthData.map { entry in
+            let monthsSinceBirth = Calendar.current.dateComponents([.month], from: dataManager.babyBirthDate, to: entry.date).month ?? 0
+            let headCircumference = dataManager.useMetricUnits ? entry.headCircumference : entry.headCircumference * 0.393701
+            return ChartDataPoint(month: monthsSinceBirth, value: headCircumference, date: entry.date)
+        }.filter { $0.value > 0 }.sorted { $0.month < $1.month }
+    }
+    
     
     var body: some View {
         NavigationView {
@@ -71,7 +90,7 @@ struct ProgressView: View {
         .sheet(isPresented: $showingAddGrowth) {
             AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: nil)
                 .environmentObject(dataManager)
-        }
+                }
         .sheet(item: $editingGrowthEntry) { entry in
             AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: entry)
                 .environmentObject(dataManager)
@@ -87,31 +106,31 @@ struct ProgressView: View {
     }
     
     private var unitToggleRow: some View {
-        HStack {
-            Spacer()
-            
+                HStack {
+                    Spacer()
+                    
             HStack(spacing: 6) {
-                Text("cm/kg")
-                    .font(.caption)
-                    .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
-                    .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
-                
-                Toggle("", isOn: Binding(
-                    get: { !dataManager.useMetricUnits },
-                    set: { dataManager.useMetricUnits = !$0 }
-                ))
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
-                .scaleEffect(0.8)
-                .fixedSize()
-                
-                Text("in/lb")
-                    .font(.caption)
-                    .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
-                    .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
+                    Text("cm/kg")
+                        .font(.caption)
+                        .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
+                        .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
+                    
+                    Toggle("", isOn: Binding(
+                        get: { !dataManager.useMetricUnits },
+                        set: { dataManager.useMetricUnits = !$0 }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .scaleEffect(0.8)
+                    .fixedSize()
+                    
+                    Text("in/lb")
+                        .font(.caption)
+                        .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
+                        .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
             }
-        }
-    }
-    
+                }
+            }
+            
     private var growthOverviewCards: some View {
         VStack(alignment: .leading, spacing: 16) {
             if dataManager.growthData.isEmpty {
@@ -128,9 +147,9 @@ struct ProgressView: View {
                             .foregroundColor(.primary)
                         
                         Text("Start tracking your baby's growth to see charts and percentiles")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                     }
                     
                     Button("Add Measurement") {
@@ -204,214 +223,152 @@ struct ProgressView: View {
     }
     
     private var growthTabView: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Growth Charts")
-                .font(.headline)
-                .fontWeight(.semibold)
+                        .font(.headline)
+                        .fontWeight(.semibold)
             
-            // Swipeable TabView for different growth charts
-            TabView(selection: $selectedGrowthTab) {
+            // Show all charts stacked vertically
+            VStack(spacing: 16) {
                 weightChartContent
-                    .tag(GrowthTab.weight)
-                    .padding(.horizontal, 8)
-                
                 heightChartContent
-                    .tag(GrowthTab.height)
-                    .padding(.horizontal, 8)
-                
-                bmiChartContent
-                    .tag(GrowthTab.bmi)
-                    .padding(.horizontal, 8)
-                
                 headCircumferenceChartContent
-                    .tag(GrowthTab.headCircumference)
-                    .padding(.horizontal, 8)
-            }
-            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-            .frame(height: 400)
-            
-            // Centered dots indicator at bottom
-            HStack {
-                Spacer()
-                HStack(spacing: 8) {
-                    ForEach(Array(GrowthTab.allCases.enumerated()), id: \.offset) { index, tab in
-                        Circle()
-                            .fill(selectedGrowthTab == tab ? Color.blue : Color.gray.opacity(0.3))
-                            .frame(width: 8, height: 8)
-                            .animation(.easeInOut(duration: 0.3), value: selectedGrowthTab)
-                    }
-                }
-                Spacer()
             }
         }
     }
     
     private var weightChartContent: some View {
-        VStack(spacing: 12) {
-            if dataManager.growthData.count > 1 {
-                SimpleGrowthChart(
-                    title: "Weight Over Time",
-                    data: dataManager.growthData,
-                    dataType: .weight,
-                    color: .green,
-                    useMetricUnits: dataManager.useMetricUnits,
-                    babyBirthDate: dataManager.babyBirthDate
-                )
-            } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    
-                    Text("Need More Data")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    Text("Add more weight measurements to see the growth chart")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.vertical, 40)
-            }
-        }
-    }
-    
-    private var heightChartContent: some View {
-        VStack(spacing: 12) {
-            if dataManager.growthData.count > 1 {
-                SimpleGrowthChart(
-                    title: "Height Over Time",
-                    data: dataManager.growthData,
-                    dataType: .height,
-                    color: .blue,
-                    useMetricUnits: dataManager.useMetricUnits,
-                    babyBirthDate: dataManager.babyBirthDate
-                )
-            } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    
-                    Text("Need More Data")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    Text("Add more height measurements to see the growth chart")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.vertical, 40)
-            }
-        }
-    }
-    
-    private var bmiChartContent: some View {
-        VStack(spacing: 12) {
-            if dataManager.growthData.count > 1 {
-                BMIChart(
-                    title: "BMI Over Time",
-                    growthData: dataManager.growthData,
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Weight Over Time")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            if dataManager.growthData.count > 0 {
+                GrowthPercentileChart(
+                    data: weightChartData,
+                    percentiles: [],
+                        color: .blue,
+                    unitLabel: dataManager.useMetricUnits ? "kg" : "lbs",
+                    title: "Weight",
                     useMetricUnits: dataManager.useMetricUnits
                 )
             } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    
-                    Text("Need More Data")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    Text("Add more measurements to see the BMI chart")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.vertical, 40)
+                EmptyStateView(
+                    icon: "scalemass",
+                    title: "Need More Data",
+                    message: "Add weight measurements to see the growth chart"
+                )
             }
         }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.regularMaterial)
+        )
     }
+    
+    private var heightChartContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Height Over Time")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            if dataManager.growthData.count > 0 {
+                GrowthPercentileChart(
+                    data: heightChartData,
+                    percentiles: [],
+                    color: .green,
+                    unitLabel: dataManager.useMetricUnits ? "cm" : "in",
+                    title: "Height",
+                        useMetricUnits: dataManager.useMetricUnits
+                    )
+            } else {
+                EmptyStateView(
+                    icon: "ruler",
+                    title: "Need More Data",
+                    message: "Add height measurements to see the growth chart"
+                )
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.regularMaterial)
+        )
+    }
+    
     
     private var headCircumferenceChartContent: some View {
-        VStack(spacing: 12) {
-            if dataManager.growthData.count > 1 {
-                SimpleGrowthChart(
-                    title: "Head Circumference Over Time",
-                    data: dataManager.growthData,
-                    dataType: .headCircumference,
-                    color: .orange,
-                    useMetricUnits: dataManager.useMetricUnits,
-                    babyBirthDate: dataManager.babyBirthDate
-                )
-            } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    
-                    Text("Need More Data")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    Text("Add more measurements to see the head circumference chart")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.vertical, 40)
-            }
-        }
-    }
-    
-    private var growthHistorySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if dataManager.growthData.count > 1 {
-                HStack {
-                    Text("Growth History")
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Head Circumference Over Time")
                         .font(.headline)
                         .fontWeight(.semibold)
                     
-                    Spacer()
-                    
-                    if dataManager.growthData.count > 5 {
-                        Button(showAllHistory ? "Show Less" : "Show All") {
-                            showAllHistory.toggle()
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                    }
-                }
-                
-                VStack(spacing: 8) {
-                    let sortedGrowthData = dataManager.growthData.sorted { $0.date > $1.date }
-                    let displayedEntries = showAllHistory ? sortedGrowthData : Array(sortedGrowthData.prefix(5))
-                    
-                    ForEach(Array(displayedEntries.enumerated()), id: \.offset) { index, entry in
-                        GrowthHistoryRow(
-                            entry: entry,
-                            useMetricUnits: dataManager.useMetricUnits,
-                            onTap: {
-                                editingGrowthEntry = entry
-                            },
-                            onDelete: {
-                                deleteGrowthEntry(entry)
+            if dataManager.growthData.count > 0 {
+                GrowthPercentileChart(
+                    data: headCircumferenceChartData,
+                    percentiles: [],
+                    color: .purple,
+                    unitLabel: dataManager.useMetricUnits ? "cm" : "in",
+                    title: "Head Circumference",
+                    useMetricUnits: dataManager.useMetricUnits
+                )
+            } else {
+                EmptyStateView(
+                    icon: "head.profile.arrow.right",
+                    title: "Need More Data",
+                    message: "Add head circumference measurements to see the growth chart"
+                )
+            }
+        }
+        .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.regularMaterial)
+                )
+            }
+            
+    private var growthHistorySection: some View {
+                VStack(alignment: .leading, spacing: 16) {
+            if dataManager.growthData.count > 1 {
+                    HStack {
+                        Text("Growth History")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Spacer()
+                        
+                        if dataManager.growthData.count > 5 {
+                            Button(showAllHistory ? "Show Less" : "Show All") {
+                                showAllHistory.toggle()
                             }
-                        )
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                        }
                     }
                     
-                    if !showAllHistory && sortedGrowthData.count > 5 {
-                        Text("+ \(sortedGrowthData.count - 5) more entries")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 8)
+                    VStack(spacing: 8) {
+                        let sortedGrowthData = dataManager.growthData.sorted { $0.date > $1.date }
+                        let displayedEntries = showAllHistory ? sortedGrowthData : Array(sortedGrowthData.prefix(5))
+                        
+                        ForEach(Array(displayedEntries.enumerated()), id: \.offset) { index, entry in
+                            GrowthHistoryRow(
+                                entry: entry,
+                                useMetricUnits: dataManager.useMetricUnits,
+                                onTap: {
+                                    editingGrowthEntry = entry
+                                },
+                                onDelete: {
+                                    deleteGrowthEntry(entry)
+                                }
+                            )
+                        }
+                        
+                        if !showAllHistory && sortedGrowthData.count > 5 {
+                            Text("+ \(sortedGrowthData.count - 5) more entries")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 8)
                     }
                 }
             }
@@ -484,319 +441,7 @@ struct GrowthCard: View {
     }
 }
 
-struct SimpleGrowthChart: View {
-    let title: String
-    let data: [GrowthEntry]
-    let dataType: GrowthDataType
-    let color: Color
-    let useMetricUnits: Bool
-    let babyBirthDate: Date
-    
-    @State private var zoomScale: CGFloat = 1.0
-    @State private var panOffset: CGSize = .zero
-    @State private var lastPanOffset: CGSize = .zero
-    
-    enum GrowthDataType {
-        case weight, height, headCircumference
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-            
-            if data.count > 1 {
-                VStack(spacing: 8) {
-                    // Chart area
-                    GeometryReader { geometry in
-                        let chartWidth = geometry.size.width - 40
-                        let chartHeight = geometry.size.height - 40
-                        
-                        ZStack {
-                            // Background grid
-                            drawGrid(width: chartWidth, height: chartHeight)
-                            
-                            // Growth data line
-                            drawGrowthLine(width: chartWidth, height: chartHeight)
-                            
-                            // Data points
-                            drawDataPoints(width: chartWidth, height: chartHeight)
-                            
-                            // Month labels
-                            drawMonthLabels(width: chartWidth, height: chartHeight)
-                        }
-                        .scaleEffect(zoomScale)
-                        .offset(panOffset)
-                        .gesture(
-                            SimultaneousGesture(
-                                MagnificationGesture()
-                                    .onChanged { value in
-                                        zoomScale = max(0.5, min(3.0, value))
-                                    }
-                                    .onEnded { value in
-                                        zoomScale = max(0.5, min(3.0, value))
-                                    },
-                                
-                                DragGesture()
-                                    .onChanged { value in
-                                        panOffset = CGSize(
-                                            width: lastPanOffset.width + value.translation.width,
-                                            height: lastPanOffset.height + value.translation.height
-                                        )
-                                    }
-                                    .onEnded { value in
-                                        lastPanOffset = panOffset
-                                    }
-                            )
-                        )
-                    }
-                    .frame(height: 200)
-                    
-                    // Legend
-                    HStack {
-                        Circle()
-                            .fill(color)
-                            .frame(width: 8, height: 8)
-                        Text("\(babyName)'s \(getDataTypeLabel())")
-                            .font(.caption)
-                            .foregroundColor(.primary)
-                        Spacer()
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.regularMaterial)
-        )
-    }
-    
-    private var babyName: String {
-        return UserDefaults.standard.string(forKey: "tots_baby_name") ?? "Baby"
-    }
-    
-    private var sortedData: [GrowthEntry] {
-        return data.sorted { $0.date < $1.date }
-    }
-    
-    private var valueRange: (min: Double, max: Double) {
-        let values = sortedData.map { getValue(for: $0) }
-        let minValue = values.min() ?? 0
-        let maxValue = values.max() ?? 1
-        let padding = (maxValue - minValue) * 0.1
-        return (min: minValue - padding, max: maxValue + padding)
-    }
-    
-    private var maxMonths: Int {
-        return 12 // Fixed at 12 months to avoid calculation issues
-    }
-    
-    private func getDataTypeLabel() -> String {
-        switch dataType {
-        case .weight: return "Weight"
-        case .height: return "Height"
-        case .headCircumference: return "Head Circumference"
-        }
-    }
-    
-    private func getValue(for entry: GrowthEntry) -> Double {
-        switch dataType {
-        case .weight:
-            return useMetricUnits ? entry.weight * 0.453592 : entry.weight
-        case .height:
-            return useMetricUnits ? entry.height * 2.54 : entry.height
-        case .headCircumference:
-            return useMetricUnits ? entry.headCircumference * 2.54 : entry.headCircumference
-        }
-    }
-    
-    private func drawGrid(width: CGFloat, height: CGFloat) -> some View {
-        Path { path in
-            // Horizontal grid lines
-            for i in 0...4 {
-                let y = height * CGFloat(i) / 4
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: width, y: y))
-            }
-            
-            // Vertical grid lines
-            for i in 0...12 {
-                let x = width * CGFloat(i) / 12
-                path.move(to: CGPoint(x: x, y: 0))
-                path.addLine(to: CGPoint(x: x, y: height))
-            }
-        }
-        .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
-        .offset(x: 20, y: 10)
-    }
-    
-    private func drawMonthLabels(width: CGFloat, height: CGFloat) -> some View {
-        VStack {
-            Spacer()
-            HStack {
-                ForEach(0...12, id: \.self) { month in
-                    Text("\(month)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .offset(x: 20, y: 5)
-        }
-    }
-    
-    private func drawGrowthLine(width: CGFloat, height: CGFloat) -> some View {
-        let range = valueRange
-        
-        return Path { path in
-            let points = sortedData.map { entry in
-                let monthsSinceBirth = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
-                let x = width * CGFloat(monthsSinceBirth) / 12
-                let value = getValue(for: entry)
-                let y = height * (1 - (value - range.min) / (range.max - range.min))
-                return CGPoint(x: x, y: y)
-            }
-            
-            if let firstPoint = points.first {
-                path.move(to: firstPoint)
-                for point in points.dropFirst() {
-                    path.addLine(to: point)
-                }
-            }
-        }
-        .stroke(color, lineWidth: 3)
-        .offset(x: 20, y: 10)
-    }
-    
-    private func drawDataPoints(width: CGFloat, height: CGFloat) -> some View {
-        let range = valueRange
-        
-        return ZStack {
-            ForEach(Array(sortedData.enumerated()), id: \.offset) { index, entry in
-                let monthsSinceBirth = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
-                let x = width * CGFloat(monthsSinceBirth) / 12
-                let value = getValue(for: entry)
-                let y = height * (1 - (value - range.min) / (range.max - range.min))
-                
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
-                    .position(x: x + 20, y: y + 10)
-            }
-        }
-    }
-}
 
-struct BMIChart: View {
-    let title: String
-    let growthData: [GrowthEntry]
-    let useMetricUnits: Bool
-    
-    private var bmiData: [(date: Date, bmi: Double)] {
-        return growthData.map { entry in
-            let weightKg = entry.weight * 0.453592 // Convert lbs to kg
-            let heightM = entry.height * 0.0254 // Convert inches to meters
-            let bmi = weightKg / (heightM * heightM)
-            return (date: entry.date, bmi: bmi)
-        }.sorted { $0.date < $1.date }
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-            
-            if growthData.count > 1 {
-                VStack(spacing: 8) {
-                    // Chart area
-                    GeometryReader { geometry in
-                        let chartWidth = geometry.size.width - 40
-                        let chartHeight = geometry.size.height - 20
-                        
-                        ZStack {
-                            // Background grid
-                            drawBMIGrid(width: chartWidth, height: chartHeight)
-                            
-                            // BMI line
-                            drawBMILine(width: chartWidth, height: chartHeight)
-                        }
-                    }
-                    .frame(height: 240)
-                }
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    
-                    Text("Need More Data")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    Text("Add more measurements to see the BMI chart")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.vertical, 40)
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.regularMaterial)
-        )
-    }
-    
-    private func drawBMIGrid(width: CGFloat, height: CGFloat) -> some View {
-        Path { path in
-            // Horizontal lines
-            for i in 0...4 {
-                let y = height * CGFloat(i) / 4
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: width, y: y))
-            }
-            
-            // Vertical lines
-            for i in 0...4 {
-                let x = width * CGFloat(i) / 4
-                path.move(to: CGPoint(x: x, y: 0))
-                path.addLine(to: CGPoint(x: x, y: height))
-            }
-        }
-        .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-        .offset(x: 20, y: 10)
-    }
-    
-    private func drawBMILine(width: CGFloat, height: CGFloat) -> some View {
-        let bmiValues = bmiData.map { $0.bmi }
-        let minBMI = bmiValues.min() ?? 0
-        let maxBMI = bmiValues.max() ?? 1
-        let range = maxBMI - minBMI
-        let padding = range * 0.1
-        
-        return Path { path in
-            let points = bmiData.enumerated().map { index, data in
-                let x = width * CGFloat(index) / CGFloat(max(1, bmiData.count - 1))
-                let y = height * (1 - (data.bmi - minBMI + padding) / (range + 2 * padding))
-                return CGPoint(x: x, y: y)
-            }
-            
-            if let firstPoint = points.first {
-                path.move(to: firstPoint)
-                for point in points.dropFirst() {
-                    path.addLine(to: point)
-                }
-            }
-        }
-        .stroke(Color.purple, lineWidth: 3)
-        .offset(x: 20, y: 10)
-    }
-}
 
 struct GrowthHistoryRow: View {
     let entry: GrowthEntry
@@ -818,39 +463,39 @@ struct GrowthHistoryRow: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-
+                
                 Spacer()
-
+                
                 // Values
-                VStack(alignment: .trailing, spacing: 2) {
+                    VStack(alignment: .trailing, spacing: 2) {
                     HStack(spacing: 16) {
                         VStack(alignment: .trailing, spacing: 1) {
                             Text("Weight")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Text(formatWeight(entry.weight))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+                        Text(formatWeight(entry.weight))
+                            .font(.subheadline)
+                            .fontWeight(.medium)
                                 .foregroundColor(.primary)
-                        }
-                        
+                    }
+                    
                         VStack(alignment: .trailing, spacing: 1) {
                             Text("Height")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Text(formatHeight(entry.height))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+                        Text(formatHeight(entry.height))
+                            .font(.subheadline)
+                            .fontWeight(.medium)
                                 .foregroundColor(.primary)
-                        }
-                        
+                    }
+                    
                         VStack(alignment: .trailing, spacing: 1) {
                             Text("Head")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Text(formatHeadCircumference(entry.headCircumference))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+                        Text(formatHeadCircumference(entry.headCircumference))
+                            .font(.subheadline)
+                            .fontWeight(.medium)
                                 .foregroundColor(.primary)
                         }
                     }
@@ -928,7 +573,215 @@ extension Array {
     }
 }
 
+// MARK: - Supporting Types
+
+struct ChartDataPoint: Identifiable {
+    let id = UUID()
+    let month: Int
+    let value: Double
+    let date: Date
+}
+
+struct PercentileCurve: Identifiable {
+    let id = UUID()
+    let percentile: Int
+    let values: [Double]
+}
+
+struct GrowthPercentileChart: View {
+    let data: [ChartDataPoint]
+    let percentiles: [PercentileCurve]
+    let color: Color
+    let unitLabel: String
+    let title: String
+    let useMetricUnits: Bool
+    
+    @State private var zoomScale: CGFloat = 1.0
+    @State private var panOffset: CGSize = .zero
+    @State private var lastPanOffset: CGSize = .zero
+    
+    
+    private var childDataLine: some ChartContent {
+        ForEach(data) { dataPoint in
+            LineMark(
+                x: .value("Month", dataPoint.month),
+                y: .value(title, dataPoint.value)
+            )
+            .foregroundStyle(color)
+            .lineStyle(StrokeStyle(lineWidth: 3))
+            .interpolationMethod(.catmullRom)
+        }
+    }
+    
+    private var childDataPoints: some ChartContent {
+        ForEach(data) { dataPoint in
+            PointMark(
+                x: .value("Month", dataPoint.month),
+                y: .value(title, dataPoint.value)
+            )
+            .foregroundStyle(color)
+            .symbolSize(60)
+        }
+    }
+    
+    private var maxMonth: Double {
+        return 36.0 // Fixed to 36 months (3 years)
+    }
+    
+    private var focusedDomain: ClosedRange<Double> {
+        let dataMaxMonth = data.map { Double($0.month) }.max() ?? 0
+        let startMonth = max(0, dataMaxMonth - 12) // Show 12 months before latest data
+        let endMonth = min(36, dataMaxMonth + 6) // Show 6 months after latest data, up to 36 months
+        return startMonth...endMonth
+    }
+    
+    private var yAxisDomain: ClosedRange<Double> {
+        // Fixed y-axis range based on the data type
+        switch title {
+        case "Weight":
+            return useMetricUnits ? 0...15 : 0...35 // kg or lbs
+        case "Height":
+            return useMetricUnits ? 40...120 : 15...48 // cm or inches
+        case "Head Circumference":
+            return useMetricUnits ? 30...60 : 12...24 // cm or inches
+        default:
+            let values = data.map { $0.value }
+        let minValue = values.min() ?? 0
+        let maxValue = values.max() ?? 1
+        let padding = (maxValue - minValue) * 0.1
+            return (minValue - padding)...(maxValue + padding)
+        }
+    }
+    
+    private func shouldShowLabel(for month: Int) -> Bool {
+        return true  // Show all month labels
+    }
+    
+    var body: some View {
+                    ZStack {
+            // Fixed y-axis that never moves
+            Chart {
+                // Empty chart just for the y-axis
+            }
+            .frame(height: 300)
+            .chartYAxis {
+                AxisMarks(position: .leading) { value in
+                    AxisGridLine()
+                        .foregroundStyle(.gray.opacity(0.3))
+                    AxisValueLabel {
+                        if let val = value.as(Double.self) {
+                            Text("\(val, specifier: "%.1f")\(unitLabel)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                    }
+                }
+            }
+            .chartYScale(domain: yAxisDomain)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            
+            // Movable chart content
+            Chart {
+                childDataLine
+                childDataPoints
+            }
+            .frame(height: 300)
+            .frame(maxWidth: .infinity)
+            .scaleEffect(zoomScale)
+            .offset(panOffset)
+            .clipped()
+            .mask(
+                Rectangle()
+                    .inset(by: 40) // Hide content behind y-axis area
+            )
+            .clipped() // Ensure content doesn't go outside chart bounds
+            .gesture(
+                SimultaneousGesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            zoomScale = max(0.5, min(3.0, value))
+                        }
+                        .onEnded { value in
+                            zoomScale = max(0.5, min(3.0, value))
+                        },
+                    
+                    DragGesture()
+                        .onChanged { value in
+                            // Allow both horizontal and vertical movement
+                            let newWidth = lastPanOffset.width + value.translation.width
+                            let newHeight = lastPanOffset.height + value.translation.height
+                            
+                            // Constrain horizontal movement
+                            let constrainedWidth = max(-200, min(200, newWidth))
+                            // Allow vertical movement within reasonable bounds
+                            let constrainedHeight = max(-100, min(100, newHeight))
+                            
+                            panOffset = CGSize(width: constrainedWidth, height: constrainedHeight)
+                        }
+                        .onEnded { value in
+                            lastPanOffset = panOffset
+                        }
+                )
+            )
+            .chartXAxis {
+                AxisMarks(values: .stride(by: 1)) { value in
+                    AxisGridLine()
+                        .foregroundStyle(.gray.opacity(0.2))
+                    AxisValueLabel {
+                        if let month = value.as(Int.self) {
+                            VStack(spacing: 2) {
+                                Text("\(month)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                                Text("mo")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                                    .opacity(0.7)
+                            }
+                        }
+                    }
+                }
+            }
+            .chartXScale(domain: focusedDomain)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 10)
+        }
+    }
+    
+}
+
+struct EmptyStateView: View {
+    let icon: String
+    let title: String
+    let message: String
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 48))
+                .foregroundColor(.secondary)
+            
+            Text(title)
+                .font(.title2)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+            
+            Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+        .padding(.vertical, 40)
+    }
+}
+
 #Preview {
     ProgressView()
         .environmentObject(TotsDataManager())
 }
+
+
+
+
+
