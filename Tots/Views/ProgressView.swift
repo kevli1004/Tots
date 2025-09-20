@@ -50,12 +50,13 @@ struct ProgressView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAddGrowth) {
-            AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: editingGrowthEntry)
+        .sheet(item: $editingGrowthEntry) { growthEntry in
+            AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: growthEntry)
                 .environmentObject(dataManager)
-                .onDisappear {
-                    editingGrowthEntry = nil
-                }
+        }
+        .sheet(isPresented: $showingAddGrowth) {
+            AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: nil)
+                .environmentObject(dataManager)
         }
     }
     
@@ -138,7 +139,6 @@ struct ProgressView: View {
                             onTap: {
                                 if let latestEntry = dataManager.growthData.first {
                                     editingGrowthEntry = latestEntry
-                                    showingAddGrowth = true
                                 }
                             }
                         )
@@ -151,7 +151,6 @@ struct ProgressView: View {
                             onTap: {
                                 if let latestEntry = dataManager.growthData.first {
                                     editingGrowthEntry = latestEntry
-                                    showingAddGrowth = true
                                 }
                             }
                         )
@@ -166,7 +165,6 @@ struct ProgressView: View {
                             onTap: {
                                 if let latestEntry = dataManager.growthData.first {
                                     editingGrowthEntry = latestEntry
-                                    showingAddGrowth = true
                                 }
                             }
                         )
@@ -179,7 +177,6 @@ struct ProgressView: View {
                             onTap: {
                                 if let latestEntry = dataManager.growthData.first {
                                     editingGrowthEntry = latestEntry
-                                    showingAddGrowth = true
                                 }
                             }
                         )
@@ -291,7 +288,6 @@ struct ProgressView: View {
                                 useMetricUnits: dataManager.useMetricUnits,
                                 onTap: {
                                     editingGrowthEntry = entry
-                                    showingAddGrowth = true
                                 },
                                 onDelete: {
                                     deleteGrowthEntry(entry)
