@@ -55,6 +55,7 @@ struct AddActivityView: View {
     @State private var rightPumpingStartTime: Date?
     @State private var rightPumpingElapsed: TimeInterval = 0
     @State private var rightPumpingTimer: Timer?
+    @State private var showingDeleteConfirmation = false
     
     enum FeedingType: String, CaseIterable {
         case bottle = "Bottle"
@@ -84,6 +85,11 @@ struct AddActivityView: View {
         }
     }
     
+    private var navigationTitle: String {
+        let isEditing = editingActivity != nil || editingGrowthEntry != nil
+        return isEditing ? "Edit \(selectedActivityType.name)" : "Add \(selectedActivityType.name)"
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -107,7 +113,7 @@ struct AddActivityView: View {
                     .padding()
                 }
             }
-                .navigationTitle(editingActivity != nil ? "Edit \(selectedActivityType.name)" : "Add \(selectedActivityType.name)")
+                .navigationTitle(navigationTitle)
                 .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -115,7 +121,25 @@ struct AddActivityView: View {
                         dismiss()
                     }
                 }
+                
+                // Add delete button when editing existing records
+                if editingActivity != nil || editingGrowthEntry != nil {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Delete") {
+                            showingDeleteConfirmation = true
+                        }
+                        .foregroundColor(.red)
+                    }
+                }
             }
+        }
+        .confirmationDialog("Delete Record", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                deleteRecord()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to delete this record? This action cannot be undone.")
         }
         .onAppear {
             if let editingActivity = editingActivity {
@@ -715,7 +739,7 @@ struct AddActivityView: View {
     
     private var saveButtonView: some View {
         Button(action: saveActivity) {
-            Text("Save Activity")
+            Text(editingActivity != nil || editingGrowthEntry != nil ? "Update Activity" : "Save Activity")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
@@ -853,6 +877,23 @@ struct AddActivityView: View {
             )
             
             dataManager.addActivity(activity)
+        }
+        
+        dismiss()
+    }
+    
+    private func deleteRecord() {
+        if let editingActivity = editingActivity {
+            // Delete the activity
+            dataManager.deleteActivity(editingActivity)
+        } else if let editingGrowthEntry = editingGrowthEntry {
+            // Find and delete the corresponding activity for this growth entry
+            if let correspondingActivity = dataManager.recentActivities.first(where: { 
+                $0.type == .growth && 
+                Calendar.current.isDate($0.time, equalTo: editingGrowthEntry.date, toGranularity: .minute)
+            }) {
+                dataManager.deleteActivity(correspondingActivity)
+            }
         }
         
         dismiss()

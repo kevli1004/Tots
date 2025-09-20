@@ -682,6 +682,14 @@ class TotsDataManager: ObservableObject {
     
     func deleteActivity(_ activity: TotsActivity) {
         recentActivities.removeAll { $0.id == activity.id }
+        
+        // If this was a growth activity, also remove the corresponding growth entry
+        if activity.type == .growth {
+            growthData.removeAll { entry in
+                Calendar.current.isDate(entry.date, equalTo: activity.time, toGranularity: .minute)
+            }
+        }
+        
         updateCountdowns() // Update countdowns after deleting activity
         
         // Update Live Activity if running
