@@ -103,6 +103,11 @@ struct AddActivityView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
+                        // Unit toggle for growth activities
+                        if selectedActivityType == .growth {
+                            unitToggleRow
+                        }
+                        
                         // Time selector
                         timeSelectorView
                         
@@ -452,36 +457,34 @@ struct AddActivityView: View {
         }
     }
     
+    private var unitToggleRow: some View {
+        HStack {
+            Spacer()
+            
+            HStack(spacing: 6) {
+                Text("cm/kg")
+                    .font(.caption)
+                    .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
+                    .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
+                
+                Toggle("", isOn: Binding(
+                    get: { !dataManager.useMetricUnits },
+                    set: { dataManager.useMetricUnits = !$0 }
+                ))
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
+                .scaleEffect(0.8)
+                .fixedSize()
+                
+                Text("in/lb")
+                    .font(.caption)
+                    .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
+                    .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
+            }
+        }
+    }
+    
     private var growthDetailsView: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // Unit toggle
-            HStack {
-                Text("Units")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                HStack(spacing: 8) {
-                    Text("kg/cm")
-                        .font(.caption)
-                        .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
-                        .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
-                    
-                    Toggle("", isOn: Binding(
-                        get: { !dataManager.useMetricUnits },
-                        set: { dataManager.useMetricUnits = !$0 }
-                    ))
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
-                    .scaleEffect(0.8)
-                    
-                    Text("lb/in")
-                        .font(.caption)
-                        .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
-                        .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
-                }
-            }
             
             // Weight slider
             VStack(alignment: .leading, spacing: 12) {

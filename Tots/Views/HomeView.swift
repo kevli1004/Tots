@@ -2223,8 +2223,14 @@ struct MilestonesView: View {
     }
     
     private var milestonesList: some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    // Top anchor for scrolling
+                    Color.clear
+                        .frame(height: 0)
+                        .id("milestonesTop")
+                    
                 if filteredMilestones.isEmpty {
                     // Empty state
                     VStack(spacing: 16) {
@@ -2310,6 +2316,12 @@ struct MilestonesView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 20)
+            }
+            .onChange(of: selectedAgeGroup) { _ in
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    proxy.scrollTo("milestonesTop", anchor: .top)
+                }
+            }
         }
     }
     
