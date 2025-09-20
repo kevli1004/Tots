@@ -86,8 +86,13 @@ struct AddActivityView: View {
     }
     
     private var navigationTitle: String {
-        let isEditing = editingActivity != nil || editingGrowthEntry != nil
-        return isEditing ? "Edit \(selectedActivityType.name)" : "Add \(selectedActivityType.name)"
+        if let editingActivity = editingActivity {
+            return "Edit \(editingActivity.type.name)"
+        } else if editingGrowthEntry != nil {
+            return "Edit Growth"
+        } else {
+            return "Add \(selectedActivityType.name)"
+        }
     }
     
     var body: some View {

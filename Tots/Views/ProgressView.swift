@@ -31,9 +31,8 @@ struct ProgressView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        // If there's existing data, default to latest values for editing
-                        // Otherwise, start fresh
-                        editingGrowthEntry = dataManager.growthData.isEmpty ? nil : dataManager.growthData.first
+                        // Plus button always creates new entry
+                        editingGrowthEntry = nil
                         showingAddGrowth = true
                     }) {
                         ZStack {
@@ -50,9 +49,15 @@ struct ProgressView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAddGrowth) {
-            AddActivityView(preselectedType: .growth, editingGrowthEntry: editingGrowthEntry)
+        .sheet(item: $editingGrowthEntry) { entry in
+            AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: entry)
                 .environmentObject(dataManager)
+        }
+        .sheet(isPresented: $showingAddGrowth) {
+            if editingGrowthEntry == nil {
+                AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: nil)
+                    .environmentObject(dataManager)
+            }
         }
     }
     
@@ -71,24 +76,23 @@ struct ProgressView: View {
                 HStack {
                     Spacer()
                     
-                    HStack(spacing: 4) {
-                        Text("cm/kg")
-                            .font(.caption)
-                            .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
-                            .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
-                        
-                        Toggle("", isOn: Binding(
-                            get: { !dataManager.useMetricUnits },
-                            set: { dataManager.useMetricUnits = !$0 }
-                        ))
-                        .toggleStyle(SwitchToggleStyle(tint: .blue))
-                        .scaleEffect(0.8)
-                        
-                        Text("in/lb")
-                            .font(.caption)
-                            .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
-                            .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
-                    }
+                    Text("cm/kg")
+                        .font(.caption)
+                        .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
+                        .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
+                    
+                    Toggle("", isOn: Binding(
+                        get: { !dataManager.useMetricUnits },
+                        set: { dataManager.useMetricUnits = !$0 }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .scaleEffect(0.8)
+                    .fixedSize()
+                    
+                    Text("in/lb")
+                        .font(.caption)
+                        .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
+                        .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
                 }
             }
             
@@ -186,6 +190,80 @@ struct ProgressView: View {
             }
             
             
+            // Growth Charts Section
+            if dataManager.growthData.count > 3 {
+                VStack(spacing: 20) {
+                    Text("Growth Trends")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    // Weight Chart
+                    GrowthLineChart(
+                        title: "Weight Over Time",
+                        data: dataManager.growthData,
+                        dataType: .weight,
+                        color: .green,
+                        useMetricUnits: dataManager.useMetricUnits,
+                        babyBirthDate: dataManager.babyBirthDate
+                    )
+                    
+                    // Height Chart
+                    GrowthLineChart(
+                        title: "Height Over Time",
+                        data: dataManager.growthData,
+                        dataType: .height,
+                        color: .blue,
+                        useMetricUnits: dataManager.useMetricUnits,
+                        babyBirthDate: dataManager.babyBirthDate
+                    )
+                    
+                    // BMI Chart
+                    BMIChart(
+                        title: "BMI Over Time",
+                        growthData: dataManager.growthData,
+                        useMetricUnits: dataManager.useMetricUnits
+                    )
+                    
+                    // Head Circumference Chart
+                    GrowthLineChart(
+                        title: "Head Circumference Over Time",
+                        data: dataManager.growthData,
+                        dataType: .headCircumference,
+                        color: .orange,
+                        useMetricUnits: dataManager.useMetricUnits,
+                        babyBirthDate: dataManager.babyBirthDate
+                    )
+                }
+            } else if dataManager.growthData.count > 0 {
+                // Need more data message
+                VStack(spacing: 12) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 40))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Growth Charts")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Text("Add at least 4 growth measurements to see trend charts")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("\(4 - dataManager.growthData.count) more measurements needed")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.regularMaterial)
+                )
+            }
+            
             // Growth History Section
             if dataManager.growthData.count > 1 {
                 VStack(alignment: .leading, spacing: 16) {
@@ -211,11 +289,9 @@ struct ProgressView: View {
                         ForEach(Array(displayedEntries.enumerated()), id: \.offset) { index, entry in
                             GrowthHistoryRow(
                                 entry: entry,
-                                isLatest: index == 0,
                                 useMetricUnits: dataManager.useMetricUnits,
                                 onTap: {
                                     editingGrowthEntry = entry
-                                    showingAddGrowth = true
                                 },
                                 onDelete: {
                                     deleteGrowthEntry(entry)
@@ -251,7 +327,6 @@ struct ProgressView: View {
 
 struct GrowthHistoryRow: View {
     let entry: GrowthEntry
-    let isLatest: Bool
     let useMetricUnits: Bool
     let onTap: () -> Void
     let onDelete: () -> Void
@@ -266,16 +341,9 @@ struct GrowthHistoryRow: View {
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
                     
-                    if isLatest {
-                        Text("Latest")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                            .fontWeight(.medium)
-                    } else {
-                        Text(timeAgo(from: entry.date))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    Text(timeAgo(from: entry.date))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 Spacer()
@@ -318,11 +386,7 @@ struct GrowthHistoryRow: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isLatest ? Color.blue.opacity(0.1) : Color(.systemGray6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isLatest ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
-                    )
+                    .fill(Color(.systemGray6))
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -364,20 +428,24 @@ struct GrowthHistoryRow: View {
     
     private func formatWeight(_ weight: Double) -> String {
         if useMetricUnits {
-            let kg = weight * 0.453592
-            return String(format: "%.1f kg", kg)
+            // Weight is already stored in kg
+            return String(format: "%.1f kg", weight)
         } else {
-            return String(format: "%.1f lbs", weight)
+            // Convert from kg to pounds
+            let lbs = weight / 0.453592
+            return String(format: "%.1f lbs", lbs)
         }
     }
     
     private func formatHeight(_ height: Double) -> String {
         if useMetricUnits {
-            let cm = height * 2.54
-            return String(format: "%.0f cm", cm)
+            // Height is already stored in cm
+            return String(format: "%.0f cm", height)
         } else {
-            let feet = Int(height / 12)
-            let inches = height.truncatingRemainder(dividingBy: 12)
+            // Convert from cm to inches, then to feet and inches
+            let totalInches = height / 2.54
+            let feet = Int(totalInches / 12)
+            let inches = totalInches.truncatingRemainder(dividingBy: 12)
             return String(format: "%d'%.1f\"", feet, inches)
         }
     }
@@ -467,27 +535,21 @@ struct GrowthLineChart: View {
                 VStack(spacing: 8) {
                     // Chart area
                     GeometryReader { geometry in
-                        let chartWidth = geometry.size.width - 60 // Leave more space for Y-axis on left
-                        let chartHeight = geometry.size.height - 40 // Leave space for X-axis
+                        let chartWidth = geometry.size.width - 40 // Minimal padding
+                        let chartHeight = geometry.size.height - 20 // Minimal padding
                         
                         ZStack {
-                            // Background grid
+                            // Background grid (lighter)
                             drawGrid(width: chartWidth, height: chartHeight)
                             
                             // Growth data line
                             drawGrowthLine(width: chartWidth, height: chartHeight)
                             
-                            // Data points
-                            drawDataPoints(width: chartWidth, height: chartHeight)
-                            
-                            // Y-axis labels
-                            drawYAxisLabels(height: chartHeight)
-                            
-                            // X-axis labels
-                            drawXAxisLabels(width: chartWidth, height: chartHeight)
+                            // Interactive data points
+                            drawInteractiveDataPoints(width: chartWidth, height: chartHeight)
                         }
                     }
-                    .frame(height: 200)
+                    .frame(height: 180)
                     
                     // Legend and Axis Labels
                     VStack(spacing: 8) {
@@ -578,8 +640,8 @@ struct GrowthLineChart: View {
                 path.addLine(to: CGPoint(x: x, y: height))
             }
         }
-        .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
-        .offset(x: 60, y: 20)
+        .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
+        .offset(x: 20, y: 10)
     }
     
     private func drawAverageLine(width: CGFloat, height: CGFloat) -> some View {
@@ -597,34 +659,71 @@ struct GrowthLineChart: View {
             }
         }
         .stroke(Color.gray.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [5, 5]))
-        .offset(x: 40, y: 20)
+        .offset(x: 20, y: 10)
     }
     
     private func drawGrowthLine(width: CGFloat, height: CGFloat) -> some View {
         let range = valueRange
         let dateRangeData = dateRange
         
-        return Path { path in
-            let points = sortedData.enumerated().map { index, entry in
-                let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
-                let value = getValue(for: entry)
-                let y = height * (1 - (value - range.min) / (range.max - range.min))
+        return ZStack {
+            // Gradient fill area under the curve
+            Path { path in
+                let points = sortedData.enumerated().map { index, entry in
+                    let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
+                    let value = getValue(for: entry)
+                    let y = height * (1 - (value - range.min) / (range.max - range.min))
+                    return CGPoint(x: x, y: y)
+                }
                 
-                return CGPoint(x: x, y: y)
-            }
-            
-            if let firstPoint = points.first {
-                path.move(to: firstPoint)
-                for point in points.dropFirst() {
-                    path.addLine(to: point)
+                if let firstPoint = points.first, let lastPoint = points.last {
+                    path.move(to: CGPoint(x: firstPoint.x, y: height)) // Start from bottom
+                    path.addLine(to: firstPoint)
+                    
+                    // Create straight lines between points so dots align perfectly
+                    for point in points.dropFirst() {
+                        path.addLine(to: point)
+                    }
+                    
+                    path.addLine(to: CGPoint(x: lastPoint.x, y: height)) // End at bottom
+                    path.closeSubpath()
                 }
             }
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [color.opacity(0.3), color.opacity(0.05)]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .offset(x: 20, y: 10)
+            
+            // Straight line connecting data points
+            Path { path in
+                let points = sortedData.enumerated().map { index, entry in
+                    let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
+                    let value = getValue(for: entry)
+                    let y = height * (1 - (value - range.min) / (range.max - range.min))
+                    return CGPoint(x: x, y: y)
+                }
+                
+                if let firstPoint = points.first {
+                    path.move(to: firstPoint)
+                    
+                    // Create straight lines between points so dots align perfectly
+                    for point in points.dropFirst() {
+                        path.addLine(to: point)
+                    }
+                }
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            .offset(x: 20, y: 10)
         }
-        .stroke(color, lineWidth: 3)
-        .offset(x: 60, y: 20)
     }
     
-    private func drawDataPoints(width: CGFloat, height: CGFloat) -> some View {
+    @State private var selectedDataPoint: GrowthEntry? = nil
+    
+    private func drawInteractiveDataPoints(width: CGFloat, height: CGFloat) -> some View {
         let range = valueRange
         let dateRangeData = dateRange
         
@@ -635,11 +734,77 @@ struct GrowthLineChart: View {
                 let value = getValue(for: entry)
                 let y = height * (1 - (value - range.min) / (range.max - range.min))
                 
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
-                    .offset(x: x + 60 - 4, y: y + 20 - 4)
+                Button(action: {
+                    selectedDataPoint = entry
+                }) {
+                    ZStack {
+                        // Subtle shadow/glow effect
+                        Circle()
+                            .fill(color.opacity(0.3))
+                            .frame(width: 20, height: 20)
+                            .blur(radius: 3)
+                            .zIndex(-1)
+                        
+                        // Outer ring
+                        Circle()
+                            .stroke(Color.white, lineWidth: 3)
+                            .frame(width: 14, height: 14)
+                        
+                        // Inner filled circle
+                        Circle()
+                            .fill(color)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .offset(x: x + 20 - 7, y: y + 10 - 7)
+                .scaleEffect(selectedDataPoint?.id == entry.id ? 1.2 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: selectedDataPoint?.id)
             }
+            
+            // Tooltip for selected data point
+            if let selectedPoint = selectedDataPoint {
+                let x = width * CGFloat(selectedPoint.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
+                let value = getValue(for: selectedPoint)
+                let y = height * (1 - (value - range.min) / (range.max - range.min))
+                
+                VStack(spacing: 4) {
+                    Text(formatDate(selectedPoint.date))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Text(formatValue(value))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(.regularMaterial)
+                        .shadow(radius: 2)
+                )
+                .offset(x: x + 20, y: y - 30)
+                .onTapGesture {
+                    selectedDataPoint = nil
+                }
+            }
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        return formatter.string(from: date)
+    }
+    
+    private func formatValue(_ value: Double) -> String {
+        switch dataType {
+        case .weight:
+            return useMetricUnits ? String(format: "%.1f kg", value) : String(format: "%.1f lb", value)
+        case .height:
+            return useMetricUnits ? String(format: "%.0f cm", value) : String(format: "%.1f in", value)
+        case .headCircumference:
+            return useMetricUnits ? String(format: "%.1f cm", value) : String(format: "%.1f in", value)
         }
     }
     
@@ -682,7 +847,7 @@ struct GrowthLineChart: View {
             }
         }
         .frame(width: 55)
-        .offset(y: 20)
+        .offset(x: 0, y: 20)
     }
     
     private func drawXAxisLabels(width: CGFloat, height: CGFloat) -> some View {
@@ -791,24 +956,18 @@ struct BMIChart: View {
                 VStack(spacing: 8) {
                     // Chart area
                     GeometryReader { geometry in
-                        let chartWidth = geometry.size.width - 60 // More space for y-axis labels on left
-                        let chartHeight = geometry.size.height - 40
+                        let chartWidth = geometry.size.width - 40 // Minimal padding
+                        let chartHeight = geometry.size.height - 20 // Minimal padding
                         
                         ZStack {
-                            // Background grid
+                            // Background grid (lighter)
                             drawBMIGrid(width: chartWidth, height: chartHeight)
                             
-                            // BMI line
+                            // BMI line with interactive points
                             drawBMILine(width: chartWidth, height: chartHeight)
-                            
-                            // Y-axis labels (on the left)
-                            drawBMIYAxisLabels(height: chartHeight)
-                            
-                            // X-axis labels
-                            drawBMIXAxisLabels(width: chartWidth, height: chartHeight)
                         }
-                    }
-                    .frame(height: 200)
+                }
+                .frame(height: 240)
                 }
             } else {
                 VStack(spacing: 8) {
@@ -863,31 +1022,67 @@ struct BMIChart: View {
                 path.addLine(to: CGPoint(x: x, y: height))
             }
         }
-        .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
-        .offset(x: 60, y: 20) // More offset for left y-axis
+        .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
+        .offset(x: 20, y: 10) // More offset for left y-axis
     }
     
     private func drawBMILine(width: CGFloat, height: CGFloat) -> some View {
         let dateRangeData = dateRange
         let bmiRangeData = bmiRange
         
-        return Path { path in
-            let points = bmiData.map { entry in
-                let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
-                let normalizedBMI = (entry.bmi - bmiRangeData.min) / (bmiRangeData.max - bmiRangeData.min)
-                let y = height * (1 - normalizedBMI)
-                return CGPoint(x: x, y: y)
-            }
-            
-            if let firstPoint = points.first {
-                path.move(to: firstPoint)
-                for point in points.dropFirst() {
-                    path.addLine(to: point)
+        return ZStack {
+            // Gradient fill area under the curve
+            Path { path in
+                let points = bmiData.map { entry in
+                    let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
+                    let normalizedBMI = (entry.bmi - bmiRangeData.min) / (bmiRangeData.max - bmiRangeData.min)
+                    let y = height * (1 - normalizedBMI)
+                    return CGPoint(x: x, y: y)
+                }
+                
+                if let firstPoint = points.first, let lastPoint = points.last {
+                    path.move(to: CGPoint(x: firstPoint.x, y: height)) // Start from bottom
+                    path.addLine(to: firstPoint)
+                    
+                    // Create straight lines between points so dots align perfectly
+                    for point in points.dropFirst() {
+                        path.addLine(to: point)
+                    }
+                    
+                    path.addLine(to: CGPoint(x: lastPoint.x, y: height)) // End at bottom
+                    path.closeSubpath()
                 }
             }
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.purple.opacity(0.3), Color.purple.opacity(0.05)]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .offset(x: 20, y: 10)
+            
+            // Straight line connecting BMI data points
+            Path { path in
+                let points = bmiData.map { entry in
+                    let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
+                    let normalizedBMI = (entry.bmi - bmiRangeData.min) / (bmiRangeData.max - bmiRangeData.min)
+                    let y = height * (1 - normalizedBMI)
+                    return CGPoint(x: x, y: y)
+                }
+                
+                if let firstPoint = points.first {
+                    path.move(to: firstPoint)
+                    
+                    // Create straight lines between points so dots align perfectly
+                    for point in points.dropFirst() {
+                        path.addLine(to: point)
+                    }
+                }
+            }
+            .stroke(.purple, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            .offset(x: 20, y: 10)
         }
-        .stroke(.purple, lineWidth: 2)
-        .offset(x: 60, y: 20)
     }
     
     private func drawBMIYAxisLabels(height: CGFloat) -> some View {
@@ -903,7 +1098,7 @@ struct BMIChart: View {
             }
         }
         .frame(width: 55)
-        .offset(y: 20)
+        .offset(x: 0, y: 20)
     }
     
     private func drawBMIXAxisLabels(width: CGFloat, height: CGFloat) -> some View {
