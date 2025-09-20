@@ -29,15 +29,15 @@ class TotsDataManager: ObservableObject {
     }
     
     var currentWeight: Double {
-        return growthData.last?.weight ?? 15.0 // Default weight in lbs
+        return growthData.last?.weight ?? 0.0
     }
     
     var currentHeight: Double {
-        return growthData.last?.height ?? 68.5 // Default height in cm
+        return growthData.last?.height ?? 0.0
     }
     
     var currentHeadCircumference: Double {
-        return growthData.last?.headCircumference ?? 35.0 // Default head circumference in cm
+        return growthData.last?.headCircumference ?? 0.0
     }
     @Published var healthTrends: [HealthTrend] = []
     
@@ -609,10 +609,10 @@ class TotsDataManager: ObservableObject {
                 return getDayData(for: date, formatter: "E")
             }
             
-        case .thisMonth:
+        case .thisMonth, .lastMonth:
             // For monthly view, aggregate data by week to prevent overflow
-            let (startDate, _) = getTimeframeRange(timeframe, from: today)
-            let endDate = today
+            let (startDate, daysInMonth) = getTimeframeRange(timeframe, from: today)
+            let endDate = calendar.date(byAdding: .day, value: daysInMonth - 1, to: startDate) ?? today
             
             var weeklyData: [DayData] = []
             var currentWeekStart = startDate
@@ -724,6 +724,12 @@ class TotsDataManager: ObservableObject {
             let startOfMonth = calendar.dateInterval(of: .month, for: today)?.start ?? today
             let daysInMonth = calendar.range(of: .day, in: .month, for: today)?.count ?? 30
             return (startOfMonth, daysInMonth)
+            
+        case .lastMonth:
+            let lastMonth = calendar.date(byAdding: .month, value: -1, to: today) ?? today
+            let startOfLastMonth = calendar.dateInterval(of: .month, for: lastMonth)?.start ?? today
+            let daysInLastMonth = calendar.range(of: .day, in: .month, for: lastMonth)?.count ?? 30
+            return (startOfLastMonth, daysInLastMonth)
         }
     }
     
@@ -786,19 +792,27 @@ class TotsDataManager: ObservableObject {
     }
     
     private func addGrowthEntry(from activity: TotsActivity) {
-        // Use provided values or fall back to current latest values
-        let weight = activity.weight ?? currentWeight
-        let height = activity.height ?? currentHeight
-        let headCircumference = activity.headCircumference ?? currentHeadCircumference
+        // Only create growth entry if at least one measurement is provided
+        guard activity.weight != nil || activity.height != nil || activity.headCircumference != nil else {
+            return
+        }
         
-        let growthEntry = GrowthEntry(
-            date: activity.time,
-            weight: weight,
-            height: height,
-            headCircumference: headCircumference
-        )
+        // Use provided values or fall back to current latest values (but not 0.0)
+        let weight = activity.weight ?? (currentWeight > 0 ? currentWeight : nil)
+        let height = activity.height ?? (currentHeight > 0 ? currentHeight : nil)
+        let headCircumference = activity.headCircumference ?? (currentHeadCircumference > 0 ? currentHeadCircumference : nil)
         
-        growthData.append(growthEntry)
+        // Only create entry if we have at least one valid measurement
+        if let weight = weight, let height = height, let headCircumference = headCircumference {
+            let growthEntry = GrowthEntry(
+                date: activity.time,
+                weight: weight,
+                height: height,
+                headCircumference: headCircumference
+            )
+            
+            growthData.append(growthEntry)
+        }
     }
     
     func deleteActivity(_ activity: TotsActivity) {

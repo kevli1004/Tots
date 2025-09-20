@@ -8,4 +8,3 @@ struct TotsWidgetBundle: WidgetBundle {
         TotsLiveActivity()
     }
 }
-t

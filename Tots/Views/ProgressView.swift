@@ -4,16 +4,18 @@ import SwiftUI
 struct ProgressView: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var selectedTimeframe: TimeFrame = .thisWeek
+    @State private var showingAddGrowth = false
     
     enum TimeFrame: String, CaseIterable {
         case thisWeek = "This Week"
         case lastWeek = "Last Week"
         case thisMonth = "This Month"
+        case lastMonth = "Last Month"
         
         var days: Int {
             switch self {
             case .thisWeek, .lastWeek: return 7
-            case .thisMonth: return 30
+            case .thisMonth, .lastMonth: return 30
             }
         }
     }
@@ -43,6 +45,10 @@ struct ProgressView: View {
             }
             .navigationTitle("Progress")
             .navigationBarTitleDisplayMode(.large)
+        }
+        .sheet(isPresented: $showingAddGrowth) {
+            AddActivityView(preselectedType: .growth)
+                .environmentObject(dataManager)
         }
     }
     
@@ -87,20 +93,6 @@ struct ProgressView: View {
                     value: "\(dataManager.streakCount) days",
                     icon: "flame.fill",
                     color: .orange
-                )
-                
-                ProgressStatCard(
-                    title: "BMI",
-                    value: String(format: "%.1f", dataManager.currentBMI),
-                    icon: "figure.child",
-                    color: .purple
-                )
-                
-                ProgressStatCard(
-                    title: "Growth Percentile",
-                    value: "\(dataManager.getWeightPercentile())th",
-                    icon: "chart.line.uptrend.xyaxis",
-                    color: .green
                 )
             }
         }
@@ -152,6 +144,18 @@ struct ProgressView: View {
                 
                 Spacer()
                 
+                // Add growth entry button
+                if !dataManager.growthData.isEmpty {
+                    Button(action: {
+                        showingAddGrowth = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.blue)
+                    }
+                }
+                
                 // Unit toggle
                 HStack(spacing: 8) {
                     Text("cm/kg")
@@ -173,38 +177,71 @@ struct ProgressView: View {
                 }
             }
             
-            // Current Stats Cards
-            VStack(spacing: 16) {
-                HStack(spacing: 16) {
-                    GrowthCard(
-                        title: "Weight",
-                        value: dataManager.formatWeight(dataManager.currentWeight),
-                        subtitle: "\(dataManager.getWeightPercentile())th percentile",
-                        color: .green
-                    )
+            // Current Stats Cards or Add First Entry
+            if dataManager.growthData.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.blue)
                     
-                    GrowthCard(
-                        title: "Height",
-                        value: dataManager.formatHeight(dataManager.currentHeight),
-                        subtitle: "\(dataManager.getHeightPercentile())th percentile",
-                        color: .blue
-                    )
+                    Text("Add Your First Growth Measurement")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Text("Track your baby's weight, height, and head circumference over time")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    Button("Add Measurement") {
+                        showingAddGrowth = true
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .cornerRadius(25)
                 }
-                
-                HStack(spacing: 16) {
-                    GrowthCard(
-                        title: "BMI",
-                        value: String(format: "%.1f", dataManager.currentBMI),
-                        subtitle: "\(dataManager.getBMIPercentile())th percentile for age",
-                        color: .purple
-                    )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.regularMaterial)
+                )
+            } else {
+                VStack(spacing: 16) {
+                    HStack(spacing: 16) {
+                        GrowthCard(
+                            title: "Weight",
+                            value: dataManager.formatWeight(dataManager.currentWeight),
+                            subtitle: "\(dataManager.getWeightPercentile())th percentile",
+                            color: .green
+                        )
+                        
+                        GrowthCard(
+                            title: "Height",
+                            value: dataManager.formatHeight(dataManager.currentHeight),
+                            subtitle: "\(dataManager.getHeightPercentile())th percentile",
+                            color: .blue
+                        )
+                    }
                     
-                    GrowthCard(
-                        title: "Head Circumference",
-                        value: dataManager.formatHeadCircumference(dataManager.currentHeadCircumference),
-                        subtitle: "Latest measurement",
-                        color: .orange
-                    )
+                    HStack(spacing: 16) {
+                        GrowthCard(
+                            title: "BMI",
+                            value: String(format: "%.1f", dataManager.currentBMI),
+                            subtitle: "\(dataManager.getBMIPercentile())th percentile for age",
+                            color: .purple
+                        )
+                        
+                        GrowthCard(
+                            title: "Head Circumference",
+                            value: dataManager.formatHeadCircumference(dataManager.currentHeadCircumference),
+                            subtitle: "Latest measurement",
+                            color: .orange
+                        )
+                    }
                 }
             }
             
@@ -229,12 +266,21 @@ struct ProgressView: View {
                         babyBirthDate: dataManager.babyBirthDate
                     )
                     
+                    GrowthLineChart(
+                        title: "Head Circumference Over Time",
+                        data: dataManager.growthData,
+                        dataType: .headCircumference,
+                        color: .orange,
+                        useMetricUnits: dataManager.useMetricUnits,
+                        babyBirthDate: dataManager.babyBirthDate
+                    )
+                    
                     PercentileTrackingChart(
                         title: "Growth Percentiles Over Time",
                         percentileHistory: dataManager.growthPercentileHistory
                     )
                 }
-            } else {
+            } else if dataManager.growthData.count == 1 {
                 VStack(spacing: 12) {
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .font(.system(size: 40))
@@ -244,6 +290,16 @@ struct ProgressView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
+                    
+                    Button("Add Measurement") {
+                        showingAddGrowth = true
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .cornerRadius(25)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
@@ -418,7 +474,7 @@ struct GrowthLineChart: View {
     let babyBirthDate: Date
     
     enum GrowthDataType {
-        case weight, height
+        case weight, height, headCircumference
     }
     
     var body: some View {
@@ -438,9 +494,6 @@ struct GrowthLineChart: View {
                             // Background grid
                             drawGrid(width: chartWidth, height: chartHeight)
                             
-                            // Average line for age
-                            drawAverageLine(width: chartWidth, height: chartHeight)
-                            
                             // Growth data line
                             drawGrowthLine(width: chartWidth, height: chartHeight)
                             
@@ -456,27 +509,32 @@ struct GrowthLineChart: View {
                     }
                     .frame(height: 200)
                     
-                    // Legend
-                    HStack(spacing: 20) {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(color)
-                                .frame(width: 8, height: 8)
-                            Text("\(babyName)'s \(dataType == .weight ? "Weight" : "Height")")
-                                .font(.caption)
-                                .foregroundColor(.primary)
+                    // Legend and Axis Labels
+                    VStack(spacing: 8) {
+                        HStack(spacing: 20) {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(color)
+                                    .frame(width: 8, height: 8)
+                                Text("\(babyName)'s \(dataType == .weight ? "Weight" : dataType == .height ? "Height" : "Head Circumference")")
+                                    .font(.caption)
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            Spacer()
                         }
                         
-                        HStack(spacing: 6) {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.5))
-                                .frame(width: 12, height: 2)
-                            Text("Average for Age")
-                                .font(.caption)
+                        HStack {
+                            Text("X-axis: Date")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Text("Y-axis: \(getYAxisLabel())")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
-                        
-                        Spacer()
                     }
                 }
             }
@@ -499,9 +557,7 @@ struct GrowthLineChart: View {
     
     private var valueRange: (min: Double, max: Double) {
         let values = sortedData.map { entry in
-            dataType == .weight ? 
-                (useMetricUnits ? convertWeightToKg(entry.weight) : entry.weight) :
-                (useMetricUnits ? convertHeightToCm(entry.height) : entry.height)
+            getValue(for: entry)
         }
         
         let minValue = values.min() ?? 0
@@ -571,11 +627,7 @@ struct GrowthLineChart: View {
         return Path { path in
             let points = sortedData.enumerated().map { index, entry in
                 let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
-                
-                let value = dataType == .weight ? 
-                    (useMetricUnits ? convertWeightToKg(entry.weight) : entry.weight) :
-                    (useMetricUnits ? convertHeightToCm(entry.height) : entry.height)
-                
+                let value = getValue(for: entry)
                 let y = height * (1 - (value - range.min) / (range.max - range.min))
                 
                 return CGPoint(x: x, y: y)
@@ -596,19 +648,40 @@ struct GrowthLineChart: View {
         let range = valueRange
         let dateRangeData = dateRange
         
-        return ForEach(Array(sortedData.enumerated()), id: \.offset) { index, entry in
-            let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
-            
-            let value = dataType == .weight ? 
-                (useMetricUnits ? convertWeightToKg(entry.weight) : entry.weight) :
-                (useMetricUnits ? convertHeightToCm(entry.height) : entry.height)
-            
-            let y = height * (1 - (value - range.min) / (range.max - range.min))
-            
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-                .offset(x: x + 40 - 4, y: y + 20 - 4)
+        return ZStack {
+            ForEach(Array(sortedData.enumerated()), id: \.offset) { index, entry in
+                let x = width * CGFloat(entry.date.timeIntervalSince(dateRangeData.start)) / CGFloat(dateRangeData.end.timeIntervalSince(dateRangeData.start))
+                
+                let value = getValue(for: entry)
+                let y = height * (1 - (value - range.min) / (range.max - range.min))
+                
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                    .offset(x: x + 40 - 4, y: y + 20 - 4)
+            }
+        }
+    }
+    
+    private func getValue(for entry: GrowthEntry) -> Double {
+        switch dataType {
+        case .weight:
+            return useMetricUnits ? convertWeightToKg(entry.weight) : entry.weight
+        case .height:
+            return useMetricUnits ? convertHeightToCm(entry.height) : entry.height
+        case .headCircumference:
+            return useMetricUnits ? entry.headCircumference : (entry.headCircumference / 2.54)
+        }
+    }
+    
+    private func getYAxisLabel() -> String {
+        switch dataType {
+        case .weight:
+            return useMetricUnits ? "Weight (kg)" : "Weight (lbs)"
+        case .height:
+            return useMetricUnits ? "Height (cm)" : "Height (in)"
+        case .headCircumference:
+            return useMetricUnits ? "Head Circumference (cm)" : "Head Circumference (in)"
         }
     }
     
