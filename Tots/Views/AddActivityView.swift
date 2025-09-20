@@ -33,6 +33,8 @@ struct AddActivityView: View {
     @State private var selectedHeightFt: Int = 1
     @State private var selectedHeightIn: Double = 8.0
     @State private var selectedHeightCm: Double = 50.8
+    @State private var selectedHeadCircumferenceCm: Double = 35.0
+    @State private var selectedHeadCircumferenceIn: Double = 13.8
     
     // Activity stopwatch states
     @State private var activityIsRunning = false
@@ -584,6 +586,64 @@ struct AddActivityView: View {
                     .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                 }
             }
+            
+            // Head Circumference slider
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Head Circumference")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                
+                if dataManager.useMetricUnits {
+                    // Metric head circumference (cm)
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("30 cm")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(String(format: "%.1f cm", selectedHeadCircumferenceCm))
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("55 cm")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Slider(value: $selectedHeadCircumferenceCm, in: 30...55, step: 0.1)
+                            .accentColor(.blue)
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                } else {
+                    // Imperial head circumference (inches)
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("12\"")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(String(format: "%.1f\"", selectedHeadCircumferenceIn))
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("22\"")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Slider(value: $selectedHeadCircumferenceIn, in: 12...22, step: 0.1)
+                            .accentColor(.blue)
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                }
+            }
         }
     }
     
@@ -704,12 +764,12 @@ struct AddActivityView: View {
             details = "Left: \(leftMinutes)m \(leftSeconds)s, Right: \(rightMinutes)m \(rightSeconds)s, Total: \(totalMinutes)m \(totalSeconds)s"
         case .growth:
             if dataManager.useMetricUnits {
-                details = String(format: "Weight: %.1f kg, Height: %.1f cm", 
-                               selectedWeightKg, selectedHeightCm)
+                details = String(format: "Weight: %.1f kg, Height: %.1f cm, Head: %.1f cm", 
+                               selectedWeightKg, selectedHeightCm, selectedHeadCircumferenceCm)
             } else {
                 let totalWeightLbs = selectedWeightLbs + (selectedWeightOz / 16.0)
-                details = String(format: "Weight: %.1f lbs, Height: %d'%.1f\"", 
-                               totalWeightLbs, selectedHeightFt, selectedHeightIn)
+                details = String(format: "Weight: %.1f lbs, Height: %d'%.1f\", Head: %.1f\"", 
+                               totalWeightLbs, selectedHeightFt, selectedHeightIn, selectedHeadCircumferenceIn)
             }
         }
         
@@ -723,7 +783,8 @@ struct AddActivityView: View {
                 duration: getDuration(),
                 notes: notes.isEmpty ? nil : notes,
                 weight: selectedActivityType == .growth ? getWeight() : nil,
-                height: selectedActivityType == .growth ? getHeight() : nil
+                height: selectedActivityType == .growth ? getHeight() : nil,
+                headCircumference: selectedActivityType == .growth ? getHeadCircumference() : nil
             ))
         } else {
             // Create new activity
@@ -735,7 +796,8 @@ struct AddActivityView: View {
                 duration: getDuration(),
                 notes: notes.isEmpty ? nil : notes,
                 weight: selectedActivityType == .growth ? getWeight() : nil,
-                height: selectedActivityType == .growth ? getHeight() : nil
+                height: selectedActivityType == .growth ? getHeight() : nil,
+                headCircumference: selectedActivityType == .growth ? getHeadCircumference() : nil
             )
             
             dataManager.addActivity(activity)
@@ -1186,6 +1248,15 @@ struct AddActivityView: View {
             // Convert imperial to cm for storage
             let totalHeightInches = Double(selectedHeightFt * 12) + selectedHeightIn
             return dataManager.convertHeightToCm(totalHeightInches, fromImperial: true)
+        }
+    }
+    
+    private func getHeadCircumference() -> Double {
+        if dataManager.useMetricUnits {
+            return selectedHeadCircumferenceCm
+        } else {
+            // Convert imperial to cm for storage
+            return selectedHeadCircumferenceIn * 2.54
         }
     }
 }

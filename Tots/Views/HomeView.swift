@@ -1391,7 +1391,7 @@ struct DayHistoryCard: View {
                             StatPill(icon: "🍼", value: "\(dayStats.feedings)")
                         }
                         if dayStats.sleepHours > 0 {
-                            StatPill(icon: "😴", value: "\(String(format: "%.1f", dayStats.sleepHours))h")
+                            StatPill(icon: "moon.zzz", value: "\(String(format: "%.1f", dayStats.sleepHours))h")
                         }
                         if dayStats.diapers > 0 {
                             StatPill(icon: "DiaperIcon", value: "\(dayStats.diapers)")
@@ -1497,11 +1497,6 @@ struct TimelineActivityRow: View {
                     Text(activity.type.name)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    
-                    Spacer()
-                    
-                    Text(activity.mood.rawValue)
-                        .font(.caption)
                 }
                 
                 if !activity.details.isEmpty {
@@ -1689,7 +1684,7 @@ struct MilestonesView: View {
         
         var icon: String {
             switch self {
-            case .all: return "list.bullet"
+            case .all: return "line.horizontal.3"
             case .newborn: return "heart.fill"
             case .infant: return "face.smiling.fill"
             case .mobileBaby: return "figure.crawl"
@@ -1769,10 +1764,20 @@ struct MilestonesView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add Custom") {
+                    Button(action: {
                         showingAddMilestone = true
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(.regularMaterial)
+                                .frame(width: 40, height: 40)
+                                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                            
+                            Image(systemName: "plus")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.primary)
+                        }
                     }
-                    .fontWeight(.semibold)
                 }
             }
             .sheet(isPresented: $showingAddMilestone) {
@@ -1839,13 +1844,27 @@ struct MilestonesView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(AgeGroup.allCases, id: \.self) { ageGroup in
-                    AgeGroupChip(
-                        ageGroup: ageGroup,
-                        isSelected: selectedAgeGroup == ageGroup
-                    ) {
+                    Button(action: {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             selectedAgeGroup = ageGroup
                         }
+                    }) {
+                        HStack(spacing: 6) {
+                            if ageGroup == .all {
+                                Image(systemName: ageGroup.icon)
+                                    .font(.caption)
+                            }
+                            Text(ageGroup.rawValue)
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(selectedAgeGroup == ageGroup ? .white : .primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(selectedAgeGroup == ageGroup ? ageGroup.color : Color(.systemGray6))
+                        )
                     }
                 }
             }
@@ -1924,10 +1943,6 @@ struct MilestonesView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             // Age group header
                             HStack {
-                                Image(systemName: ageGroup.icon)
-                                    .font(.headline)
-                                    .foregroundColor(ageGroup.color)
-                                
                                 Text(ageGroup.rawValue)
                                     .font(.headline)
                                     .fontWeight(.semibold)
@@ -1991,16 +2006,10 @@ struct AgeGroupChip: View {
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 8) {
-                Image(systemName: ageGroup.icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isSelected ? .white : ageGroup.color)
-                
-                Text(ageGroup.rawValue)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(isSelected ? .white : .primary)
-            }
+            Text(ageGroup.rawValue)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(isSelected ? .white : .primary)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(
@@ -2056,20 +2065,14 @@ struct MilestoneCard: View {
                 .multilineTextAlignment(.leading)
             
             if milestone.isCompleted, let completedDate = milestone.completedDate {
-                HStack(spacing: 6) {
-                    Image(systemName: "party.popper.fill")
-                        .foregroundColor(.green)
-                        .font(.caption)
-                    
-                    Text("Completed \(completedDate, style: .date)")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.green)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color.green.opacity(0.1))
-                .clipShape(Capsule())
+                Text("Completed \(completedDate, style: .date)")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.green.opacity(0.1))
+                    .clipShape(Capsule())
             }
             
             // Action buttons row
@@ -2148,6 +2151,34 @@ struct ImprovedAddMilestoneView: View {
     @State private var minAgeWeeks = 4
     @State private var maxAgeWeeks = 8
     
+    private func formatAgeFromWeeks(_ weeks: Int) -> String {
+        if weeks == 0 {
+            return "Birth"
+        } else if weeks < 8 {
+            return "\(weeks) week\(weeks == 1 ? "" : "s")"
+        } else if weeks < 52 {
+            let months = weeks / 4
+            return "\(months) month\(months == 1 ? "" : "s")"
+        } else if weeks >= 104 {
+            return "2+ years"
+        } else {
+            let years = weeks / 52
+            let remainingWeeks = weeks % 52
+            let months = remainingWeeks / 4
+            if months == 0 {
+                return "\(years) year\(years == 1 ? "" : "s")"
+            } else {
+                return "\(years) year\(years == 1 ? "" : "s") \(months) month\(months == 1 ? "" : "s")"
+            }
+        }
+    }
+    
+    private var ageRangeDescription: String {
+        let fromAge = formatAgeFromWeeks(minAgeWeeks)
+        let toAge = formatAgeFromWeeks(maxAgeWeeks)
+        return "\(fromAge) - \(toAge)"
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -2160,23 +2191,32 @@ struct ImprovedAddMilestoneView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Title")
-                                    .font(.subheadline)
+                                    .font(.body)
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
-                                TextField("e.g., 'First giggle', 'Loves peek-a-boo'", text: $customTitle)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .font(.body)
+                                TextField("e.g., First giggle, Loves peek-a-boo", text: $customTitle)
+                                    .font(.title2)
+                                    .frame(height: 52)
+                                    .padding(.horizontal, 16)
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(12)
+                                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                             }
                             
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Description (Optional)")
-                                    .font(.subheadline)
+                                    .font(.body)
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
-                                TextField("Add more details about this milestone...", text: $customDescription, axis: .vertical)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .lineLimit(2...4)
+                                TextField("Add more details about this milestone", text: $customDescription, axis: .vertical)
                                     .font(.body)
+                                    .lineLimit(3...6)
+                                    .frame(minHeight: 80)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(12)
+                                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                             }
                         }
                         .padding(20)
@@ -2188,39 +2228,40 @@ struct ImprovedAddMilestoneView: View {
                                 .font(.headline)
                                 .fontWeight(.semibold)
                             
+                            // Current age range description
+                            Text(ageRangeDescription)
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.blue)
+                                .padding(.vertical, 8)
+                                .animation(.easeInOut(duration: 0.2), value: ageRangeDescription)
+                            
                             VStack(spacing: 16) {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        Text("From: \(minAgeWeeks) weeks")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                        Text("(\(minAgeWeeks/4) months)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
+                                    Text("From: \(formatAgeFromWeeks(minAgeWeeks))")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
                                     
                                     Slider(value: Binding(
                                         get: { Double(minAgeWeeks) },
-                                        set: { minAgeWeeks = Int($0) }
+                                        set: { 
+                                            minAgeWeeks = Int($0)
+                                            if maxAgeWeeks < minAgeWeeks {
+                                                maxAgeWeeks = minAgeWeeks
+                                            }
+                                        }
                                     ), in: 0...104, step: 1)
                                     .accentColor(.blue)
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        Text("To: \(maxAgeWeeks) weeks")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                        Text("(\(maxAgeWeeks/4) months)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
+                                    Text("To: \(formatAgeFromWeeks(maxAgeWeeks))")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
                                     
                                     Slider(value: Binding(
                                         get: { Double(maxAgeWeeks) },
-                                        set: { maxAgeWeeks = Int($0) }
+                                        set: { maxAgeWeeks = max(Int($0), minAgeWeeks) }
                                     ), in: 0...104, step: 1)
                                     .accentColor(.blue)
                                 }
@@ -2276,23 +2317,27 @@ struct ImprovedAddMilestoneView: View {
 
 struct WordTrackerView: View {
     @EnvironmentObject var dataManager: TotsDataManager
-    @State private var selectedCategory: WordCategory = .people
+    @State private var selectedCategory: WordCategory? = nil // nil means "All"
     @State private var showingAddWord = false
     @State private var searchText = ""
     
     var filteredWords: [BabyWord] {
         let categoryFiltered = dataManager.words.filter { word in
-            selectedCategory == .other ? true : word.category == selectedCategory
+            selectedCategory == nil ? true : word.category == selectedCategory
         }
         
+        let searchFiltered: [BabyWord]
         if searchText.isEmpty {
-            return categoryFiltered
+            searchFiltered = categoryFiltered
         } else {
-            return categoryFiltered.filter { 
+            searchFiltered = categoryFiltered.filter { 
                 $0.word.localizedCaseInsensitiveContains(searchText) ||
                 $0.notes.localizedCaseInsensitiveContains(searchText)
             }
         }
+        
+        // Order by most recent said
+        return searchFiltered.sorted { $0.dateFirstSaid > $1.dateFirstSaid }
     }
     
     var body: some View {
@@ -2319,10 +2364,20 @@ struct WordTrackerView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add Word") {
+                    Button(action: {
                         showingAddWord = true
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(.regularMaterial)
+                                .frame(width: 40, height: 40)
+                                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                            
+                            Image(systemName: "plus")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.primary)
+                        }
                     }
-                    .fontWeight(.semibold)
                 }
             }
             .sheet(isPresented: $showingAddWord) {
@@ -2382,16 +2437,44 @@ struct WordTrackerView: View {
     private var categorySelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(WordCategory.allCases, id: \.self) { category in
-                    WordCategoryChip(
-                        category: category,
-                        isSelected: selectedCategory == category,
-                        count: dataManager.wordsByCategory[category]?.count ?? 0
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedCategory = category
-                        }
+                // All button
+                Button(action: {
+                    selectedCategory = nil
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "line.horizontal.3")
+                            .font(.caption)
+                        Text("All")
                     }
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(selectedCategory == nil ? .white : .primary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(selectedCategory == nil ? Color.blue : Color(.systemGray6))
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Category buttons
+                ForEach(WordCategory.allCases, id: \.self) { category in
+                    Button(action: {
+                        selectedCategory = category
+                    }) {
+                        Text(category.rawValue)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(selectedCategory == category ? .white : .primary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(selectedCategory == category ? Color.blue : Color(.systemGray6))
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(.horizontal, 16)
@@ -2509,18 +2592,6 @@ struct WordCard: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Category icon
-            VStack {
-                Image(systemName: word.category.icon)
-                    .font(.title2)
-                    .foregroundColor(word.category.color)
-                    .frame(width: 40, height: 40)
-                    .background(word.category.color.opacity(0.1))
-                    .clipShape(Circle())
-                
-                Spacer()
-            }
-            
             // Content
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -2534,10 +2605,10 @@ struct WordCard: View {
                     Text(word.category.rawValue)
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color(.systemGray5))
+                        .background(word.category.color)
                         .clipShape(Capsule())
                 }
                 
@@ -2633,6 +2704,7 @@ struct AddWordView: View {
                                                     .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                                             }
                                             .buttonStyle(PlainButtonStyle())
+                                            .contentShape(Rectangle())
                                         }
                                     }
                                     .padding(.horizontal, 20)
@@ -2709,6 +2781,7 @@ struct AddWordView: View {
                                                         .background(Color(.systemBackground))
                                                     }
                                                     .buttonStyle(PlainButtonStyle())
+                                                    .contentShape(Rectangle())
                                                     
                                                     if suggestion != suggestions.last {
                                                         Divider()

@@ -35,6 +35,10 @@ class TotsDataManager: ObservableObject {
     var currentHeight: Double {
         return growthData.last?.height ?? 68.5 // Default height in cm
     }
+    
+    var currentHeadCircumference: Double {
+        return growthData.last?.headCircumference ?? 35.0 // Default head circumference in cm
+    }
     @Published var healthTrends: [HealthTrend] = []
     
     // CloudKit
@@ -397,6 +401,15 @@ class TotsDataManager: ObservableObject {
         }
     }
     
+    func formatHeadCircumference(_ headCircumferenceInCm: Double) -> String {
+        if useMetricUnits {
+            return String(format: "%.1f cm", headCircumferenceInCm)
+        } else {
+            let headCircumferenceInInches = headCircumferenceInCm / 2.54
+            return String(format: "%.1f in", headCircumferenceInInches)
+        }
+    }
+    
     func convertWeightToKg(_ weight: Double, fromImperial: Bool = false) -> Double {
         if fromImperial {
             return weight / 2.20462
@@ -732,6 +745,11 @@ class TotsDataManager: ObservableObject {
         recentActivities.insert(activity, at: 0)
         updateCountdowns() // Update countdowns after adding activity
         
+        // Handle growth activities - create growth entry with partial updates
+        if activity.type == .growth {
+            addGrowthEntry(from: activity)
+        }
+        
         // Update Live Activity if running
         updateLiveActivity()
         
@@ -765,6 +783,22 @@ class TotsDataManager: ObservableObject {
                 print("❌ Failed to sync activity to CloudKit: \(error)")
             }
         }
+    }
+    
+    private func addGrowthEntry(from activity: TotsActivity) {
+        // Use provided values or fall back to current latest values
+        let weight = activity.weight ?? currentWeight
+        let height = activity.height ?? currentHeight
+        let headCircumference = activity.headCircumference ?? currentHeadCircumference
+        
+        let growthEntry = GrowthEntry(
+            date: activity.time,
+            weight: weight,
+            height: height,
+            headCircumference: headCircumference
+        )
+        
+        growthData.append(growthEntry)
     }
     
     func deleteActivity(_ activity: TotsActivity) {
@@ -1644,8 +1678,9 @@ struct TotsActivity: Identifiable, Codable {
     let notes: String?
     let weight: Double? // in pounds
     let height: Double? // in inches
+    let headCircumference: Double? // in cm
     
-    init(type: ActivityType, time: Date, details: String, mood: BabyMood = .neutral, duration: Int? = nil, notes: String? = nil, weight: Double? = nil, height: Double? = nil) {
+    init(type: ActivityType, time: Date, details: String, mood: BabyMood = .neutral, duration: Int? = nil, notes: String? = nil, weight: Double? = nil, height: Double? = nil, headCircumference: Double? = nil) {
         self.type = type
         self.time = time
         self.details = details
@@ -1654,6 +1689,7 @@ struct TotsActivity: Identifiable, Codable {
         self.notes = notes
         self.weight = weight
         self.height = height
+        self.headCircumference = headCircumference
     }
 }
 
@@ -1938,9 +1974,9 @@ enum WordCategory: String, CaseIterable, Codable {
         case .numbers: return .cyan
         case .bodyParts: return .mint
         case .clothes: return .teal
-        case .places: return .secondary
-        case .transportation: return .primary
-        case .other: return .secondary
+        case .places: return .yellow
+        case .transportation: return Color(.systemBlue)
+        case .other: return Color(.systemGray)
         }
     }
 }

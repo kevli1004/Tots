@@ -191,12 +191,21 @@ struct ProgressView: View {
                     )
                 }
                 
-                GrowthCard(
-                    title: "BMI",
-                    value: String(format: "%.1f", dataManager.currentBMI),
-                    subtitle: "\(dataManager.getBMIPercentile())th percentile for age",
-                    color: .purple
-                )
+                HStack(spacing: 16) {
+                    GrowthCard(
+                        title: "BMI",
+                        value: String(format: "%.1f", dataManager.currentBMI),
+                        subtitle: "\(dataManager.getBMIPercentile())th percentile for age",
+                        color: .purple
+                    )
+                    
+                    GrowthCard(
+                        title: "Head Circumference",
+                        value: dataManager.formatHeadCircumference(dataManager.currentHeadCircumference),
+                        subtitle: "Latest measurement",
+                        color: .orange
+                    )
+                }
             }
             
             // Growth Charts
@@ -394,6 +403,7 @@ struct GrowthCard: View {
         case "Weight": return "scalemass.fill"
         case "Height": return "ruler.fill"
         case "BMI": return "figure.child"
+        case "Head Circumference": return "circle.dotted"
         default: return "chart.bar.fill"
         }
     }
