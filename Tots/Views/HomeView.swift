@@ -187,7 +187,7 @@ struct HomeView: View {
                 LiquidBackground()
                 
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         // Countdown timers
                         countdownView
                         

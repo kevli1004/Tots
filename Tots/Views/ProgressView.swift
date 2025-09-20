@@ -731,10 +731,10 @@ struct GrowthPercentileChart: View {
     }
     
     private var yAxisDomain: ClosedRange<Double> {
-        // Fixed y-axis range based on the data type
+        // Fixed y-axis range based on the data type - extended to fit 95th percentile
         switch title {
         case "Weight":
-            return useMetricUnits ? 0...15 : 0...35 // kg or lbs
+            return useMetricUnits ? 0...20 : 0...45 // kg or lbs - extended for 95th percentile
         case "Height":
             return useMetricUnits ? 40...120 : 15...48 // cm or inches
         case "Head Circumference":
@@ -762,8 +762,42 @@ struct GrowthPercentileChart: View {
     }
     
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            Chart {
+        VStack(alignment: .leading, spacing: 8) {
+            // Legend for percentiles
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Rectangle()
+                        .fill(.red.opacity(0.5))
+                        .frame(width: 20, height: 2)
+                    Text("5th")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack(spacing: 4) {
+                    Rectangle()
+                        .fill(.orange.opacity(0.5))
+                        .frame(width: 20, height: 2)
+                    Text("50th")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack(spacing: 4) {
+                    Rectangle()
+                        .fill(.green.opacity(0.5))
+                        .frame(width: 20, height: 2)
+                    Text("95th")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                Chart {
                 // 3 Percentile lines with connected points
                 if percentiles.count >= 3 {
                     // 5th percentile line
@@ -800,11 +834,22 @@ struct GrowthPercentileChart: View {
                     }
                 }
                 
-                // Your actual data - just points, no lines
+                // Your actual data - solid line with points
+                ForEach(data) { dataPoint in
+                    LineMark(
+                        x: .value("Month", dataPoint.month),
+                        y: .value("Value", dataPoint.value),
+                        series: .value("Data", "Your Baby")
+                    )
+                    .foregroundStyle(color)
+                    .lineStyle(StrokeStyle(lineWidth: 3))
+                    .interpolationMethod(.catmullRom)
+                }
+                
                 ForEach(data) { dataPoint in
                     PointMark(
                         x: .value("Month", dataPoint.month),
-                        y: .value(title, dataPoint.value)
+                        y: .value("Value", dataPoint.value)
                     )
                     .foregroundStyle(color)
                     .symbolSize(80)
@@ -828,7 +873,7 @@ struct GrowthPercentileChart: View {
                                     .foregroundColor(.secondary)
                                     .opacity(0.8)
                             }
-                            .padding(.horizontal, 8)
+                            .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                         }
                     }
@@ -849,12 +894,17 @@ struct GrowthPercentileChart: View {
             }
             .chartXScale(domain: 0...36) // Always show full 36-month range
             .chartYScale(domain: yAxisDomain)
+            .chartPlotStyle { plotArea in
+                plotArea
+                    .padding(.leading, 0) // Ensure plot area starts at y-axis
+            }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
         }
         .frame(height: 300)
         .frame(maxWidth: .infinity) // Fixed viewport width
         .clipped() // Clip the scrollable content to the viewport
+        }
     }
     
 }
