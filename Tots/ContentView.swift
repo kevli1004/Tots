@@ -15,7 +15,7 @@ struct ContentView: View {
             ProgressView()
                 .tabItem {
                     Image(systemName: selectedTab == 1 ? "chart.bar.fill" : "chart.bar")
-                    Text("Progress")
+                    Text("Growth")
                 }
                 .tag(1)
             

@@ -3,22 +3,7 @@ import SwiftUI
 
 struct ProgressView: View {
     @EnvironmentObject var dataManager: TotsDataManager
-    @State private var selectedTimeframe: TimeFrame = .thisWeek
     @State private var showingAddGrowth = false
-    
-    enum TimeFrame: String, CaseIterable {
-        case thisWeek = "This Week"
-        case lastWeek = "Last Week"
-        case thisMonth = "This Month"
-        case lastMonth = "Last Month"
-        
-        var days: Int {
-            switch self {
-            case .thisWeek, .lastWeek: return 7
-            case .thisMonth, .lastMonth: return 30
-            }
-        }
-    }
     
     var body: some View {
         NavigationView {
@@ -28,109 +13,18 @@ struct ProgressView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Time frame selector
-                        timeFrameSelectorView
-                        
-                        // Key stats
-                        keyStatsView
-                        
-                        // Weekly overview
-                        weeklyOverviewView
-                        
                         // Growth tracking
                         growthView
                     }
                     .padding()
                 }
             }
-            .navigationTitle("Progress")
+            .navigationTitle("Growth")
             .navigationBarTitleDisplayMode(.large)
         }
         .sheet(isPresented: $showingAddGrowth) {
             AddActivityView(preselectedType: .growth)
                 .environmentObject(dataManager)
-        }
-    }
-    
-    private var timeFrameSelectorView: some View {
-        HStack(spacing: 12) {
-            ForEach(TimeFrame.allCases, id: \.self) { timeframe in
-                Button(action: {
-                    selectedTimeframe = timeframe
-                }) {
-                    Text(timeframe.rawValue)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(selectedTimeframe == timeframe ? .white : .primary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(selectedTimeframe == timeframe ? Color.blue : Color(.systemGray6))
-                        )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-        }
-    }
-    
-    private var keyStatsView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Key Stats")
-                .font(.headline)
-                .fontWeight(.semibold)
-            
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                ProgressStatCard(
-                    title: "Total Activities",
-                    value: "\(dataManager.totalActivitiesLogged)",
-                    icon: "chart.bar.fill",
-                    color: .blue
-                )
-                
-                ProgressStatCard(
-                    title: "Streak",
-                    value: "\(dataManager.streakCount) days",
-                    icon: "flame.fill",
-                    color: .orange
-                )
-            }
-        }
-    }
-    
-    private var weeklyOverviewView: some View {
-        let timeframeData = dataManager.getDataForTimeframe(selectedTimeframe)
-        
-        return VStack(alignment: .leading, spacing: 16) {
-            Text("\(selectedTimeframe.rawValue) Overview")
-                .font(.headline)
-                .fontWeight(.semibold)
-            
-            VStack(spacing: 16) {
-                WeeklyBarChart(
-                    title: selectedTimeframe == .thisMonth ? "Average Feedings per Day (by week)" : "Feedings per Day",
-                    data: timeframeData.map { Double($0.feedings) },
-                    color: .pink,
-                    maxValue: 10,
-                    yAxisLabels: ["0", "2", "4", "6", "8", "10"]
-                )
-                
-                WeeklyBarChart(
-                    title: selectedTimeframe == .thisMonth ? "Average Sleep Hours per Day (by week)" : "Sleep Hours per Day",
-                    data: timeframeData.map { $0.sleepHours },
-                    color: .indigo,
-                    maxValue: 16,
-                    yAxisLabels: ["0", "4", "8", "12", "16"]
-                )
-                
-                WeeklyBarChart(
-                    title: selectedTimeframe == .thisMonth ? "Average Diaper Changes per Day (by week)" : "Diaper Changes per Day",
-                    data: timeframeData.map { Double($0.diapers) },
-                    color: .orange,
-                    maxValue: 8,
-                    yAxisLabels: ["0", "2", "4", "6", "8"]
-                )
-            }
         }
     }
     
@@ -314,108 +208,6 @@ struct ProgressView: View {
 }
 
 // MARK: - Supporting Views
-
-struct ProgressStatCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(color)
-                    .font(.title2)
-                
-                Spacer()
-            }
-            
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-    }
-}
-
-struct WeeklyBarChart: View {
-    let title: String
-    let data: [Double]
-    let color: Color
-    let maxValue: Double
-    let yAxisLabels: [String]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-            
-            HStack(spacing: 8) {
-                // Y-axis labels
-                VStack(alignment: .trailing, spacing: 0) {
-                    ForEach(Array(yAxisLabels.reversed().enumerated()), id: \.offset) { index, label in
-                        Text(label)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .frame(height: 80 / Double(yAxisLabels.count - 1))
-                    }
-                }
-                .frame(width: 20)
-                
-                // Chart bars
-                HStack(alignment: .bottom, spacing: 4) {
-                    ForEach(Array(data.enumerated()), id: \.offset) { index, value in
-                        VStack(spacing: 4) {
-                            // Value label on top of bar
-                            if value > 0 {
-                                Text(String(format: "%.0f", value))
-                                    .font(.caption2)
-                                    .foregroundColor(color)
-                                    .fontWeight(.medium)
-                            }
-                            
-                            Rectangle()
-                                .fill(color.opacity(0.8))
-                                .frame(width: 30, height: max(4, (value / maxValue) * 80))
-                                .cornerRadius(2)
-                                .overlay(
-                                    Rectangle()
-                                        .fill(color)
-                                        .frame(width: 30, height: max(2, (value / maxValue) * 80 * 0.3))
-                                        .cornerRadius(2),
-                                    alignment: .top
-                                )
-                            
-                            Text(getDayLabel(for: index))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-            }
-            .frame(height: 120)
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.regularMaterial)
-        )
-    }
-    
-    private func getDayLabel(for index: Int) -> String {
-        let days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        return days[safe: index] ?? ""
-    }
-}
-
 
 struct GrowthCard: View {
     let title: String
