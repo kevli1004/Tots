@@ -136,54 +136,117 @@ class TotsDataManager: ObservableObject {
         return Dictionary(grouping: words) { $0.category }
     }
     
-    // Top 200+ baby words organized by category for autocomplete
+    // Top 500+ baby/kid words organized by category for autocomplete and auto-categorization
     let commonBabyWords: [WordCategory: [String]] = [
         .people: [
             "mama", "dada", "papa", "baby", "mommy", "daddy", "grandma", "grandpa", "nana", "pop",
             "sister", "brother", "family", "me", "you", "name", "boy", "girl", "friend", "person",
-            "lady", "man", "kid", "child", "aunt", "uncle", "cousin", "neighbor"
+            "lady", "man", "kid", "child", "aunt", "uncle", "cousin", "neighbor", "teacher", "doctor",
+            "nurse", "mom", "dad", "granny", "grampa", "mimi", "gigi", "nanny",
+            "babysitter", "stranger", "visitor", "guest", "everyone", "somebody", "nobody", "anybody"
         ],
         .animals: [
             "dog", "cat", "cow", "duck", "fish", "bird", "horse", "pig", "sheep", "chicken",
             "bear", "lion", "tiger", "elephant", "monkey", "rabbit", "mouse", "frog", "bee", "butterfly",
-            "snake", "turtle", "owl", "fox", "deer", "squirrel", "puppy", "kitty", "bunny", "doggy"
+            "snake", "turtle", "owl", "fox", "deer", "squirrel", "puppy", "kitty", "bunny", "doggy",
+            "zebra", "giraffe", "hippo", "rhino", "kangaroo", "penguin", "dolphin", "whale", "shark",
+            "octopus", "crab", "lobster", "spider", "ant", "fly", "ladybug", "worm", "snail", "slug",
+            "goat", "llama", "donkey", "camel", "peacock", "parrot", "robin", "eagle", "hawk", "crow"
         ],
         .food: [
             "milk", "water", "cookie", "banana", "apple", "more", "eat", "drink", "hungry", "bottle",
             "cup", "spoon", "bowl", "plate", "bread", "cheese", "crackers", "juice", "snack", "dinner",
             "breakfast", "lunch", "hot", "cold", "sweet", "yummy", "orange", "grape", "berry", "cake",
-            "ice cream", "pizza", "pasta", "soup", "sandwich", "toast", "cereal", "yogurt"
+            "ice cream", "pizza", "pasta", "soup", "sandwich", "toast", "cereal", "yogurt", "eggs",
+            "meat", "vegetables", "carrots", "peas", "corn", "broccoli", "potato",
+            "rice", "noodles", "spaghetti", "hamburger", "hotdog", "french fries", "chips", "popcorn",
+            "candy", "chocolate", "gum", "lollipop", "popsicle", "jelly", "jam", "honey", "sugar",
+            "salt", "ketchup", "mustard", "mayonnaise", "butter", "cream", "strawberry", "blueberry"
         ],
         .actions: [
             "go", "up", "down", "stop", "come", "sit", "stand", "walk", "run", "jump", "dance",
             "play", "look", "see", "watch", "listen", "hear", "touch", "hold", "give", "take",
             "put", "get", "open", "close", "push", "pull", "throw", "catch", "kick", "hug",
-            "kiss", "sleep", "wake", "wash", "brush", "clean", "help", "work", "read", "sing"
+            "kiss", "sleep", "wake", "wash", "brush", "clean", "help", "work", "read", "sing",
+            "talk", "say", "tell", "ask", "answer", "call", "shout", "whisper", "laugh", "cry",
+            "smile", "frown", "wink", "blink", "nod", "shake", "wave", "clap", "snap", "point",
+            "crawl", "climb", "slide", "swing", "ride", "drive", "fly", "swim", "float", "sink",
+            "build", "make", "draw", "paint", "color", "cut", "paste", "fold", "tear", "fix"
         ],
         .objects: [
-            "ball", "book", "car", "cup", "shoe", "toy", "hat", "shirt", "pants", "sock",
+            "ball", "book", "car", "shoe", "toy", "hat", "shirt", "pants", "sock",
             "diaper", "blanket", "pillow", "bed", "chair", "table", "door", "window", "phone", "keys",
-            "bag", "box", "bottle", "pacifier", "blocks", "doll", "truck", "train", "plane", "bike",
-            "swing", "slide", "sandbox", "bubble", "music", "tv", "computer", "camera", "watch", "glasses"
+            "bag", "box", "pacifier", "blocks", "doll", "truck", "train", "plane", "bike",
+            "swing", "slide", "sandbox", "bubble", "music", "tv", "computer", "camera", "watch", "glasses",
+            "house", "home", "room", "kitchen", "bathroom", "bedroom", "living room", "garage", "yard",
+            "tree", "flower", "grass", "sun", "moon", "star", "cloud", "rain", "snow", "wind",
+            "light", "lamp", "candle", "fire", "pool", "ocean", "lake", "river", "mountain",
+            "road", "street", "sidewalk", "bridge", "building", "store", "school", "park", "playground"
         ],
         .feelings: [
             "happy", "sad", "mad", "love", "good", "bad", "nice", "pretty", "beautiful", "funny",
             "scared", "brave", "excited", "tired", "sleepy", "awake", "hungry", "full", "thirsty", "hurt",
-            "better", "sick", "well", "fine", "okay", "great", "wonderful", "amazing", "surprised", "proud"
+            "better", "sick", "well", "fine", "okay", "great", "wonderful", "amazing", "surprised", "proud",
+            "angry", "upset", "worried", "nervous", "calm", "peaceful", "comfortable", "uncomfortable",
+            "warm", "cool", "hot", "cold", "wet", "dry", "clean", "dirty", "soft", "hard",
+            "smooth", "rough", "sharp", "dull", "bright", "dark", "loud", "quiet", "fast", "slow"
         ],
         .sounds: [
             "wow", "oh", "uh-oh", "shh", "boom", "beep", "pop", "bang", "crash", "splash",
             "meow", "woof", "moo", "quack", "roar", "chirp", "buzz", "hiss", "oink", "baa",
-            "neigh", "trumpet", "honk", "ring", "tick", "tock", "whoosh", "zoom", "vroom", "choo-choo"
+            "neigh", "trumpet", "honk", "ring", "tick", "tock", "whoosh", "zoom", "vroom", "choo-choo",
+            "ding", "dong", "clang", "clunk", "thud", "thump", "knock", "tap", "click", "snap",
+            "crackle", "sizzle", "bubble", "gurgle", "slurp", "gulp", "burp", "hiccup", "sneeze", "cough",
+            "achoo", "bless you", "excuse me", "pardon", "sorry", "oops", "ouch", "ow", "yay", "hooray"
+        ],
+        .colors: [
+            "red", "blue", "yellow", "green", "purple", "pink", "orange", "black", "white", "brown",
+            "gray", "grey", "gold", "silver", "rainbow", "bright", "dark", "light", "colorful"
+        ],
+        .shapes: [
+            "round", "square", "circle", "triangle", "rectangle", "oval", "star", "heart", "diamond",
+            "straight", "curved", "big", "little", "small", "tall", "short", "long", "wide", "thin", "thick"
+        ],
+        .numbers: [
+            "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+            "eleven", "twelve", "hundred", "zero", "first", "last", "many", "all", "some", "none"
+        ],
+        .bodyParts: [
+            "head", "hair", "face", "eyes", "nose", "mouth", "ears", "teeth", "tongue", "chin",
+            "neck", "shoulders", "arms", "hands", "fingers", "thumb", "legs", "feet", "toes", "belly",
+            "back", "knee", "elbow", "wrist", "ankle", "cheek", "forehead", "eyebrow", "lip"
+        ],
+        .clothes: [
+            "shirt", "pants", "dress", "skirt", "shoes", "socks", "hat", "coat", "jacket", "sweater",
+            "pajamas", "underwear", "diaper", "mittens", "gloves", "scarf", "boots", "sandals", "belt"
+        ],
+        .places: [
+            "here", "there", "inside", "outside", "up", "down", "top", "bottom", "middle", "corner",
+            "home", "house", "room", "kitchen", "bathroom", "bedroom", "park", "store", "school",
+            "playground", "beach", "garden", "yard", "street"
+        ],
+        .transportation: [
+            "car", "truck", "bus", "train", "plane", "boat", "bike", "motorcycle", "helicopter",
+            "taxi", "fire truck", "police car", "school bus", "van", "ship", "rocket", "scooter"
         ],
         .other: [
-            "yes", "no", "please", "thank you", "help", "mine", "yours", "this", "that", "here",
-            "there", "where", "what", "who", "when", "why", "how", "big", "little", "small",
-            "tall", "short", "long", "round", "square", "red", "blue", "yellow", "green", "purple",
-            "pink", "orange", "black", "white", "brown", "gray", "one", "two", "three", "many",
-            "all", "some", "none", "first", "last", "again", "more", "done", "finished", "ready"
+            "yes", "no", "please", "thank you", "help", "mine", "yours", "this", "that",
+            "where", "what", "who", "when", "why", "how", "again", "more", "done", "finished", "ready",
+            "in", "on", "under", "over", "beside", "behind", "front", "back", "left", "right", "edge", "center",
+            "today", "tomorrow", "yesterday", "now", "later", "soon", "never", "always", "sometimes"
         ]
     ]
+    
+    // Flattened word list for quick lookup and auto-categorization
+    private lazy var allWordsWithCategories: [(word: String, category: WordCategory)] = {
+        var result: [(String, WordCategory)] = []
+        for (category, words) in commonBabyWords {
+            for word in words {
+                result.append((word.lowercased(), category))
+            }
+        }
+        return result.sorted(by: { $0.0 < $1.0 })
+    }()
     
     // Comprehensive predefined milestones based on AAP, CDC, and WHO guidelines
     private let predefinedMilestones: [Milestone] = [
@@ -848,6 +911,60 @@ class TotsDataManager: ObservableObject {
             words[index].word = newWord
             words[index].category = category
             words[index].notes = notes
+        }
+    }
+    
+    // MARK: - Word Auto-Categorization & Typeahead
+    
+    func getWordSuggestions(for input: String, limit: Int = 3) -> [String] {
+        guard !input.isEmpty else { return [] }
+        
+        let lowercaseInput = input.lowercased()
+        let suggestions = allWordsWithCategories
+            .filter { $0.0.hasPrefix(lowercaseInput) }
+            .prefix(limit)
+            .map { $0.0.capitalized }
+        
+        let result = Array(Set(suggestions)).sorted() // Remove duplicates and sort
+        
+        // Debug logging for "chi" prefix
+        if lowercaseInput.hasPrefix("chi") {
+            print("🔍 Suggestions for '\(input)': \(result)")
+        }
+        
+        return result
+    }
+    
+    func getAutoCategorizedCategory(for word: String) -> WordCategory {
+        let lowercaseWord = word.lowercased()
+        
+        // First, check if the word exists in our database
+        if let match = allWordsWithCategories.first(where: { $0.0 == lowercaseWord }) {
+            return match.1
+        }
+        
+        // If not found, use simple heuristics for categorization
+        return categorizeWordByHeuristics(lowercaseWord)
+    }
+    
+    private func categorizeWordByHeuristics(_ word: String) -> WordCategory {
+        // Simple heuristics for unknown words
+        let actionIndicators = ["ing", "ed", "go", "run", "walk", "jump", "play"]
+        let feelingIndicators = ["happy", "sad", "good", "bad", "love", "like", "hate"]
+        let soundIndicators = ["oo", "ah", "oh", "wow", "beep", "ring"]
+        
+        if actionIndicators.contains(where: { word.contains($0) }) {
+            return .actions
+        } else if feelingIndicators.contains(where: { word.contains($0) }) {
+            return .feelings
+        } else if soundIndicators.contains(where: { word.contains($0) }) {
+            return .sounds
+        } else if word.hasSuffix("y") || word.hasSuffix("ie") {
+            // Many animal names end in y (doggy, kitty, etc.)
+            return .animals
+        } else {
+            // Default to other for unknown words
+            return .other
         }
     }
     
@@ -1778,6 +1895,13 @@ enum WordCategory: String, CaseIterable, Codable {
     case objects = "Objects"
     case feelings = "Feelings"
     case sounds = "Sounds"
+    case colors = "Colors"
+    case shapes = "Shapes"
+    case numbers = "Numbers"
+    case bodyParts = "Body Parts"
+    case clothes = "Clothes"
+    case places = "Places"
+    case transportation = "Transportation"
     case other = "Other"
     
     var icon: String {
@@ -1789,6 +1913,13 @@ enum WordCategory: String, CaseIterable, Codable {
         case .objects: return "cube.box.fill"
         case .feelings: return "heart.fill"
         case .sounds: return "speaker.wave.2.fill"
+        case .colors: return "paintpalette.fill"
+        case .shapes: return "circle.square"
+        case .numbers: return "number"
+        case .bodyParts: return "figure.arms.open"
+        case .clothes: return "tshirt.fill"
+        case .places: return "house.fill"
+        case .transportation: return "car.fill"
         case .other: return "questionmark.circle.fill"
         }
     }
@@ -1802,6 +1933,13 @@ enum WordCategory: String, CaseIterable, Codable {
         case .objects: return .gray
         case .feelings: return .pink
         case .sounds: return .purple
+        case .colors: return .red
+        case .shapes: return .indigo
+        case .numbers: return .cyan
+        case .bodyParts: return .mint
+        case .clothes: return .teal
+        case .places: return .secondary
+        case .transportation: return .primary
         case .other: return .secondary
         }
     }

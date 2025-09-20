@@ -2568,21 +2568,19 @@ struct WordCard: View {
 struct AddWordView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: TotsDataManager
-    @State private var word = ""
-    @State private var selectedCategory: WordCategory = .other
-    @State private var notes = ""
-    @State private var searchText = ""
+        @State private var word = ""
+        @State private var suggestions: [String] = []
+        @State private var showingSuggestions = false
+        @State private var isSelectingSuggestion = false
+        @State private var isTextFieldFocused = false
+        @State private var wordWasSelected = false
     
-    var filteredSuggestions: [String] {
-        let categoryWords = dataManager.commonBabyWords[selectedCategory] ?? []
-        
-        if searchText.isEmpty {
-            return categoryWords.prefix(8).map { $0 }
-        } else {
-            return categoryWords.filter { 
-                $0.localizedCaseInsensitiveContains(searchText)
-            }.prefix(8).map { $0 }
-        }
+    var detectedCategory: WordCategory {
+        dataManager.getAutoCategorizedCategory(for: word)
+    }
+    
+    var hasValidInput: Bool {
+        !word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     
     var body: some View {
@@ -2593,103 +2591,176 @@ struct AddWordView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Word Details Section
+                        // Popular Words Section
+                        if !hasValidInput {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Popular First Words")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                
+                                let popularWords = [
+                                    "mama", "dada", "hi", "bye", "more", "no", "up", "go", "please", "thank you",
+                                    "water", "milk", "eat", "hungry", "help", "yes", "stop", "come", "sit", "down",
+                                    "hot", "cold", "big", "little", "red", "blue", "ball", "book", "car", "dog",
+                                    "cat", "baby", "love", "happy", "sleepy", "all done", "open", "close"
+                                ]
+                                
+                                ScrollView(.vertical, showsIndicators: true) {
+                                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 16) {
+                                        ForEach(popularWords, id: \.self) { popularWord in
+                                            Button(action: {
+                                                // Set flag to prevent typeahead from appearing
+                                                isSelectingSuggestion = true
+                                                isTextFieldFocused = false
+                                                wordWasSelected = true
+                                                word = popularWord.capitalized
+                                                showingSuggestions = false
+                                                // Reset flag after delay
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                                    isSelectingSuggestion = false
+                                                }
+                                            }) {
+                                                Text(popularWord.capitalized)
+                                                    .font(.body)
+                                                    .fontWeight(.medium)
+                                                    .foregroundColor(.primary)
+                                                    .frame(maxWidth: .infinity)
+                                                    .padding(.horizontal, 16)
+                                                    .padding(.vertical, 12)
+                                                    .background(Color(.systemBackground))
+                                                    .cornerRadius(12)
+                                                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.bottom, 20)
+                                }
+                                .frame(maxHeight: 200)
+                            }
+                            .padding(20)
+                            .liquidGlassCard()
+                        }
+                        
+                        // Word Input Section with Typeahead
                         VStack(alignment: .leading, spacing: 16) {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Word")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
-                                TextField("What word did they say?", text: $word)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .font(.body)
-                                    .autocapitalization(.none)
-                                    .onChange(of: word) { newValue in
-                                        searchText = newValue
-                                    }
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Category")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.secondary)
                                 
-                                Picker("Category", selection: $selectedCategory) {
-                                    ForEach(WordCategory.allCases, id: \.self) { category in
-                                        HStack {
-                                            Image(systemName: category.icon)
-                                                .foregroundColor(category.color)
-                                            Text(category.rawValue)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    TextField("What word did they say?", text: $word)
+                                        .font(.title2)
+                                        .frame(height: 52)
+                                        .padding(.horizontal, 16)
+                                        .background(Color(.systemBackground))
+                                        .cornerRadius(12)
+                                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                                        .autocapitalization(.words)
+                                        .onChange(of: word) { newValue in
+                                            if !isTextFieldFocused {
+                                                isTextFieldFocused = true
+                                            }
+                                            // Reset wordWasSelected when user types manually
+                                            if !isSelectingSuggestion {
+                                                wordWasSelected = false
+                                            }
+                                            updateSuggestions(for: newValue.trimmingCharacters(in: .whitespacesAndNewlines))
                                         }
-                                        .tag(category)
+                                        .onTapGesture {
+                                            isTextFieldFocused = true
+                                            updateSuggestions(for: word.trimmingCharacters(in: .whitespacesAndNewlines))
+                                        }
+                                    
+                                    // Typeahead suggestions dropdown
+                                    if showingSuggestions && !suggestions.isEmpty {
+                                        ScrollView {
+                                            LazyVStack(spacing: 0) {
+                                                ForEach(suggestions, id: \.self) { suggestion in
+                                                    Button(action: {
+                                                        // Set flag to prevent suggestions from reappearing
+                                                        isSelectingSuggestion = true
+                                                        isTextFieldFocused = false
+                                                        showingSuggestions = false
+                                                        wordWasSelected = true
+                                                        word = suggestion
+                                                        // Dismiss keyboard
+                                                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                                        // Reset the flag after a longer delay
+                                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                                            isSelectingSuggestion = false
+                                                        }
+                                                    }) {
+                                                        HStack {
+                                                            Text(suggestion)
+                                                                .font(.body)
+                                                                .foregroundColor(.primary)
+                                                            Spacer()
+                                                            Text(dataManager.getAutoCategorizedCategory(for: suggestion).rawValue)
+                                                                .font(.caption)
+                                                                .foregroundColor(.secondary)
+                                                        }
+                                                        .frame(height: 52)
+                                                        .padding(.horizontal, 16)
+                                                        .background(Color(.systemBackground))
+                                                    }
+                                                    .buttonStyle(PlainButtonStyle())
+                                                    
+                                                    if suggestion != suggestions.last {
+                                                        Divider()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        .frame(height: 158)
+                                        .scrollIndicators(.visible)
+                                        .background(Color(.systemBackground))
+                                        .cornerRadius(8)
+                                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                        .padding(.top, 4)
                                     }
                                 }
-                                .pickerStyle(MenuPickerStyle())
-                                .accentColor(selectedCategory.color)
                             }
                             
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Notes (Optional)")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.secondary)
-                                TextField("Any special context or details...", text: $notes, axis: .vertical)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .lineLimit(2...4)
-                                    .font(.body)
+                            // Auto-detected category display
+                            if hasValidInput && (wordWasSelected || !isTextFieldFocused) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Auto-detected Category")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.secondary)
+                                    
+                                    HStack {
+                                        Text(detectedCategory.rawValue)
+                                            .font(.body)
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                        Text("✓")
+                                            .foregroundColor(.green)
+                                            .font(.body)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .frame(height: 52)
+                                    .padding(.horizontal, 16)
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(12)
+                                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                                }
                             }
+                            
                         }
                         .padding(20)
                         .liquidGlassCard()
-                        
-                        // Suggestions Section
-                        if !filteredSuggestions.isEmpty {
-                            VStack(alignment: .leading, spacing: 16) {
-                                HStack {
-                                    Image(systemName: "lightbulb.fill")
-                                        .foregroundColor(.yellow)
-                                    Text("Suggestions")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                }
-                                
-                                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
-                                    ForEach(filteredSuggestions, id: \.self) { suggestion in
-                                        Button(action: {
-                                            word = suggestion
-                                            searchText = suggestion
-                                        }) {
-                                            HStack {
-                                                Image(systemName: selectedCategory.icon)
-                                                    .font(.caption)
-                                                    .foregroundColor(selectedCategory.color)
-                                                Text(suggestion.capitalized)
-                                                    .font(.subheadline)
-                                                    .fontWeight(.medium)
-                                                    .foregroundColor(.primary)
-                                                Spacer()
-                                            }
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 12)
-                                            .background(Color(.systemBackground))
-                                            .cornerRadius(12)
-                                            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                }
-                            }
-                            .padding(20)
-                            .liquidGlassCard()
-                        }
                         
                         // Save button
                         Button("Add Word") {
                             dataManager.addWord(
                                 word.trimmingCharacters(in: .whitespacesAndNewlines), 
-                                category: selectedCategory, 
-                                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                                category: detectedCategory
                             )
                             dismiss()
                         }
@@ -2698,12 +2769,17 @@ struct AddWordView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(selectedCategory.color)
+                        .background(hasValidInput ? Color.green : Color.gray)
                         .cornerRadius(16)
-                        .disabled(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .opacity(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1.0)
+                        .disabled(!hasValidInput)
+                        .opacity(hasValidInput ? 1.0 : 0.6)
                     }
                     .padding()
+                    .onTapGesture {
+                        // Dismiss keyboard and show category when tapping outside text field
+                        isTextFieldFocused = false
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
                 }
             }
             .navigationTitle("Add Word")
@@ -2716,9 +2792,29 @@ struct AddWordView: View {
                 }
             }
             .onTapGesture {
-                // Dismiss keyboard when tapping outside
+                // Dismiss suggestions and keyboard when tapping outside
+                showingSuggestions = false
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
+        }
+    }
+    
+    private func updateSuggestions(for input: String) {
+        let trimmedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Don't show suggestions if we're currently selecting one
+        if isSelectingSuggestion {
+            showingSuggestions = false
+            return
+        }
+        
+        if trimmedInput.isEmpty {
+            suggestions = []
+            showingSuggestions = false
+        } else {
+            suggestions = dataManager.getWordSuggestions(for: trimmedInput)
+            // Show suggestions if we have some, we're focused, and not selecting
+            showingSuggestions = !suggestions.isEmpty && isTextFieldFocused && !isSelectingSuggestion
         }
     }
 }
