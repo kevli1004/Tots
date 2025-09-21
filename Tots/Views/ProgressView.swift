@@ -318,11 +318,31 @@ struct ProgressView: View {
                 }
             }
             
-            // Show all charts stacked vertically
-            VStack(spacing: 16) {
-                weightChartContent
-                heightChartContent
-                headCircumferenceChartContent
+            // Show all charts stacked vertically or single empty state
+            if dataManager.growthData.count > 0 {
+                VStack(spacing: 16) {
+                    weightChartContent
+                    heightChartContent
+                    headCircumferenceChartContent
+                }
+            } else {
+                // Single empty state for all growth charts
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Growth Charts")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    EmptyStateView(
+                        icon: "chart.line.uptrend.xyaxis",
+                        title: "No Growth Data Yet",
+                        message: "Add your first growth measurement to see weight, height, and head circumference charts with percentile tracking"
+                    )
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.regularMaterial)
+                )
             }
         }
     }
@@ -333,22 +353,14 @@ struct ProgressView: View {
                 .font(.headline)
                 .fontWeight(.semibold)
             
-            if dataManager.growthData.count > 0 {
-                GrowthPercentileChart(
-                    data: weightChartData,
-                    percentiles: weightPercentileData,
-                    color: .blue,
-                    unitLabel: dataManager.useMetricUnits ? "kg" : "lbs",
-                    title: "Weight",
-                    useMetricUnits: dataManager.useMetricUnits
-                )
-            } else {
-                EmptyStateView(
-                    icon: "scalemass",
-                    title: "Need More Data",
-                    message: "Add weight measurements to see the growth chart"
-                )
-            }
+            GrowthPercentileChart(
+                data: weightChartData,
+                percentiles: weightPercentileData,
+                color: .blue,
+                unitLabel: dataManager.useMetricUnits ? "kg" : "lbs",
+                title: "Weight",
+                useMetricUnits: dataManager.useMetricUnits
+            )
         }
         .padding()
         .background(
@@ -363,22 +375,14 @@ struct ProgressView: View {
                 .font(.headline)
                 .fontWeight(.semibold)
             
-            if dataManager.growthData.count > 0 {
-                GrowthPercentileChart(
-                    data: heightChartData,
-                    percentiles: heightPercentileData,
-                    color: .green,
-                    unitLabel: dataManager.useMetricUnits ? "cm" : "in",
-                    title: "Height",
-                    useMetricUnits: dataManager.useMetricUnits
-                )
-            } else {
-                EmptyStateView(
-                    icon: "ruler",
-                    title: "Need More Data",
-                    message: "Add height measurements to see the growth chart"
-                )
-            }
+            GrowthPercentileChart(
+                data: heightChartData,
+                percentiles: heightPercentileData,
+                color: .green,
+                unitLabel: dataManager.useMetricUnits ? "cm" : "in",
+                title: "Height",
+                useMetricUnits: dataManager.useMetricUnits
+            )
         }
         .padding()
         .background(
@@ -394,22 +398,14 @@ struct ProgressView: View {
                         .font(.headline)
                         .fontWeight(.semibold)
                     
-            if dataManager.growthData.count > 0 {
-                GrowthPercentileChart(
-                    data: headCircumferenceChartData,
-                    percentiles: headCircumferencePercentileData,
-                    color: .purple,
-                    unitLabel: dataManager.useMetricUnits ? "cm" : "in",
-                    title: "Head Circumference",
-                    useMetricUnits: dataManager.useMetricUnits
-                )
-            } else {
-                EmptyStateView(
-                    icon: "head.profile.arrow.right",
-                    title: "Need More Data",
-                    message: "Add head circumference measurements to see the growth chart"
-                )
-            }
+            GrowthPercentileChart(
+                data: headCircumferenceChartData,
+                percentiles: headCircumferencePercentileData,
+                color: .purple,
+                unitLabel: dataManager.useMetricUnits ? "cm" : "in",
+                title: "Head Circumference",
+                useMetricUnits: dataManager.useMetricUnits
+            )
         }
         .padding()
                 .background(
@@ -420,7 +416,7 @@ struct ProgressView: View {
             
     private var growthHistorySection: some View {
                 VStack(alignment: .leading, spacing: 16) {
-            if dataManager.growthData.count > 1 {
+            if dataManager.growthData.count > 0 {
                     HStack {
                         Text("Growth History")
                             .font(.headline)

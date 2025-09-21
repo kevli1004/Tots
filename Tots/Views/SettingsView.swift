@@ -19,6 +19,8 @@ struct SettingsView: View {
     @State private var profileImageUpdateTrigger = false
     @State private var showingExportSheet = false
     @State private var showingTrackingGoals = false
+    @State private var showingTerms = false
+    @State private var showingPrivacyPolicy = false
     
     var body: some View {
         ZStack {
@@ -101,6 +103,12 @@ struct SettingsView: View {
         .sheet(isPresented: $showingTrackingGoals) {
             TrackingGoalsView()
                 .environmentObject(dataManager)
+        }
+        .sheet(isPresented: $showingTerms) {
+            TermsAndConditionsView()
+        }
+        .sheet(isPresented: $showingPrivacyPolicy) {
+            PrivacyPolicyView()
         }
     }
     
@@ -228,20 +236,26 @@ struct SettingsView: View {
                     }
                 }
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(dataManager.babyName.isEmpty ? "Enter your baby's name" : dataManager.babyName)
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.primary)
                         
+                        Spacer()
+                        
                         Image(systemName: "pencil")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.secondary)
                     }
                     
-                    Text(dataManager.babyAge)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
+                    HStack {
+                        Text(dataManager.babyAge)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                    }
                 }
                 
                 Spacer()
@@ -357,11 +371,6 @@ struct SettingsView: View {
     
     private var settingsOptionsView: some View {
         VStack(spacing: 16) {
-            SettingsRow(
-                icon: "person.crop.square.fill",
-                title: "Personal details",
-                action: { showingPersonalDetails = true }
-            )
             
             // Live Activity toggle
             HStack(spacing: 12) {
@@ -473,19 +482,23 @@ struct SettingsView: View {
             SettingsRow(
                 icon: "doc.text.fill",
                 title: "Terms and Conditions",
-                action: { /* Open terms */ }
+                action: { showingTerms = true }
             )
             
             SettingsRow(
                 icon: "shield.fill",
                 title: "Privacy Policy",
-                action: { /* Open privacy */ }
+                action: { showingPrivacyPolicy = true }
             )
             
             SettingsRow(
                 icon: "envelope.fill",
                 title: "Support Email",
-                action: { /* Open email */ }
+                action: { 
+                    if let url = URL(string: "mailto:support@growwithtots.com") {
+                        UIApplication.shared.open(url)
+                    }
+                }
             )
             
             // Hidden for now
@@ -497,19 +510,10 @@ struct SettingsView: View {
             )
             */
             
+            // Data management section removed
+            
             Divider()
                 .padding(.vertical, 8)
-            
-            HStack {
-                SettingsRow(
-                    icon: "square.and.arrow.up.fill",
-                    title: "Export Data",
-                    subtitle: "Download your data as CSV",
-                    action: { 
-                        exportDataAsCSV()
-                    }
-                )
-            }
             
             // Hidden debug buttons
             /*
@@ -686,6 +690,9 @@ struct SettingsRow: View {
                     .foregroundColor(.secondary)
             }
             .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(Color.clear)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -853,7 +860,8 @@ struct PersonalDetailsView: View {
                                         .foregroundColor(.secondary)
                                     TextField("Baby's name", text: $babyName)
                                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .font(.body)
+                                        .font(.title2)
+                                        .fontWeight(.medium)
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 8) {
@@ -861,9 +869,12 @@ struct PersonalDetailsView: View {
                                         .font(.subheadline)
                                         .fontWeight(.medium)
                                         .foregroundColor(.secondary)
-                                    DatePicker("", selection: $birthDate, displayedComponents: .date)
-                                        .datePickerStyle(CompactDatePickerStyle())
-                                        .labelsHidden()
+                                    HStack {
+                                        DatePicker("", selection: $birthDate, displayedComponents: .date)
+                                            .datePickerStyle(CompactDatePickerStyle())
+                                            .labelsHidden()
+                                        Spacer()
+                                    }
                                 }
                             }
                         }
@@ -887,44 +898,8 @@ struct PersonalDetailsView: View {
                                     .foregroundColor(.secondary)
                                 TextField("Your name", text: $primaryCaregiverName)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .font(.body)
-                            }
-                        }
-                        .padding(20)
-                        .liquidGlassCard()
-                        
-                        // Data Management Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Image(systemName: "folder.fill")
-                                    .foregroundColor(.orange)
-                                Text("Data Management")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                            }
-                            
-                            VStack(spacing: 12) {
-                                Button("Export Data") {
-                                    exportData()
-                                }
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.blue)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(12)
-                                
-                                Button("Clear All Data") {
-                                    showingDeleteConfirmation = true
-                                }
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.red)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(12)
+                                    .font(.title2)
+                                    .fontWeight(.medium)
                             }
                         }
                         .padding(20)
@@ -1458,6 +1433,178 @@ struct ActivityViewController: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+struct TermsAndConditionsView: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Terms and Conditions")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .padding(.bottom, 10)
+                    
+                    Group {
+                        Text("Last updated: \(Date().formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, 10)
+                        
+                        Text("1. Acceptance of Terms")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("By downloading, installing, or using the Tots baby tracking app (\"the App\"), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use the App.")
+                        
+                        Text("2. Description of Service")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("Tots is a baby tracking application that helps parents monitor and record their baby's activities including feeding, sleeping, diaper changes, growth measurements, and developmental milestones. The App may sync data across devices using CloudKit.")
+                        
+                        Text("3. User Responsibilities")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("You are responsible for:\n• Providing accurate information\n• Maintaining the security of your device\n• Using the App in accordance with these terms\n• Consulting healthcare professionals for medical advice")
+                        
+                        Text("4. Privacy and Data")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("Your privacy is important to us. Please review our Privacy Policy to understand how we collect, use, and protect your information. All baby tracking data is stored locally on your device and optionally synced through Apple's CloudKit service.")
+                    }
+                    
+                    Group {
+                        Text("5. Medical Disclaimer")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("Tots is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your pediatrician or other qualified healthcare provider with any questions you may have regarding your baby's health.")
+                        
+                        Text("6. Limitation of Liability")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("The App is provided \"as is\" without warranties of any kind. We shall not be liable for any damages arising from the use of this App, including but not limited to data loss, inaccurate tracking, or reliance on App information for medical decisions.")
+                        
+                        Text("7. Updates and Changes")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("We may update these Terms and Conditions from time to time. Continued use of the App after changes constitutes acceptance of the new terms.")
+                        
+                        Text("8. Contact Information")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("For questions about these Terms and Conditions, please contact us at support@growwithtots.com or visit growwithtots.com.")
+                    }
+                }
+                .padding()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct PrivacyPolicyView: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Privacy Policy")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .padding(.bottom, 10)
+                    
+                    Group {
+                        Text("Last updated: \(Date().formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, 10)
+                        
+                        Text("1. Information We Collect")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("Tots collects and stores the following information locally on your device:\n• Baby's name and birth date\n• Feeding, sleeping, and diaper tracking data\n• Growth measurements and milestones\n• Photos you choose to add\n• Notes and observations")
+                        
+                        Text("2. How We Use Your Information")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("Your information is used to:\n• Provide baby tracking functionality\n• Generate insights and reports\n• Sync data across your devices (if enabled)\n• Improve the App experience")
+                        
+                        Text("3. Data Storage and Security")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("All data is primarily stored locally on your device. If you enable CloudKit sync, data is securely transmitted and stored in your personal iCloud account, which is encrypted and controlled by Apple's privacy policies.")
+                        
+                        Text("4. Data Sharing")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("We do not sell, trade, or share your personal data with third parties. Your baby tracking data remains private to you. If you enable family sharing features, data is only shared with family members you explicitly invite.")
+                    }
+                    
+                    Group {
+                        Text("5. Analytics and Diagnostics")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("We may collect anonymized usage statistics and crash reports to improve the App. This data cannot be used to identify you or your baby.")
+                        
+                        Text("6. Children's Privacy")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("While Tots is used to track babies and children, the App is designed for use by parents and caregivers who are 13 years or older. We do not knowingly collect personal information from children under 13.")
+                        
+                        Text("7. Your Rights")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("You have the right to:\n• Access your data (it's stored on your device)\n• Delete your data (through the App or by deleting the App)\n• Export your data (through the App's export feature)\n• Control sync settings")
+                        
+                        Text("8. Changes to Privacy Policy")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("We may update this Privacy Policy periodically. We will notify you of significant changes through the App or our website.")
+                        
+                        Text("9. Contact Us")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Text("If you have questions about this Privacy Policy or your data, please contact us at support@growwithtots.com or visit growwithtots.com.")
+                    }
+                }
+                .padding()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
 }
 
 #Preview {

@@ -441,8 +441,8 @@ struct HomeView: View {
                     CountdownCard(
                         icon: "PumpingIcon",
                         title: "Pumping",
-                        countdownInterval: nextPumpingCountdown,
-                        time: nextPumpingTime,
+                        countdownInterval: dataManager.nextPumpingCountdown,
+                        time: dataManager.nextPumpingTime,
                         color: .blue
                     )
                     .environmentObject(dataManager)
@@ -551,16 +551,7 @@ struct HomeView: View {
             .first?.time
     }
     
-    private var nextPumpingTime: Date? {
-        guard let lastTime = lastPumpingTime else { return nil }
-        // Suggest pumping every 3 hours (similar to feeding)
-        return Calendar.current.date(byAdding: .hour, value: 3, to: lastTime)
-    }
-    
-    private var nextPumpingCountdown: TimeInterval {
-        guard let nextTime = nextPumpingTime else { return 0 }
-        return nextTime.timeIntervalSinceNow
-    }
+    // Removed local pumping countdown logic - now using dataManager.nextPumpingCountdown and dataManager.nextPumpingTime
     
     // MARK: - Timer Activity Creation
     private func createBreastfeedingActivityFromTimer() -> TotsActivity {
