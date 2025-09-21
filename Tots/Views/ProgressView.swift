@@ -97,11 +97,12 @@ struct ProgressView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Liquid animated background
-                LiquidBackground()
-                
-                ScrollView {
+            GeometryReader { geometry in
+                ZStack {
+                    // Liquid animated background
+                    LiquidBackground()
+                    
+                    ScrollView {
                     VStack(spacing: 16) {
                         // Ad Banner
                         AdBannerContainerWide()
@@ -120,7 +121,9 @@ struct ProgressView: View {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 8)
+                    .frame(width: geometry.size.width)
                 }
+            }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

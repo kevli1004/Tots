@@ -183,12 +183,13 @@ struct HomeView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Liquid animated background
-                LiquidBackground()
-                
-                ScrollView {
-                    VStack(spacing: 12) {
+            GeometryReader { geometry in
+                ZStack {
+                    // Liquid animated background
+                    LiquidBackground()
+                    
+                    ScrollView {
+                        VStack(spacing: 12) {
                         // Ad Banner
                         AdBannerContainerWide()
                         
@@ -206,7 +207,9 @@ struct HomeView: View {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 8)
+                    .frame(width: geometry.size.width)
                 }
+            }
             }
                 .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -2593,19 +2596,20 @@ struct MilestonesView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Liquid animated background
-                LiquidBackground()
-                
-                VStack(spacing: 16) {
-                    // Ad Banner
-                    AdBannerContainerMedium()
+            GeometryReader { geometry in
+                ZStack {
+                    // Liquid animated background
+                    LiquidBackground()
                     
-                    // Header with stats
-                    headerView
-                    
-                    // Age group selector
-                    ageGroupSelector
+                    VStack(spacing: 16) {
+                        // Ad Banner
+                        AdBannerContainerMedium()
+                        
+                        // Header with stats
+                        headerView
+                        
+                        // Age group selector
+                        ageGroupSelector
                     
                     // Search bar
                     searchBar
@@ -2613,6 +2617,8 @@ struct MilestonesView: View {
                     // Milestones list
                     milestonesList
                 }
+                .frame(width: geometry.size.width)
+            }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -3225,19 +3231,20 @@ struct WordTrackerView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Liquid animated background
-                LiquidBackground()
-                
-                VStack(spacing: 16) {
-                    // Ad Banner
-                    AdBannerContainerMedium()
+            GeometryReader { geometry in
+                ZStack {
+                    // Liquid animated background
+                    LiquidBackground()
                     
-                    // Header with stats
-                    headerView
-                    
-                    // Category selector
-                    categorySelector
+                    VStack(spacing: 16) {
+                        // Ad Banner
+                        AdBannerContainerMedium()
+                        
+                        // Header with stats
+                        headerView
+                        
+                        // Category selector
+                        categorySelector
                     
                     // Search bar
                     searchBar
@@ -3245,6 +3252,8 @@ struct WordTrackerView: View {
                     // Words list
                     wordsList
                 }
+                .frame(width: geometry.size.width)
+            }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
