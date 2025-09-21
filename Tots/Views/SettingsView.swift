@@ -17,6 +17,8 @@ struct SettingsView: View {
     @State private var debugMessage = ""
     @State private var shareDelegate: ShareControllerDelegate?
     @State private var profileImageUpdateTrigger = false
+    @State private var showingExportSheet = false
+    @State private var showingTrackingGoals = false
     
     var body: some View {
         ZStack {
@@ -32,8 +34,8 @@ struct SettingsView: View {
                     babyProfileView
                         .id(profileImageUpdateTrigger)
                     
-                    // Family sharing
-                    familySharingView
+                    // Family sharing - hidden for now
+                    // familySharingView
                     
                     // Settings options
                     settingsOptionsView
@@ -93,6 +95,91 @@ struct SettingsView: View {
         } message: {
             Text(debugMessage)
         }
+        .sheet(isPresented: $showingExportSheet) {
+            ActivityViewController(activityItems: [generateCSVFile()])
+        }
+        .sheet(isPresented: $showingTrackingGoals) {
+            TrackingGoalsView()
+                .environmentObject(dataManager)
+        }
+    }
+    
+    private func exportDataAsCSV() {
+        showingExportSheet = true
+    }
+    
+    private func generateCSVFile() -> URL {
+        let csvContent = generateCSVContent()
+        let fileName = "tots_data_\(Date().formatted(date: .numeric, time: .omitted)).csv"
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(fileName)
+        
+        do {
+            try csvContent.write(to: fileURL, atomically: true, encoding: .utf8)
+        } catch {
+            print("Error writing CSV file: \(error)")
+        }
+        
+        return fileURL
+    }
+    
+    private func generateCSVContent() -> String {
+        var csvContent = ""
+        
+        // Activities CSV
+        csvContent += "ACTIVITIES\n"
+        csvContent += "Date,Time,Type,Details,Duration (minutes),Notes\n"
+        
+        let sortedActivities = dataManager.recentActivities.sorted { $0.time > $1.time }
+        for activity in sortedActivities {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .short
+            dateFormatter.timeStyle = .short
+            
+            let date = dateFormatter.string(from: activity.time).replacingOccurrences(of: ",", with: ";")
+            let type = activity.type.name
+            let details = (activity.details ?? "").replacingOccurrences(of: ",", with: ";")
+            let duration = activity.duration?.description ?? ""
+            let notes = (activity.notes ?? "").replacingOccurrences(of: ",", with: ";")
+            
+            csvContent += "\"\(date)\",\(type),\"\(details)\",\(duration),\"\(notes)\"\n"
+        }
+        
+        // Growth Data CSV
+        csvContent += "\nGROWTH DATA\n"
+        csvContent += "Date,Weight (kg),Height (cm),Head Circumference (cm)\n"
+        
+        let sortedGrowthData = dataManager.growthData.sorted { $0.date > $1.date }
+        for entry in sortedGrowthData {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .short
+            
+            let date = dateFormatter.string(from: entry.date)
+            let weight = String(format: "%.1f", entry.weight)
+            let height = String(format: "%.1f", entry.height)
+            let headCirc = String(format: "%.1f", entry.headCircumference)
+            
+            csvContent += "\(date),\(weight),\(height),\(headCirc)\n"
+        }
+        
+        // Words CSV
+        csvContent += "\nWORDS\n"
+        csvContent += "Word,Category,Date First Said,Notes\n"
+        
+        let sortedWords = dataManager.words.sorted { $0.dateFirstSaid > $1.dateFirstSaid }
+        for word in sortedWords {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .short
+            
+            let wordText = word.word.replacingOccurrences(of: ",", with: ";")
+            let category = word.category.rawValue
+            let date = dateFormatter.string(from: word.dateFirstSaid)
+            let notes = word.notes.replacingOccurrences(of: ",", with: ";")
+            
+            csvContent += "\"\(wordText)\",\(category),\(date),\"\(notes)\"\n"
+        }
+        
+        return csvContent
     }
     
     private var headerView: some View {
@@ -105,11 +192,11 @@ struct SettingsView: View {
     }
     
     private var babyProfileView: some View {
-        HStack(spacing: 16) {
-            // Baby avatar - show profile picture if available, otherwise show TotsIcon
-            Button(action: {
-                showingPersonalDetails = true
-            }) {
+        Button(action: {
+            showingPersonalDetails = true
+        }) {
+            HStack(spacing: 16) {
+                // Baby avatar - show profile picture if available, otherwise show TotsIcon
                 ZStack {
                     Circle()
                         .fill(
@@ -140,30 +227,30 @@ struct SettingsView: View {
                             .frame(width: 32, height: 32)
                     }
                 }
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(dataManager.babyName.isEmpty ? "Enter your baby's name" : dataManager.babyName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.primary)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(dataManager.babyName.isEmpty ? "Enter your baby's name" : dataManager.babyName)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.primary)
+                        
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
                     
-                    Image(systemName: "pencil")
+                    Text(dataManager.babyAge)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.secondary)
                 }
                 
-                Text(dataManager.babyAge)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.secondary)
+                Spacer()
             }
-            
-            Spacer()
+            .padding(20)
+            .background(Color(.systemGray6))
+            .cornerRadius(16)
         }
-        .padding(20)
-        .background(Color(.systemGray6))
-        .cornerRadius(16)
+        .buttonStyle(PlainButtonStyle())
     }
     
     private var familySharingView: some View {
@@ -319,7 +406,8 @@ struct SettingsView: View {
             }
             .padding(.vertical, 12)
             
-            // Home Screen Widget toggle
+            // Home Screen Widget toggle - hidden for now
+            /*
             HStack(spacing: 12) {
                 Image(systemName: "widget.small")
                     .font(.system(size: 18, weight: .medium))
@@ -343,13 +431,16 @@ struct SettingsView: View {
                     .labelsHidden()
             }
             .padding(.vertical, 12)
+            */
             
             SettingsRow(
                 icon: "target",
                 title: "Edit tracking goals",
-                action: { /* Navigate to goals */ }
+                action: { showingTrackingGoals = true }
             )
             
+            // Hidden settings sections
+            /*
             SettingsRow(
                 icon: "flag.fill",
                 title: "Goals & milestones",
@@ -373,6 +464,7 @@ struct SettingsView: View {
                 title: "Notifications",
                 action: { /* Navigate to notifications */ }
             )
+            */
         }
     }
     
@@ -396,24 +488,31 @@ struct SettingsView: View {
                 action: { /* Open email */ }
             )
             
+            // Hidden for now
+            /*
             SettingsRow(
                 icon: "megaphone.fill",
                 title: "Feature Requests",
                 action: { /* Open feedback */ }
             )
+            */
             
             Divider()
                 .padding(.vertical, 8)
             
             HStack {
                 SettingsRow(
-                    icon: "icloud.fill",
-                    title: "Sync Data",
-                    subtitle: "Last Synced: 7:52 PM",
-                    action: { /* Sync data */ }
+                    icon: "square.and.arrow.up.fill",
+                    title: "Export Data",
+                    subtitle: "Download your data as CSV",
+                    action: { 
+                        exportDataAsCSV()
+                    }
                 )
             }
             
+            // Hidden debug buttons
+            /*
             SettingsRow(
                 icon: "ladybug.fill",
                 title: "Debug CloudKit Data",
@@ -454,6 +553,7 @@ struct SettingsView: View {
                     }
                 }
             )
+            */
             
             SettingsRow(
                 icon: "trash.fill",
@@ -1194,6 +1294,170 @@ struct ImagePicker: UIViewControllerRepresentable {
             parent.dismiss()
         }
     }
+}
+
+struct TrackingGoalsView: View {
+    @EnvironmentObject var dataManager: TotsDataManager
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var feedingInterval: Double = 3.0 // hours (covers both breastfeeding and bottle feeding)
+    @State private var pumpingInterval: Double = 3.0 // hours
+    @State private var diaperInterval: Double = 2.0 // hours
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        VStack(alignment: .leading, spacing: 20) {
+                            Text("Configure how often you want to be reminded for each activity.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal)
+                            
+                            // Feeding interval (covers both breastfeeding and bottle feeding)
+                            GoalSliderRow(
+                                title: "Feeding",
+                                subtitle: "Time between feeding sessions (breastfeeding & bottle)",
+                                value: $feedingInterval,
+                                range: 1.0...8.0,
+                                step: 0.5,
+                                unit: "hours"
+                            )
+                            
+                            // Pumping interval
+                            GoalSliderRow(
+                                title: "Pumping",
+                                subtitle: "Time between pumping sessions",
+                                value: $pumpingInterval,
+                                range: 1.0...8.0,
+                                step: 0.5,
+                                unit: "hours"
+                            )
+                            
+                            // Diaper interval
+                            GoalSliderRow(
+                                title: "Diaper Change",
+                                subtitle: "Time between diaper checks",
+                                value: $diaperInterval,
+                                range: 1.0...6.0,
+                                step: 0.5,
+                                unit: "hours"
+                            )
+                        }
+                        .padding(.vertical)
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+            .navigationTitle("Tracking Goals")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveTrackingGoals()
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .onAppear {
+            loadTrackingGoals()
+        }
+    }
+    
+    private func loadTrackingGoals() {
+        feedingInterval = UserDefaults.standard.double(forKey: "feeding_interval")
+        if feedingInterval == 0 { feedingInterval = 3.0 }
+        
+        pumpingInterval = UserDefaults.standard.double(forKey: "pumping_interval")
+        if pumpingInterval == 0 { pumpingInterval = 3.0 }
+        
+        diaperInterval = UserDefaults.standard.double(forKey: "diaper_interval")
+        if diaperInterval == 0 { diaperInterval = 2.0 }
+    }
+    
+    private func saveTrackingGoals() {
+        UserDefaults.standard.set(feedingInterval, forKey: "feeding_interval")
+        UserDefaults.standard.set(pumpingInterval, forKey: "pumping_interval")
+        UserDefaults.standard.set(diaperInterval, forKey: "diaper_interval")
+        
+        // Trigger countdown update
+        dataManager.updateCountdowns()
+    }
+}
+
+struct GoalSliderRow: View {
+    let title: String
+    let subtitle: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let unit: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            VStack(spacing: 12) {
+                HStack {
+                    Text("\(range.lowerBound, specifier: "%.1f") \(unit)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text("\(value, specifier: "%.1f") \(unit)")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Text("\(range.upperBound, specifier: "%.1f") \(unit)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Slider(value: $value, in: range, step: step)
+                    .accentColor(.blue)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+}
+
+struct ActivityViewController: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {

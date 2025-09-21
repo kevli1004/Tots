@@ -84,8 +84,10 @@ class TotsDataManager: ObservableObject {
     // MARK: - Countdown Timers
     @Published var nextFeedingCountdown: TimeInterval = 0
     @Published var nextDiaperCountdown: TimeInterval = 0
+    @Published var nextPumpingCountdown: TimeInterval = 0
     @Published var nextFeedingTime: Date?
     @Published var nextDiaperTime: Date?
+    @Published var nextPumpingTime: Date?
     
     // Today's tracking data
     @Published var todayFeedings: Int = 7
@@ -1508,10 +1510,19 @@ class TotsDataManager: ObservableObject {
     func updateCountdowns() {
         let now = Date()
         
-        // Calculate next feeding time
+        // Get configurable intervals from UserDefaults
+        let feedingIntervalHours = UserDefaults.standard.double(forKey: "feeding_interval")
+        let pumpingIntervalHours = UserDefaults.standard.double(forKey: "pumping_interval")
+        let diaperIntervalHours = UserDefaults.standard.double(forKey: "diaper_interval")
+        
+        // Use defaults if not configured
+        let feedingInterval: TimeInterval = (feedingIntervalHours > 0 ? feedingIntervalHours : 3.0) * 3600
+        let pumpingInterval: TimeInterval = (pumpingIntervalHours > 0 ? pumpingIntervalHours : 3.0) * 3600
+        let diaperInterval: TimeInterval = (diaperIntervalHours > 0 ? diaperIntervalHours : 2.0) * 3600
+        
+        // Calculate next feeding time (includes both feeding and breastfeeding)
         if let lastFeeding = recentActivities.first(where: { $0.type == .feeding }) {
-            let averageFeedingInterval: TimeInterval = 3 * 3600 // 3 hours
-            let nextFeeding = lastFeeding.time.addingTimeInterval(averageFeedingInterval)
+            let nextFeeding = lastFeeding.time.addingTimeInterval(feedingInterval)
             nextFeedingTime = nextFeeding
             nextFeedingCountdown = max(0, nextFeeding.timeIntervalSince(now))
         } else {
@@ -1521,10 +1532,16 @@ class TotsDataManager: ObservableObject {
             nextFeedingCountdown = max(0, defaultNextFeeding.timeIntervalSince(now))
         }
         
+        // Calculate next pumping time
+        if let lastPumping = recentActivities.first(where: { $0.type == .pumping }) {
+            let nextPumping = lastPumping.time.addingTimeInterval(pumpingInterval)
+            nextPumpingTime = nextPumping
+            nextPumpingCountdown = max(0, nextPumping.timeIntervalSince(now))
+        }
+        
         // Calculate next diaper change
         if let lastDiaper = recentActivities.first(where: { $0.type == .diaper }) {
-            let averageDiaperInterval: TimeInterval = 2.5 * 3600 // 2.5 hours
-            let nextDiaper = lastDiaper.time.addingTimeInterval(averageDiaperInterval)
+            let nextDiaper = lastDiaper.time.addingTimeInterval(diaperInterval)
             nextDiaperTime = nextDiaper
             nextDiaperCountdown = max(0, nextDiaper.timeIntervalSince(now))
         } else {
