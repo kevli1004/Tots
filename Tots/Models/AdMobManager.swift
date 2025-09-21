@@ -55,7 +55,7 @@ struct AdBannerContainer: View {
             .frame(height: height)
             .background(Color(.systemGray6))
             .cornerRadius(8)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 4) // Wider for popups
             .padding(.top, 21) // ~0.75cm padding above ad
     }
 }
@@ -81,7 +81,7 @@ struct AdBannerContainerMedium: View {
             .frame(height: height)
             .background(Color(.systemGray6))
             .cornerRadius(8)
-            .padding(.horizontal, 12) // Medium width for milestones and words
+            .padding(.horizontal, 16) // Less wide for main milestone/word pages
             .padding(.top, 21) // ~0.75cm padding above ad
     }
 }
