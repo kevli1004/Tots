@@ -3,7 +3,7 @@ import CloudKit
 
 class CloudKitSchemaSetup {
     static let shared = CloudKitSchemaSetup()
-    private let container = CKContainer(identifier: "iCloud.com.growwithtots.tots.DB")
+    private let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
     private let privateDatabase: CKDatabase
     
     private init() {

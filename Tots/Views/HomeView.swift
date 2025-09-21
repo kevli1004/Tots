@@ -189,6 +189,9 @@ struct HomeView: View {
                 
                 ScrollView {
                     VStack(spacing: 12) {
+                        // Ad Banner
+                        AdBannerContainer()
+                        
                         // Countdown timers
                         countdownView
                         
@@ -2606,7 +2609,10 @@ struct MilestonesView: View {
                 // Liquid animated background
                 LiquidBackground()
                 
-                VStack(spacing: 0) {
+                VStack(spacing: 16) {
+                    // Ad Banner
+                    AdBannerContainer()
+                    
                     // Header with stats
                     headerView
                     
@@ -3232,7 +3238,10 @@ struct WordTrackerView: View {
                 // Liquid animated background
                 LiquidBackground()
                 
-                VStack(spacing: 0) {
+                VStack(spacing: 16) {
+                    // Ad Banner
+                    AdBannerContainer()
+                    
                     // Header with stats
                     headerView
                     
@@ -3408,7 +3417,7 @@ struct WordTrackerView: View {
     
     @ViewBuilder
     private var wordsList: some View {
-        if filteredWords.isEmpty {
+            if filteredWords.isEmpty {
             ScrollView {
                 VStack(spacing: 16) {
                     Image(systemName: "bubble.left.fill")
@@ -3433,11 +3442,11 @@ struct WordTrackerView: View {
                 }
                 .padding(.top, 60)
             }
-        } else {
+            } else {
             List(filteredWords) { word in
-                WordCard(word: word) {
-                    dataManager.deleteWord(word)
-                }
+                        WordCard(word: word) {
+                            dataManager.deleteWord(word)
+                        }
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             }
@@ -3492,34 +3501,34 @@ struct WordCard: View {
     let onDelete: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(word.word.capitalized)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(word.word.capitalized)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Text(word.category.rawValue)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(word.category.color)
+                        .clipShape(Capsule())
+                }
                 
-                Spacer()
-                
-                Text(word.category.rawValue)
+                Text("First said \(word.dateFirstSaid, style: .date)")
                     .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(word.category.color)
-                    .clipShape(Capsule())
-            }
-            
-            Text("First said \(word.dateFirstSaid, style: .date)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            if !word.notes.isEmpty {
-                Text(word.notes)
-                    .font(.subheadline)
                     .foregroundColor(.secondary)
-                    .lineLimit(2)
+                
+                if !word.notes.isEmpty {
+                    Text(word.notes)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
             }
         }
         .padding(16)

@@ -6,7 +6,7 @@ import SwiftUI
 class CloudKitManager: ObservableObject {
     nonisolated static let shared = CloudKitManager()
     
-    private let container = CKContainer(identifier: "iCloud.com.growwithtots.tots.DB")
+    private let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
     let privateDatabase: CKDatabase
     private let sharedDatabase: CKDatabase
     

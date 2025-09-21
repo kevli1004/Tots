@@ -103,6 +103,9 @@ struct ProgressView: View {
                 
                 ScrollView {
                     VStack(spacing: 16) {
+                        // Ad Banner
+                        AdBannerContainer()
+                        
                         // Unit toggle at top
                         unitToggleRow
                         

@@ -600,7 +600,7 @@ struct SettingsView: View {
             return
         }
         
-        let container = CKContainer(identifier: "iCloud.com.growwithtots.tots.DB")
+        let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
         
         // Always use the preparation handler to ensure proper setup
         print("📱 Setting up CloudKit sharing UI...")
