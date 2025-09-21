@@ -10,11 +10,8 @@ class AdMobManager: NSObject, ObservableObject {
         MobileAds.shared.start { _ in }
     }
     
-    // Test Ad Unit IDs - Replace with your actual Ad Unit IDs
-    static let bannerAdUnitID = "ca-app-pub-3940256099942544/2934735716" // Test ID
-    
-    // Replace with your actual Ad Unit IDs when ready for production:
-    // static let bannerAdUnitID = "ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY"
+    // Production Ad Unit IDs
+    static let bannerAdUnitID = "ca-app-pub-1320655646844688/2987594446" // Production banner ID
 }
 
 // MARK: - Banner Ad View
