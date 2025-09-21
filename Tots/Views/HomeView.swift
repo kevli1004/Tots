@@ -2060,13 +2060,14 @@ struct DatePickerHistoryView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Liquid animated background
-                LiquidBackground()
-                
-                VStack(spacing: 0) {
-                    // Ad Banner
-                    AdBannerContainer()
+            GeometryReader { geometry in
+                ZStack {
+                    // Liquid animated background
+                    LiquidBackground()
+                    
+                    VStack(spacing: 0) {
+                        // Ad Banner
+                        AdBannerContainer()
                     
                     // Horizontal date selector
                     dateScrollerView
@@ -2101,6 +2102,8 @@ struct DatePickerHistoryView: View {
                         }
                     }
                 }
+                .frame(width: geometry.size.width)
+            }
             }
             }
             .navigationTitle("History")
@@ -3067,11 +3070,12 @@ struct ImprovedAddMilestoneView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Background
-                LiquidBackground()
-                
-                ScrollView {
+            GeometryReader { geometry in
+                ZStack {
+                    // Background
+                    LiquidBackground()
+                    
+                    ScrollView {
                     VStack(spacing: 24) {
                         // Ad Banner
                         AdBannerContainer()
@@ -3183,7 +3187,9 @@ struct ImprovedAddMilestoneView: View {
                         .opacity(customTitle.isEmpty ? 0.6 : 1.0)
                     }
                     .padding()
+                    .frame(width: geometry.size.width)
                 }
+            }
             }
             .navigationTitle("Add Custom Milestone")
             .navigationBarTitleDisplayMode(.large)
@@ -3564,14 +3570,15 @@ struct AddWordView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Liquid animated background
-                LiquidBackground()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Ad Banner
-                        AdBannerContainer()
+            GeometryReader { geometry in
+                ZStack {
+                    // Liquid animated background
+                    LiquidBackground()
+                    
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            // Ad Banner
+                            AdBannerContainer()
                         
                         // Popular Words Section
                         if !hasValidInput {
@@ -3764,7 +3771,9 @@ struct AddWordView: View {
                         isTextFieldFocused = false
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
+                    .frame(width: geometry.size.width)
                 }
+            }
             }
             .navigationTitle("Add Word")
             .navigationBarTitleDisplayMode(.large)
