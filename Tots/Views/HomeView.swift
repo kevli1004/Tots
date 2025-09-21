@@ -209,7 +209,7 @@ struct HomeView: View {
                 }
             }
                 .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     customTitleView
@@ -2609,7 +2609,7 @@ struct MilestonesView: View {
                 // Liquid animated background
                 LiquidBackground()
                 
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     // Ad Banner
                     AdBannerContainer()
                     
@@ -2625,11 +2625,9 @@ struct MilestonesView: View {
                     // Milestones list
                     milestonesList
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
             }
             .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     milestonesTitleView
@@ -2718,6 +2716,7 @@ struct MilestonesView: View {
                 )
             )
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 16)
         }
     }
     
@@ -2749,7 +2748,7 @@ struct MilestonesView: View {
                     }
                 }
             }
-            .padding(.leading, 16)
+            .padding(.horizontal, 16)
         }
         .padding(.vertical, 12)
     }
@@ -2774,6 +2773,7 @@ struct MilestonesView: View {
         .padding(.vertical, 12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
+        .padding(.horizontal, 16)
         .padding(.bottom, 8)
     }
     
@@ -2869,6 +2869,7 @@ struct MilestonesView: View {
                     }
                 }
             }
+            .padding(.horizontal, 16)
             .padding(.bottom, 20)
             }
             .onChange(of: selectedAgeGroup) { _ in
@@ -3237,7 +3238,7 @@ struct WordTrackerView: View {
                 // Liquid animated background
                 LiquidBackground()
                 
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     // Ad Banner
                     AdBannerContainer()
                     
@@ -3253,11 +3254,9 @@ struct WordTrackerView: View {
                     // Words list
                     wordsList
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
             }
             .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     wordTrackerTitleView
@@ -3340,6 +3339,7 @@ struct WordTrackerView: View {
                 )
             )
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 16)
         }
     }
     
@@ -3386,7 +3386,7 @@ struct WordTrackerView: View {
                     .buttonStyle(PlainButtonStyle())
                 }
             }
-            .padding(.leading, 16)
+            .padding(.horizontal, 16)
         }
         .padding(.vertical, 12)
     }
@@ -3411,6 +3411,7 @@ struct WordTrackerView: View {
         .padding(.vertical, 12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
+        .padding(.horizontal, 16)
         .padding(.bottom, 8)
     }
     

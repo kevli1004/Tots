@@ -10,8 +10,11 @@ class AdMobManager: NSObject, ObservableObject {
         MobileAds.shared.start { _ in }
     }
     
-    // Production Ad Unit IDs
-    static let bannerAdUnitID = "ca-app-pub-1320655646844688/2987594446"
+    // Test Ad Unit IDs - Replace with your actual Ad Unit IDs
+    static let bannerAdUnitID = "ca-app-pub-3940256099942544/2934735716" // Test ID
+    
+    // Replace with your actual Ad Unit IDs when ready for production:
+    // static let bannerAdUnitID = "ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY"
 }
 
 // MARK: - Banner Ad View
@@ -34,12 +37,6 @@ struct BannerAdView: UIViewRepresentable {
             bannerView.rootViewController = rootViewController
         }
         
-        // Debug logging
-        print("🔍 AdMob Debug:")
-        print("   Ad Unit ID: \(adUnitID)")
-        print("   Is Test ID: \(adUnitID.contains("3940256099942544"))")
-        print("   Is Production ID: \(adUnitID.contains("1320655646844688"))")
-        
         bannerView.load(Request())
         return bannerView
     }
@@ -58,21 +55,7 @@ struct AdBannerContainer: View {
             .frame(height: height)
             .background(Color(.systemGray6))
             .cornerRadius(8)
-            .padding(.top, 8)
-    }
-}
-
-// MARK: - Ad Banner Container with Extra Margins (for Milestones & Words)
-struct AdBannerContainerWithMargins: View {
-    let height: CGFloat = 50 // Standard banner height
-    
-    var body: some View {
-        BannerAdView()
-            .frame(height: height)
-            .background(Color(.systemGray6))
-            .cornerRadius(8)
             .padding(.horizontal, 16)
-            .padding(.top, 8)
     }
 }
 

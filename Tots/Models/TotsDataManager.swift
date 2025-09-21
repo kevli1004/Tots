@@ -1491,7 +1491,7 @@ class TotsDataManager: ObservableObject {
         let sleepActivities = activities.filter { $0.type == .sleep }
         let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
         
-        let tummyTimeActivities = activities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
+        let tummyTimeActivities = activities.filter { $0.type == .activity && $0.details.contains("Tummy") }
         let tummyTime = tummyTimeActivities.compactMap { $0.duration }.reduce(0, +)
         
         return DayStats(
