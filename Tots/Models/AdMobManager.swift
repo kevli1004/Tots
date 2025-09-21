@@ -55,7 +55,7 @@ struct AdBannerContainer: View {
             .frame(height: height)
             .background(Color(.systemGray6))
             .cornerRadius(8)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 8)
             .padding(.top, 21) // ~0.75cm padding above ad
     }
 }
@@ -69,6 +69,19 @@ struct AdBannerContainerWide: View {
             .background(Color(.systemGray6))
             .cornerRadius(8)
             .padding(.horizontal, 0) // Widest - no horizontal padding like milestone page
+            .padding(.top, 21) // ~0.75cm padding above ad
+    }
+}
+
+struct AdBannerContainerMedium: View {
+    let height: CGFloat = 50 // Standard banner height
+    
+    var body: some View {
+        BannerAdView()
+            .frame(height: height)
+            .background(Color(.systemGray6))
+            .cornerRadius(8)
+            .padding(.horizontal, 12) // Medium width for milestones and words
             .padding(.top, 21) // ~0.75cm padding above ad
     }
 }

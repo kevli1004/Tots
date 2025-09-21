@@ -131,6 +131,9 @@ struct AddActivityView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
+                        // Ad Banner
+                        AdBannerContainer()
+                        
                         // Unit toggle for growth activities
                         if selectedActivityType == .growth {
                             unitToggleRow

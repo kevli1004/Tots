@@ -2062,6 +2062,9 @@ struct DatePickerHistoryView: View {
                 LiquidBackground()
                 
                 VStack(spacing: 0) {
+                    // Ad Banner
+                    AdBannerContainer()
+                    
                     // Horizontal date selector
                     dateScrollerView
                     
@@ -2238,21 +2241,6 @@ struct DayHistoryCard: View {
                 }
                 
                 Spacer()
-                
-                // Quick stats
-                if !activities.isEmpty {
-                    HStack(spacing: 16) {
-                        if dayStats.feedings > 0 {
-                            StatPill(icon: "bottle.fill", value: "\(dayStats.feedings)")
-                        }
-                        if dayStats.sleepHours > 0 {
-                            StatPill(icon: "moon.zzz", value: "\(String(format: "%.1f", dayStats.sleepHours))h")
-                        }
-                        if dayStats.diapers > 0 {
-                            StatPill(icon: "DiaperIcon", value: "\(dayStats.diapers)")
-                        }
-                    }
-                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -2611,7 +2599,7 @@ struct MilestonesView: View {
                 
                 VStack(spacing: 16) {
                     // Ad Banner
-                    AdBannerContainer()
+                    AdBannerContainerMedium()
                     
                     // Header with stats
                     headerView
@@ -3079,6 +3067,9 @@ struct ImprovedAddMilestoneView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
+                        // Ad Banner
+                        AdBannerContainer()
+                        
                         // Milestone Details
                         VStack(alignment: .leading, spacing: 16) {
                             VStack(alignment: .leading, spacing: 8) {
@@ -3240,7 +3231,7 @@ struct WordTrackerView: View {
                 
                 VStack(spacing: 16) {
                     // Ad Banner
-                    AdBannerContainer()
+                    AdBannerContainerMedium()
                     
                     // Header with stats
                     headerView
@@ -3570,6 +3561,9 @@ struct AddWordView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
+                        // Ad Banner
+                        AdBannerContainer()
+                        
                         // Popular Words Section
                         if !hasValidInput {
                             VStack(alignment: .leading, spacing: 16) {
