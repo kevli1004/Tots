@@ -234,7 +234,7 @@ struct ProgressView: View {
                             subtitle: "\(dataManager.getWeightPercentile())th percentile",
                             color: .green,
                             onTap: {
-                                if let latestEntry = dataManager.growthData.first {
+                                if let latestEntry = dataManager.growthData.sorted(by: { $0.date > $1.date }).first {
                                     editingGrowthEntry = latestEntry
                                 }
                             }
@@ -246,7 +246,7 @@ struct ProgressView: View {
                             subtitle: "\(dataManager.getHeightPercentile())th percentile",
                             color: .blue,
                             onTap: {
-                                if let latestEntry = dataManager.growthData.first {
+                                if let latestEntry = dataManager.growthData.sorted(by: { $0.date > $1.date }).first {
                                     editingGrowthEntry = latestEntry
                                 }
                             }
@@ -260,7 +260,7 @@ struct ProgressView: View {
                             subtitle: "\(dataManager.getBMIPercentile())th percentile for age",
                             color: .purple,
                             onTap: {
-                                if let latestEntry = dataManager.growthData.first {
+                                if let latestEntry = dataManager.growthData.sorted(by: { $0.date > $1.date }).first {
                                     editingGrowthEntry = latestEntry
                                 }
                             }
@@ -272,7 +272,7 @@ struct ProgressView: View {
                             subtitle: "Latest measurement",
                             color: .orange,
                             onTap: {
-                                if let latestEntry = dataManager.growthData.first {
+                                if let latestEntry = dataManager.growthData.sorted(by: { $0.date > $1.date }).first {
                                     editingGrowthEntry = latestEntry
                                 }
                             }
@@ -629,28 +629,28 @@ struct GrowthHistoryRow: View {
     
     private func formatWeight(_ weight: Double) -> String {
         if useMetricUnits {
-            let kg = weight * 0.453592
-            return String(format: "%.1f kg", kg)
+            return String(format: "%.1f kg", weight) // weight is already in kg
         } else {
-            return String(format: "%.1f lbs", weight)
+            let lbs = weight * 2.20462 // convert kg to lbs
+            return String(format: "%.1f lbs", lbs)
         }
     }
     
     private func formatHeight(_ height: Double) -> String {
         if useMetricUnits {
-            let cm = height * 2.54
-            return String(format: "%.1f cm", cm)
+            return String(format: "%.1f cm", height) // height is already in cm
         } else {
-            return String(format: "%.1f\"", height)
+            let inches = height * 0.393701 // convert cm to inches
+            return String(format: "%.1f\"", inches)
         }
     }
     
     private func formatHeadCircumference(_ headCircumference: Double) -> String {
         if useMetricUnits {
-            let cm = headCircumference * 2.54
-            return String(format: "%.1f cm", cm)
+            return String(format: "%.1f cm", headCircumference) // headCircumference is already in cm
         } else {
-            return String(format: "%.1f\"", headCircumference)
+            let inches = headCircumference * 0.393701 // convert cm to inches
+            return String(format: "%.1f\"", inches)
         }
     }
 }

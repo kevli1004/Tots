@@ -22,22 +22,22 @@ class TotsDataManager: ObservableObject {
     
     // Growth percentile data
     var currentBMI: Double {
-        guard let latestGrowth = growthData.last else { return 0.0 }
+        guard let latestGrowth = growthData.sorted(by: { $0.date > $1.date }).first else { return 0.0 }
         let weightKg = convertWeightToKg(latestGrowth.weight)
         let heightM = convertHeightToCm(latestGrowth.height) / 100.0
         return weightKg / (heightM * heightM)
     }
     
     var currentWeight: Double {
-        return growthData.last?.weight ?? 0.0
+        return growthData.sorted(by: { $0.date > $1.date }).first?.weight ?? 0.0
     }
     
     var currentHeight: Double {
-        return growthData.last?.height ?? 0.0
+        return growthData.sorted(by: { $0.date > $1.date }).first?.height ?? 0.0
     }
     
     var currentHeadCircumference: Double {
-        return growthData.last?.headCircumference ?? 0.0
+        return growthData.sorted(by: { $0.date > $1.date }).first?.headCircumference ?? 0.0
     }
     @Published var healthTrends: [HealthTrend] = []
     
