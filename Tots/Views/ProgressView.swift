@@ -104,7 +104,7 @@ struct ProgressView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         // Ad Banner
-                        AdBannerContainer()
+                        AdBannerContainerWide()
                         
                         // Unit toggle at top
                         unitToggleRow
@@ -119,11 +119,11 @@ struct ProgressView: View {
                         growthHistorySection
                     }
                     .padding(.horizontal)
-                    .padding(.bottom)
+                    .padding(.bottom, 8)
                 }
             }
             .navigationTitle("")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     growthTitleView

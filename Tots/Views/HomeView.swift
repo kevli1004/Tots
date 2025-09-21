@@ -190,7 +190,7 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: 12) {
                         // Ad Banner
-                        AdBannerContainer()
+                        AdBannerContainerWide()
                         
                         // Countdown timers
                         countdownView
@@ -205,11 +205,11 @@ struct HomeView: View {
                         recentActivitiesView
                     }
                     .padding(.horizontal)
-                    .padding(.bottom)
+                    .padding(.bottom, 8)
                 }
             }
                 .navigationTitle("")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     customTitleView
@@ -2098,7 +2098,7 @@ struct DatePickerHistoryView: View {
             }
             }
             .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -2627,7 +2627,7 @@ struct MilestonesView: View {
                 }
             }
             .navigationTitle("")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     milestonesTitleView
@@ -3189,7 +3189,7 @@ struct ImprovedAddMilestoneView: View {
                 }
             }
             .navigationTitle("Add Custom Milestone")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -3256,7 +3256,7 @@ struct WordTrackerView: View {
                 }
             }
             .navigationTitle("")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     wordTrackerTitleView
@@ -3764,7 +3764,7 @@ struct AddWordView: View {
                 }
             }
             .navigationTitle("Add Word")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
