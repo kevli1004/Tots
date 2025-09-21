@@ -243,25 +243,37 @@ struct AddActivityView: View {
                 // Check if this is an active session being edited (time is very recent)
                 let isActiveSession = Date().timeIntervalSince(editingActivity.time) < 60 // Within last minute
                 
+                // Always parse details first to get the stored values
+                parseActivityDetails(editingActivity)
+                
                 if isActiveSession {
-                    // For active sessions, restore timers first then populate fields
+                    // For active sessions, also restore timers
                     restoreBreastfeedingTimer()
                     restorePumpingTimers()
                     
-                    // Populate text fields with current timer values for active sessions
+                    // Only override with current timer values if text fields are still empty
                     if editingActivity.type == .feeding && editingActivity.details.contains("Breastfeeding") {
-                        breastfeedingMinutes = String(Int(breastfeedingElapsed / 60))
-                        breastfeedingSeconds = String(Int(breastfeedingElapsed) % 60)
+                        if breastfeedingMinutes.isEmpty {
+                            breastfeedingMinutes = String(Int(breastfeedingElapsed / 60))
+                        }
+                        if breastfeedingSeconds.isEmpty {
+                            breastfeedingSeconds = String(Int(breastfeedingElapsed) % 60)
+                        }
                         feedingType = .breastfeeding
                     } else if editingActivity.type == .pumping {
-                        leftPumpingMinutes = String(Int(leftPumpingElapsed / 60))
-                        leftPumpingSeconds = String(Int(leftPumpingElapsed) % 60)
-                        rightPumpingMinutes = String(Int(rightPumpingElapsed / 60))
-                        rightPumpingSeconds = String(Int(rightPumpingElapsed) % 60)
+                        if leftPumpingMinutes.isEmpty {
+                            leftPumpingMinutes = String(Int(leftPumpingElapsed / 60))
+                        }
+                        if leftPumpingSeconds.isEmpty {
+                            leftPumpingSeconds = String(Int(leftPumpingElapsed) % 60)
+                        }
+                        if rightPumpingMinutes.isEmpty {
+                            rightPumpingMinutes = String(Int(rightPumpingElapsed / 60))
+                        }
+                        if rightPumpingSeconds.isEmpty {
+                            rightPumpingSeconds = String(Int(rightPumpingElapsed) % 60)
+                        }
                     }
-                } else {
-                    // Parse activity-specific data from details for historical records
-                    parseActivityDetails(editingActivity)
                 }
                 
                 // Populate fields for editing
@@ -489,8 +501,15 @@ struct AddActivityView: View {
                                     .toggleStyle(SwitchToggleStyle(tint: .pink))
                                     .scaleEffect(0.8)
                                     .onChange(of: breastfeedingManualMode) { isManual in
-                                        if isManual && breastfeedingIsRunning {
-                                            stopBreastfeedingTimer()
+                                        if isManual {
+                                            // When switching to manual, populate text fields with current values
+                                            if breastfeedingElapsed > 0 {
+                                                breastfeedingMinutes = String(Int(breastfeedingElapsed / 60))
+                                                breastfeedingSeconds = String(Int(breastfeedingElapsed) % 60)
+                                            }
+                                            if breastfeedingIsRunning {
+                                                stopBreastfeedingTimer()
+                                            }
                                         } else if !isManual && !breastfeedingMinutes.isEmpty {
                                             // Update elapsed time from manual input when switching back to automatic
                                             let minutes = Int(breastfeedingMinutes) ?? 0
@@ -512,12 +531,13 @@ struct AddActivityView: View {
                                         .foregroundColor(.secondary)
                                     TextField("0", text: Binding(
                                         get: {
-                                            if editingActivity != nil {
+                                            if !breastfeedingMinutes.isEmpty {
                                                 return breastfeedingMinutes
-                                            } else if breastfeedingMinutes.isEmpty || !breastfeedingManualMode {
+                                            } else if breastfeedingElapsed > 0 {
                                                 return String(Int(breastfeedingElapsed / 60))
+                                            } else {
+                                                return "0"
                                             }
-                                            return breastfeedingMinutes
                                         },
                                         set: { breastfeedingMinutes = $0 }
                                     ))
@@ -531,12 +551,13 @@ struct AddActivityView: View {
                                         .foregroundColor(.secondary)
                                     TextField("0", text: Binding(
                                         get: {
-                                            if editingActivity != nil {
+                                            if !breastfeedingSeconds.isEmpty {
                                                 return breastfeedingSeconds
-                                            } else if breastfeedingSeconds.isEmpty || !breastfeedingManualMode {
+                                            } else if breastfeedingElapsed > 0 {
                                                 return String(Int(breastfeedingElapsed) % 60)
+                                            } else {
+                                                return "0"
                                             }
-                                            return breastfeedingSeconds
                                         },
                                         set: { breastfeedingSeconds = $0 }
                                     ))
@@ -1333,6 +1354,15 @@ struct AddActivityView: View {
                             .scaleEffect(0.8)
                             .onChange(of: pumpingManualMode) { isManual in
                                 if isManual {
+                                    // When switching to manual, populate text fields with current values
+                                    if leftPumpingElapsed > 0 {
+                                        leftPumpingMinutes = String(Int(leftPumpingElapsed / 60))
+                                        leftPumpingSeconds = String(Int(leftPumpingElapsed) % 60)
+                                    }
+                                    if rightPumpingElapsed > 0 {
+                                        rightPumpingMinutes = String(Int(rightPumpingElapsed / 60))
+                                        rightPumpingSeconds = String(Int(rightPumpingElapsed) % 60)
+                                    }
                                     if leftPumpingIsRunning {
                                         stopLeftPumping()
                                     }
@@ -1373,12 +1403,13 @@ struct AddActivityView: View {
                                     .foregroundColor(.secondary)
                                 TextField("0", text: Binding(
                                     get: {
-                                        if editingActivity != nil {
-                                            return leftPumpingMinutes.isEmpty ? String(Int(leftPumpingElapsed / 60)) : leftPumpingMinutes
-                                        } else if leftPumpingMinutes.isEmpty || !pumpingManualMode {
+                                        if !leftPumpingMinutes.isEmpty {
+                                            return leftPumpingMinutes
+                                        } else if leftPumpingElapsed > 0 {
                                             return String(Int(leftPumpingElapsed / 60))
+                                        } else {
+                                            return "0"
                                         }
-                                        return leftPumpingMinutes
                                     },
                                     set: { leftPumpingMinutes = $0 }
                                 ))
@@ -1393,12 +1424,13 @@ struct AddActivityView: View {
                                     .foregroundColor(.secondary)
                                 TextField("0", text: Binding(
                                     get: {
-                                        if editingActivity != nil {
-                                            return leftPumpingSeconds.isEmpty ? String(Int(leftPumpingElapsed) % 60) : leftPumpingSeconds
-                                        } else if leftPumpingSeconds.isEmpty || !pumpingManualMode {
+                                        if !leftPumpingSeconds.isEmpty {
+                                            return leftPumpingSeconds
+                                        } else if leftPumpingElapsed > 0 {
                                             return String(Int(leftPumpingElapsed) % 60)
+                                        } else {
+                                            return "0"
                                         }
-                                        return leftPumpingSeconds
                                     },
                                     set: { leftPumpingSeconds = $0 }
                                 ))
@@ -1450,11 +1482,7 @@ struct AddActivityView: View {
                                 }
                             }
                             
-                            Button(action: {
-                                resetLeftPumping()
-                                leftPumpingMinutes = ""
-                                leftPumpingSeconds = ""
-                            }) {
+                            Button(action: resetLeftPumping) {
                                 HStack {
                                     Image(systemName: "arrow.counterclockwise")
                                     Text("Reset")
@@ -1485,12 +1513,13 @@ struct AddActivityView: View {
                                     .foregroundColor(.secondary)
                                 TextField("0", text: Binding(
                                     get: {
-                                        if editingActivity != nil {
-                                            return rightPumpingMinutes.isEmpty ? String(Int(rightPumpingElapsed / 60)) : rightPumpingMinutes
-                                        } else if rightPumpingMinutes.isEmpty || !pumpingManualMode {
+                                        if !rightPumpingMinutes.isEmpty {
+                                            return rightPumpingMinutes
+                                        } else if rightPumpingElapsed > 0 {
                                             return String(Int(rightPumpingElapsed / 60))
+                                        } else {
+                                            return "0"
                                         }
-                                        return rightPumpingMinutes
                                     },
                                     set: { rightPumpingMinutes = $0 }
                                 ))
@@ -1505,12 +1534,13 @@ struct AddActivityView: View {
                                     .foregroundColor(.secondary)
                                 TextField("0", text: Binding(
                                     get: {
-                                        if editingActivity != nil {
-                                            return rightPumpingSeconds.isEmpty ? String(Int(rightPumpingElapsed) % 60) : rightPumpingSeconds
-                                        } else if rightPumpingSeconds.isEmpty || !pumpingManualMode {
+                                        if !rightPumpingSeconds.isEmpty {
+                                            return rightPumpingSeconds
+                                        } else if rightPumpingElapsed > 0 {
                                             return String(Int(rightPumpingElapsed) % 60)
+                                        } else {
+                                            return "0"
                                         }
-                                        return rightPumpingSeconds
                                     },
                                     set: { rightPumpingSeconds = $0 }
                                 ))
@@ -1562,11 +1592,7 @@ struct AddActivityView: View {
                                 }
                             }
                             
-                            Button(action: {
-                                resetRightPumping()
-                                rightPumpingMinutes = ""
-                                rightPumpingSeconds = ""
-                            }) {
+                            Button(action: resetRightPumping) {
                                 HStack {
                                     Image(systemName: "arrow.counterclockwise")
                                     Text("Reset")
@@ -1637,32 +1663,27 @@ struct AddActivityView: View {
             let minutes = Int(leftPumpingMinutes) ?? 0
             let seconds = Int(leftPumpingSeconds) ?? 0
             leftPumpingElapsed = TimeInterval(minutes * 60 + seconds)
-            // Calculate start time based on elapsed time
-            leftPumpingStartTime = Date().addingTimeInterval(-leftPumpingElapsed)
-        } else {
-            leftPumpingStartTime = Date()
         }
+        
+        // Always calculate start time based on current elapsed time (for resume functionality)
+        leftPumpingStartTime = Date().addingTimeInterval(-leftPumpingElapsed)
         
         leftPumpingIsRunning = true
         
-        leftPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            if let startTime = leftPumpingStartTime {
-                leftPumpingElapsed = Date().timeIntervalSince(startTime)
-                // Update stored elapsed time for background tracking
-                UserDefaults.standard.set(leftPumpingElapsed, forKey: "leftPumpingElapsed")
-            }
+        leftPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            updateLeftPumpingElapsed()
         }
         
-        // Store for background tracking
+        // Store start time for background tracking
         UserDefaults.standard.set(leftPumpingStartTime, forKey: "leftPumpingStartTime")
         UserDefaults.standard.set(leftPumpingElapsed, forKey: "leftPumpingElapsed")
         UserDefaults.standard.set(true, forKey: "leftPumpingIsRunning")
     }
     
     private func stopLeftPumping() {
-        leftPumpingIsRunning = false
         leftPumpingTimer?.invalidate()
         leftPumpingTimer = nil
+        leftPumpingIsRunning = false
         
         // Clear background tracking
         UserDefaults.standard.removeObject(forKey: "leftPumpingStartTime")
@@ -1671,8 +1692,19 @@ struct AddActivityView: View {
     }
     
     private func resetLeftPumping() {
+        stopLeftPumping()
         leftPumpingElapsed = 0
         leftPumpingStartTime = nil
+        leftPumpingMinutes = ""
+        leftPumpingSeconds = ""
+    }
+    
+    private func updateLeftPumpingElapsed() {
+        guard let startTime = leftPumpingStartTime else { return }
+        leftPumpingElapsed = Date().timeIntervalSince(startTime)
+        
+        // Update stored elapsed time for background tracking
+        UserDefaults.standard.set(leftPumpingElapsed, forKey: "leftPumpingElapsed")
     }
     
     private func startRightPumping() {
@@ -1681,32 +1713,27 @@ struct AddActivityView: View {
             let minutes = Int(rightPumpingMinutes) ?? 0
             let seconds = Int(rightPumpingSeconds) ?? 0
             rightPumpingElapsed = TimeInterval(minutes * 60 + seconds)
-            // Calculate start time based on elapsed time
-            rightPumpingStartTime = Date().addingTimeInterval(-rightPumpingElapsed)
-        } else {
-            rightPumpingStartTime = Date()
         }
+        
+        // Always calculate start time based on current elapsed time (for resume functionality)
+        rightPumpingStartTime = Date().addingTimeInterval(-rightPumpingElapsed)
         
         rightPumpingIsRunning = true
         
-        rightPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            if let startTime = rightPumpingStartTime {
-                rightPumpingElapsed = Date().timeIntervalSince(startTime)
-                // Update stored elapsed time for background tracking
-                UserDefaults.standard.set(rightPumpingElapsed, forKey: "rightPumpingElapsed")
-            }
+        rightPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            updateRightPumpingElapsed()
         }
         
-        // Store for background tracking
+        // Store start time for background tracking
         UserDefaults.standard.set(rightPumpingStartTime, forKey: "rightPumpingStartTime")
         UserDefaults.standard.set(rightPumpingElapsed, forKey: "rightPumpingElapsed")
         UserDefaults.standard.set(true, forKey: "rightPumpingIsRunning")
     }
     
     private func stopRightPumping() {
-        rightPumpingIsRunning = false
         rightPumpingTimer?.invalidate()
         rightPumpingTimer = nil
+        rightPumpingIsRunning = false
         
         // Clear background tracking
         UserDefaults.standard.removeObject(forKey: "rightPumpingStartTime")
@@ -1715,8 +1742,19 @@ struct AddActivityView: View {
     }
     
     private func resetRightPumping() {
+        stopRightPumping()
         rightPumpingElapsed = 0
         rightPumpingStartTime = nil
+        rightPumpingMinutes = ""
+        rightPumpingSeconds = ""
+    }
+    
+    private func updateRightPumpingElapsed() {
+        guard let startTime = rightPumpingStartTime else { return }
+        rightPumpingElapsed = Date().timeIntervalSince(startTime)
+        
+        // Update stored elapsed time for background tracking
+        UserDefaults.standard.set(rightPumpingElapsed, forKey: "rightPumpingElapsed")
     }
     
     private func stopAllTimers() {
@@ -1936,11 +1974,10 @@ struct AddActivityView: View {
             let minutes = Int(breastfeedingMinutes) ?? 0
             let seconds = Int(breastfeedingSeconds) ?? 0
             breastfeedingElapsed = TimeInterval(minutes * 60 + seconds)
-            // Calculate start time based on elapsed time
-            breastfeedingStartTime = Date().addingTimeInterval(-breastfeedingElapsed)
-        } else {
-            breastfeedingStartTime = Date()
         }
+        
+        // Always calculate start time based on current elapsed time (for resume functionality)
+        breastfeedingStartTime = Date().addingTimeInterval(-breastfeedingElapsed)
         
         breastfeedingIsRunning = true
         
@@ -1969,6 +2006,8 @@ struct AddActivityView: View {
         stopBreastfeedingTimer()
         breastfeedingElapsed = 0
         breastfeedingStartTime = nil
+        breastfeedingMinutes = ""
+        breastfeedingSeconds = ""
     }
     
     private func updateBreastfeedingElapsed() {

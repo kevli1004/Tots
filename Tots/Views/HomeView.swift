@@ -4173,7 +4173,7 @@ struct OngoingSessionCard: View {
                 Text("Active")
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundColor(color)
+                    .foregroundColor(.green)
             }
         }
         .padding(16)
