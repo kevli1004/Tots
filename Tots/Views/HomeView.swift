@@ -47,6 +47,7 @@ struct HomeView: View {
     @State private var showingActivitySelector = false
     @State private var showingAddActivity = false
     @State private var selectedActivityType: ActivityType = .feeding
+    @State private var selectedFeedingType: AddActivityView.FeedingType?
     @State private var editingActivity: TotsActivity?
     @State private var selectedSummaryPeriod: SummaryPeriod = .today
     
@@ -191,6 +192,9 @@ struct HomeView: View {
                         // Countdown timers
                         countdownView
                         
+                        // Ongoing sessions
+                        ongoingSessionsView
+                        
                         // Today's summary with goals
                         todaySummaryWithGoalsView
                         
@@ -244,12 +248,13 @@ struct HomeView: View {
             if let editingActivity = editingActivity {
                 AddActivityView(editingActivity: editingActivity)
             } else {
-            AddActivityView(preselectedType: selectedActivityType)
+                AddActivityView(preselectedType: selectedActivityType, preselectedFeedingType: selectedFeedingType)
             }
         }
         .onChange(of: showingAddActivity) { isShowing in
             if !isShowing {
                 editingActivity = nil
+                selectedFeedingType = nil
             }
         }
         .overlay(
@@ -397,19 +402,26 @@ struct HomeView: View {
     
     private var countdownView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Next Activities")
+            Text("Upcoming Activities")
                 .font(.headline)
                 .fontWeight(.semibold)
             
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                CountdownCard(
-                    icon: "🍼",
-                    title: "Feed",
-                    countdownInterval: dataManager.nextFeedingCountdown,
-                    time: dataManager.nextFeedingTime,
-                    color: .pink
-                )
-                .environmentObject(dataManager)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
+                // Show feed card only if breastfeeding is not active
+                if !isBreastfeedingActive {
+                    CountdownCard(
+                        icon: "🍼",
+                        title: "Feed",
+                        countdownInterval: dataManager.nextFeedingCountdown,
+                        time: dataManager.nextFeedingTime,
+                        color: .pink
+                    )
+                    .environmentObject(dataManager)
+                    .onTapGesture {
+                        selectedActivityType = .feeding
+                        showingAddActivity = true
+                    }
+                }
                 
                 CountdownCard(
                     icon: "DiaperIcon",
@@ -419,8 +431,175 @@ struct HomeView: View {
                     color: .orange
                 )
                 .environmentObject(dataManager)
+                .onTapGesture {
+                    selectedActivityType = .diaper
+                    showingAddActivity = true
+                }
+                
+                // Show pumping cards if pumping has been done before and not currently active
+                if hasPumpingHistory && !isPumpingActive {
+                    CountdownCard(
+                        icon: "PumpingIcon",
+                        title: "Pumping",
+                        countdownInterval: nextPumpingCountdown,
+                        time: nextPumpingTime,
+                        color: .blue
+                    )
+                    .environmentObject(dataManager)
+                    .onTapGesture {
+                        selectedActivityType = .pumping
+                        showingAddActivity = true
+                    }
+                }
             }
         }
+    }
+    
+    private var ongoingSessionsView: some View {
+        Group {
+            if hasOngoingSessions {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Current Activities")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    VStack(spacing: 12) {
+                        if isBreastfeedingActive {
+                            OngoingSessionCard(
+                                title: "Breastfeeding",
+                                icon: "🤱",
+                                startTime: breastfeedingStartTime,
+                                color: .pink
+                            ) {
+                                selectedActivityType = .feeding
+                                selectedFeedingType = .breastfeeding
+                                showingAddActivity = true
+                            }
+                        }
+                        
+                        if isLeftPumpingActive {
+                            OngoingSessionCard(
+                                title: "Left Pumping",
+                                icon: "PumpingIcon",
+                                startTime: leftPumpingStartTime,
+                                color: .blue
+                            ) {
+                                selectedActivityType = .pumping
+                                showingAddActivity = true
+                            }
+                        }
+                        
+                        if isRightPumpingActive {
+                            OngoingSessionCard(
+                                title: "Right Pumping",
+                                icon: "PumpingIcon",
+                                startTime: rightPumpingStartTime,
+                                color: .purple
+                            ) {
+                                selectedActivityType = .pumping
+                                showingAddActivity = true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Ongoing Session State
+    private var hasOngoingSessions: Bool {
+        isBreastfeedingActive || isLeftPumpingActive || isRightPumpingActive
+    }
+    
+    private var isBreastfeedingActive: Bool {
+        UserDefaults.standard.bool(forKey: "breastfeedingIsRunning")
+    }
+    
+    private var isLeftPumpingActive: Bool {
+        UserDefaults.standard.bool(forKey: "leftPumpingIsRunning")
+    }
+    
+    private var isRightPumpingActive: Bool {
+        UserDefaults.standard.bool(forKey: "rightPumpingIsRunning")
+    }
+    
+    private var isPumpingActive: Bool {
+        isLeftPumpingActive || isRightPumpingActive
+    }
+    
+    private var breastfeedingStartTime: Date? {
+        UserDefaults.standard.object(forKey: "breastfeedingStartTime") as? Date
+    }
+    
+    private var leftPumpingStartTime: Date? {
+        UserDefaults.standard.object(forKey: "leftPumpingStartTime") as? Date
+    }
+    
+    private var rightPumpingStartTime: Date? {
+        UserDefaults.standard.object(forKey: "rightPumpingStartTime") as? Date
+    }
+    
+    // MARK: - Pumping Countdown Logic
+    private var hasPumpingHistory: Bool {
+        !dataManager.recentActivities.filter { $0.type == .pumping }.isEmpty
+    }
+    
+    private var lastPumpingTime: Date? {
+        dataManager.recentActivities
+            .filter { $0.type == .pumping }
+            .sorted { $0.time > $1.time }
+            .first?.time
+    }
+    
+    private var nextPumpingTime: Date? {
+        guard let lastTime = lastPumpingTime else { return nil }
+        // Suggest pumping every 3 hours (similar to feeding)
+        return Calendar.current.date(byAdding: .hour, value: 3, to: lastTime)
+    }
+    
+    private var nextPumpingCountdown: TimeInterval {
+        guard let nextTime = nextPumpingTime else { return 0 }
+        return nextTime.timeIntervalSinceNow
+    }
+    
+    // MARK: - Timer Activity Creation
+    private func createBreastfeedingActivityFromTimer() -> TotsActivity {
+        let elapsed = breastfeedingStartTime.map { Date().timeIntervalSince($0) } ?? 0
+        let minutes = Int(elapsed / 60)
+        let seconds = Int(elapsed) % 60
+        let details = "Breastfeeding - \(minutes)m \(seconds)s"
+        
+        return TotsActivity(
+            type: .feeding,
+            time: breastfeedingStartTime ?? Date(),
+            details: details,
+            mood: .content,
+            duration: minutes,
+            notes: nil
+        )
+    }
+    
+    private func createPumpingActivityFromTimer() -> TotsActivity {
+        let leftElapsed = leftPumpingStartTime.map { Date().timeIntervalSince($0) } ?? 0
+        let rightElapsed = rightPumpingStartTime.map { Date().timeIntervalSince($0) } ?? 0
+        
+        let leftMinutes = Int(leftElapsed / 60)
+        let leftSeconds = Int(leftElapsed) % 60
+        let rightMinutes = Int(rightElapsed / 60)
+        let rightSeconds = Int(rightElapsed) % 60
+        let totalMinutes = Int((leftElapsed + rightElapsed) / 60)
+        let totalSeconds = Int(leftElapsed + rightElapsed) % 60
+        
+        let details = "Left: \(leftMinutes)m \(leftSeconds)s, Right: \(rightMinutes)m \(rightSeconds)s, Total: \(totalMinutes)m \(totalSeconds)s"
+        
+        return TotsActivity(
+            type: .pumping,
+            time: leftPumpingStartTime ?? rightPumpingStartTime ?? Date(),
+            details: details,
+            mood: .content,
+            duration: totalMinutes,
+            notes: nil
+        )
     }
     
     private var headerView: some View {
@@ -460,9 +639,18 @@ struct HomeView: View {
     
     private var todaySummaryWithGoalsView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Summary & Goals")
-                .font(.headline)
-                .fontWeight(.semibold)
+            HStack {
+                Text("Summary & Goals")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                Text("tap for details")
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.7))
+                    .fontWeight(.medium)
+            }
             
             // Swipeable TabView for different summary layouts
             TabView(selection: $selectedSummaryPeriod) {
@@ -750,6 +938,10 @@ struct CountdownCard: View {
         return icon == "DiaperIcon"
     }
     
+    private var isPumpingIcon: Bool {
+        return icon == "PumpingIcon"
+    }
+    
     private var countdownText: String {
         return dataManager.formatCountdown(countdownInterval)
     }
@@ -758,25 +950,56 @@ struct CountdownCard: View {
         return countdownInterval <= 0
     }
     
+    private var isFirstTime: Bool {
+        // Check if this is the first time for this activity type
+        switch title.lowercased() {
+        case "feed":
+            return dataManager.recentActivities.filter { $0.type == .feeding }.isEmpty
+        case "diaper":
+            return dataManager.recentActivities.filter { $0.type == .diaper }.isEmpty
+        case "pumping":
+            return dataManager.recentActivities.filter { $0.type == .pumping }.isEmpty
+        default:
+            return false
+        }
+    }
+    
+    private var dueText: String {
+        if isFirstTime {
+            switch title.lowercased() {
+            case "feed":
+                return "START FIRST FEED"
+            case "diaper":
+                return "START FIRST DIAPER"
+            case "pumping":
+                return "START FIRST PUMP"
+            default:
+                return "START"
+            }
+        } else {
+            return "DUE"
+        }
+    }
+    
     var body: some View {
         ZStack {
             // Front side - Countdown
             if !isFlipped {
-                VStack(spacing: 14) {
+                VStack(spacing: 10) {
                     // Icon section
             if icon.contains(".") {
                 Image(systemName: icon)
-                            .font(.title)
+                            .font(.title2)
                             .foregroundColor(color)
-                    } else if isDiaperIcon {
+                    } else if isDiaperIcon || isPumpingIcon {
                         Image(icon)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 24, height: 24)
                             .foregroundColor(.white)
                     } else {
                         Text(icon)
-                            .font(.title)
+                            .font(.title2)
                     }
                     
                     Text(title)
@@ -786,32 +1009,25 @@ struct CountdownCard: View {
                         .textCase(.uppercase)
                         .tracking(0.5)
                     
-                    VStack(spacing: 4) {
+                    VStack(spacing: 2) {
                         if isDue {
-                            Text("DUE")
-                                .font(.title2)
+                            Text(dueText)
+                                .font(isFirstTime ? .caption2 : .headline)
                                 .fontWeight(.bold)
-                                .foregroundColor(.red)
-                                .opacity(isFlashing ? 0.3 : 1.0)
-                                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isFlashing)
+                                .foregroundColor(isFirstTime ? color : .red)
+                                .multilineTextAlignment(.center)
                         } else {
                             Text(countdownText)
-                                .font(.title2)
+                                .font(.headline)
                                 .fontWeight(.bold)
                                 .foregroundColor(color)
                             
                             Text("until next \(title.lowercased())")
-                                .font(.caption)
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                                 .fontWeight(.medium)
                         }
                     }
-                    
-                    // Tap hint
-                    Text("tap for details")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
-                        .fontWeight(.medium)
                 }
             }
             // Back side - Activity Details
@@ -822,7 +1038,7 @@ struct CountdownCard: View {
                         Image(systemName: icon)
                     .font(.title2)
                     .foregroundColor(color)
-            } else if isDiaperIcon {
+            } else if isDiaperIcon || isPumpingIcon {
                 Image(icon)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -939,9 +1155,9 @@ struct CountdownCard: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 160) // Fixed height for consistent flip animation
-        .padding(.vertical, 24)
-        .padding(.horizontal, 20)
+        .frame(height: 120) // Reduced height for 3-column layout
+        .padding(.vertical, 16)
+        .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(.white.opacity(0.9))
@@ -954,14 +1170,9 @@ struct CountdownCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .rotation3DEffect(
             .degrees(isFlipped ? 180 : 0),
-            axis: (x: 0, y: 1, z: 0)
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 1.0
         )
-        .scaleEffect(x: isFlipped ? -1 : 1, y: 1) // Fix mirroring on back side
-        .onTapGesture {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                isFlipped.toggle()
-            }
-        }
         .onChange(of: isDue) { newValue in
             if newValue {
                 isFlashing = true
@@ -1259,6 +1470,8 @@ struct SummaryGoalCard: View {
     let goal: Any
     let color: Color
     let unit: String
+    @EnvironmentObject var dataManager: TotsDataManager
+    @State private var isFlipped = false
     
     init(icon: String, title: String, current: Any, goal: Any, color: Color, unit: String = "") {
         self.icon = icon
@@ -1314,70 +1527,413 @@ struct SummaryGoalCard: View {
         return min(currentDouble / goalDouble, 1.0)
     }
     
-    var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                if icon.contains(".") {
-                    // SF Symbol
-                    Image(systemName: icon)
-                        .foregroundColor(color)
-                        .font(.title2)
-                } else if isDiaperIcon {
-                    // Custom SVG diaper icon
-                    Image(icon)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 24, height: 24)
-                        .foregroundColor(.white)
-                } else {
-                    // Regular Emoji
-                    Text(icon)
-                        .font(.title2)
-                }
-                
-                Spacer()
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
+    // MARK: - Detail Computed Properties
+    private var lastFeedingTime: String {
+        guard let lastFeeding = dataManager.recentActivities
+            .filter({ $0.type == .feeding })
+            .sorted(by: { $0.time > $1.time })
+            .first else { return "No feedings yet" }
+        
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: lastFeeding.time)
+    }
+    
+    private var averageFeedingInterval: String {
+        let feedings = dataManager.recentActivities
+            .filter { $0.type == .feeding && Calendar.current.isDateInToday($0.time) }
+            .sorted { $0.time < $1.time }
+        
+        guard feedings.count > 1 else { return "Not enough data" }
+        
+        var totalInterval: TimeInterval = 0
+        for i in 1..<feedings.count {
+            totalInterval += feedings[i].time.timeIntervalSince(feedings[i-1].time)
+        }
+        
+        let averageInterval = totalInterval / Double(feedings.count - 1)
+        let hours = Int(averageInterval) / 3600
+        let minutes = Int(averageInterval.truncatingRemainder(dividingBy: 3600)) / 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+    
+    private var lastSleepTime: String {
+        guard let lastSleep = dataManager.recentActivities
+            .filter({ $0.type == .sleep })
+            .sorted(by: { $0.time > $1.time })
+            .first else { return "No sleep yet" }
+        
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: lastSleep.time)
+    }
+    
+    private var longestNapToday: String {
+        let sleeps = dataManager.recentActivities
+            .filter { $0.type == .sleep && Calendar.current.isDateInToday($0.time) }
+        
+        guard let longestDuration = sleeps.compactMap({ $0.duration }).max() else {
+            return "No naps yet"
+        }
+        
+        let hours = longestDuration / 60
+        let minutes = longestDuration % 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+    
+    
+    private var lastDiaperTime: String {
+        guard let lastDiaper = dataManager.recentActivities
+            .filter({ $0.type == .diaper })
+            .sorted(by: { $0.time > $1.time })
+            .first else { return "No changes yet" }
+        
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: lastDiaper.time)
+    }
+    
+    private var wetDiapersToday: Int {
+        return dataManager.recentActivities
+            .filter { $0.type == .diaper && Calendar.current.isDateInToday($0.time) && $0.details.lowercased().contains("wet") }
+            .count
+    }
+    
+    private var dirtyDiapersToday: Int {
+        return dataManager.recentActivities
+            .filter { $0.type == .diaper && Calendar.current.isDateInToday($0.time) && $0.details.lowercased().contains("dirty") }
+            .count
+    }
+    
+    private var tummyTimeSessions: Int {
+        return dataManager.recentActivities
+            .filter { $0.type == .activity && Calendar.current.isDateInToday($0.time) && $0.details.lowercased().contains("tummy") }
+            .count
+    }
+    
+    
+    private var remainingTummyTime: String {
+        let currentMinutes = current as? Int ?? 0
+        let goalMinutes = goal as? Int ?? 0
+        let remaining = max(0, goalMinutes - currentMinutes)
+        
+        return "\(remaining)m"
+    }
+    
+    @ViewBuilder
+    private var detailsForActivity: some View {
+        switch title.lowercased() {
+        case "feedings":
+            VStack(spacing: 6) {
                 HStack {
-                    Text("\(currentValue)\(unit)")
-                        .font(.title)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                    
-                    Text("\(goalValue)\(unit)")
+                    Text("Last feeding:")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                    Spacer()
+                    Text(lastFeedingTime)
+                        .font(.caption)
+                        .fontWeight(.medium)
                 }
                 
-                // Progress bar
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color(.systemGray5))
-                            .frame(height: 4)
-                            .cornerRadius(2)
-                        
-                        Rectangle()
-                            .fill(color)
-                            .frame(width: geometry.size.width * progress, height: 4)
-                            .cornerRadius(2)
-                            .animation(.easeInOut(duration: 0.3), value: progress)
-                    }
+                HStack {
+                    Text("Average interval:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(averageFeedingInterval)
+                        .font(.caption)
+                        .fontWeight(.medium)
                 }
-                .frame(height: 4)
                 
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .textCase(.uppercase)
-                    .tracking(0.5)
+                HStack {
+                    Text("Progress:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(Int(progress * 100))% of goal")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(progress >= 1.0 ? .green : color)
+                }
+            }
+            
+        case "sleep":
+            VStack(spacing: 6) {
+                HStack {
+                    Text("Last sleep:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(lastSleepTime)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Longest nap:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(longestNapToday)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Progress:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(Int(progress * 100))% of goal")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(progress >= 1.0 ? .green : color)
+                }
+            }
+            
+        case "diapers":
+            VStack(spacing: 6) {
+                HStack {
+                    Text("Last change:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(lastDiaperTime)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Wet diapers:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(wetDiapersToday)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Dirty diapers:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(dirtyDiapersToday)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+            }
+            
+        case "tummy time":
+            VStack(spacing: 6) {
+                HStack {
+                    Text("Sessions today:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(tummyTimeSessions)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Remaining:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(remainingTummyTime)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(progress >= 1.0 ? .green : color)
+                }
+                
+                HStack {
+                    Text("Progress:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(Int(progress * 100))% of goal")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(progress >= 1.0 ? .green : color)
+                }
+            }
+            
+        default:
+            VStack(spacing: 6) {
+                HStack {
+                    Text("Current:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(currentValue)\(unit)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Goal:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(goalValue)\(unit)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Progress:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(Int(progress * 100))%")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(progress >= 1.0 ? .green : color)
+                }
             }
         }
+    }
+    
+    var body: some View {
+        ZStack {
+            // Front side - Current view
+            if !isFlipped {
+                VStack(spacing: 12) {
+                    HStack {
+                        if icon.contains(".") {
+                            // SF Symbol
+                            Image(systemName: icon)
+                                .foregroundColor(color)
+                                .font(.title2)
+                        } else if isDiaperIcon {
+                            // Custom SVG diaper icon
+                            Image(icon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 24, height: 24)
+                                .foregroundColor(.white)
+                        } else {
+                            // Regular Emoji
+                            Text(icon)
+                                .font(.title2)
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("\(currentValue)\(unit)")
+                                .font(.title)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            Text("\(goalValue)\(unit)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // Progress bar
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                Rectangle()
+                                    .fill(Color(.systemGray5))
+                                    .frame(height: 4)
+                                    .cornerRadius(2)
+                                
+                                Rectangle()
+                                    .fill(color)
+                                    .frame(width: geometry.size.width * progress, height: 4)
+                                    .cornerRadius(2)
+                                    .animation(.easeInOut(duration: 0.3), value: progress)
+                            }
+                        }
+                        .frame(height: 4)
+                        
+                        HStack {
+                            Text(title)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .textCase(.uppercase)
+                                .tracking(0.5)
+                            
+                            Spacer()
+                            
+                            Text("tap for details")
+                                .font(.caption2)
+                                .foregroundColor(.secondary.opacity(0.7))
+                                .fontWeight(.medium)
+                        }
+                    }
+                    
+                    Spacer(minLength: 0)
+                }
+                .frame(minHeight: 120, maxHeight: 120)
+            }
+            // Back side - Detailed view
+            else {
+                VStack(spacing: 12) {
+                    HStack {
+                        if icon.contains(".") {
+                            Image(systemName: icon)
+                                .foregroundColor(color)
+                                .font(.title3)
+                        } else if isDiaperIcon {
+                            Image(icon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 20, height: 20)
+                                .foregroundColor(.white)
+                        } else {
+                            Text(icon)
+                                .font(.title3)
+                        }
+                        
+                        Text(title)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                        
+                        Spacer()
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        detailsForActivity
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxHeight: .infinity)
+                }
+                .frame(minHeight: 120, maxHeight: 120)
+                .scaleEffect(x: -1, y: 1) // Fix text mirroring on back side
+            }
+        }
+        .frame(height: 120)
         .padding()
         .liquidGlassCard(cornerRadius: 16, shadowRadius: 12)
+        .rotation3DEffect(
+            .degrees(isFlipped ? 180 : 0),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 1.0
+        )
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                isFlipped.toggle()
+            }
+        }
     }
 }
 
@@ -2747,7 +3303,7 @@ struct WordTrackerView: View {
                     
                     Text("vocabulary learned")
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.white.opacity(0.7))
                 }
                 
                 Spacer()
@@ -3562,6 +4118,100 @@ struct WeeklyActivityRow: View {
                 }
             }
         }
+    }
+}
+
+struct OngoingSessionCard: View {
+    let title: String
+    let icon: String
+    let startTime: Date?
+    let color: Color
+    let onTap: () -> Void
+    @State private var elapsedTime: TimeInterval = 0
+    @State private var timer: Timer?
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Icon
+            Group {
+                if icon == "PumpingIcon" {
+                    Image(icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 24, height: 24)
+                        .foregroundColor(color)
+                } else {
+                    Text(icon)
+                        .font(.title2)
+                }
+            }
+            .frame(width: 40, height: 40)
+            .background(color.opacity(0.2))
+            .clipShape(Circle())
+            
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Text(formatElapsedTime(elapsedTime))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            // Status indicator
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(1.0)
+                    .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: elapsedTime)
+                
+                Text("Active")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(color)
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+        .onTapGesture {
+            onTap()
+        }
+        .onAppear {
+            updateElapsedTime()
+            startTimer()
+        }
+        .onDisappear {
+            stopTimer()
+        }
+    }
+    
+    private func updateElapsedTime() {
+        guard let startTime = startTime else { return }
+        elapsedTime = Date().timeIntervalSince(startTime)
+    }
+    
+    private func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            updateElapsedTime()
+        }
+    }
+    
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+    
+    private func formatElapsedTime(_ timeInterval: TimeInterval) -> String {
+        let minutes = Int(timeInterval) / 60
+        let seconds = Int(timeInterval) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 }
 
