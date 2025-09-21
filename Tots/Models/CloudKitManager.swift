@@ -23,11 +23,7 @@ class CloudKitManager: ObservableObject {
         privateDatabase = container.privateCloudDatabase
         sharedDatabase = container.sharedCloudDatabase
         
-        // Debug: Print which environment we're using
-        print("🔧 CloudKit Environment Info:")
-        print("   Container ID: \(container.containerIdentifier ?? "unknown")")
-        print("   Environment: Production (aps-environment=production)")
-        print("   Database: Private CloudKit Database")
+        // Production CloudKit setup
         
         Task { @MainActor in
             checkAccountStatus()
@@ -44,19 +40,14 @@ class CloudKitManager: ObservableObject {
                     self?.isSignedIn = true
                 case .noAccount:
                     self?.isSignedIn = false
-                    print("❌ No iCloud account")
                 case .restricted:
                     self?.isSignedIn = false
-                    print("❌ iCloud account restricted")
                 case .couldNotDetermine:
                     self?.isSignedIn = false
-                    print("❌ Could not determine iCloud status")
                 case .temporarilyUnavailable:
                     self?.isSignedIn = false
-                    print("⚠️ iCloud temporarily unavailable")
                 @unknown default:
                     self?.isSignedIn = false
-                    print("❌ Unknown iCloud status")
                 }
             }
         }
@@ -108,7 +99,6 @@ class CloudKitManager: ObservableObject {
     func fetchBabyProfiles() async throws -> [CKRecord] {
         // First ensure user record exists
         let userRecord = try await getOrCreateUserRecord()
-        print("🔍 CloudKit: Fetching profiles for user: \(userRecord.recordID.recordName)")
         
         // Query for baby profiles created by this user
         let userReference = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
@@ -116,14 +106,8 @@ class CloudKitManager: ObservableObject {
         let query = CKQuery(recordType: "BabyProfile", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "birthDate", ascending: false)]
         
-        print("🔍 CloudKit: Running query for BabyProfile records...")
         let result = try await privateDatabase.records(matching: query)
         let profiles = result.matchResults.compactMap { try? $0.1.get() }
-        print("🔍 CloudKit: Found \(profiles.count) baby profiles")
-        
-        for (index, profile) in profiles.enumerated() {
-            print("🔍 CloudKit: Profile \(index + 1): \(profile["name"] as? String ?? "Unknown") (ID: \(profile.recordID.recordName))")
-        }
         
         return profiles
     }
@@ -195,7 +179,6 @@ class CloudKitManager: ObservableObject {
     // MARK: - Family Sharing
     
     func shareBabyProfile(_ profileRecord: CKRecord) async throws -> CKShare {
-        print("🔄 Starting CloudKit share process...")
         
         // Create a new record without any reference fields to avoid the reference error
         let cleanRecord = CKRecord(recordType: "BabyProfile")
@@ -206,18 +189,14 @@ class CloudKitManager: ObservableObject {
         cleanRecord["diaperGoal"] = profileRecord["diaperGoal"]
         // Explicitly NOT copying createdBy or other reference fields
         
-        print("📝 Saving clean profile record...")
         let savedRecord = try await privateDatabase.save(cleanRecord)
-        print("✅ Clean record saved: \(savedRecord.recordID.recordName)")
         
         // Create and return the share for UICloudSharingController to handle
-        print("📝 Creating share for UICloudSharingController...")
         let share = CKShare(rootRecord: savedRecord)
         share[CKShare.SystemFieldKey.title] = profileRecord["name"] as? String ?? "Baby Profile"
         share.publicPermission = .none
         
         // Let UICloudSharingController handle the actual share saving
-        print("✅ Returning share for UI controller")
         return share
     }
     
@@ -230,10 +209,8 @@ class CloudKitManager: ObservableObject {
     }
     
     func stopSharingProfile(_ profileRecord: CKRecord) async throws {
-        print("🔄 Attempting to stop sharing profile...")
         // For now, just mark as not shared locally
         // CloudKit will handle the actual share removal
-        print("✅ Sharing stopped locally")
     }
     
     func fetchFamilyMembers(for share: CKShare) async throws -> [FamilyMember] {
@@ -318,100 +295,82 @@ class CloudKitManager: ObservableObject {
         
         // Notify app to show onboarding
         await MainActor.run {
-            print("📢 Posting user_signed_out notification")
             NotificationCenter.default.post(name: .init("user_signed_out"), object: nil)
         }
     }
     
     func deleteAccount() async throws {
-        print("🗑️ CloudKit: Starting comprehensive account deletion...")
         
         // Fetch all user's records and delete them
         let userRecord = try await getOrCreateUserRecord()
-        print("🗑️ CloudKit: Found user record: \(userRecord.recordID.recordName)")
         
         // Delete all baby profiles and associated data
         let profiles = try await fetchBabyProfiles()
-        print("🗑️ CloudKit: Found \(profiles.count) baby profiles to delete")
         
         for profile in profiles {
-            print("🗑️ CloudKit: Deleting profile: \(profile["name"] as? String ?? "Unknown")")
             
             // Stop sharing first (this also deletes the share record)
             do {
                 try await stopSharingProfile(profile)
-                print("✅ CloudKit: Stopped sharing for profile")
             } catch {
-                print("⚠️ CloudKit: Could not stop sharing (might not be shared): \(error)")
             }
             
             // Delete all activities for this profile
             let activities = try await fetchActivities(for: profile.recordID)
-            print("🗑️ CloudKit: Found \(activities.count) activities to delete for this profile")
             
             for activity in activities {
                 do {
                     let activityRecord = try await privateDatabase.record(for: CKRecord.ID(recordName: activity.id.uuidString))
                     try await privateDatabase.deleteRecord(withID: activityRecord.recordID)
-                    print("✅ CloudKit: Deleted activity: \(activity.type.rawValue)")
                 } catch {
-                    print("⚠️ CloudKit: Could not delete activity \(activity.id): \(error)")
                 }
             }
             
             // Delete the profile record
             try await privateDatabase.deleteRecord(withID: profile.recordID)
-            print("✅ CloudKit: Deleted baby profile record")
         }
         
         // Delete any remaining records by querying all record types
-        print("🗑️ CloudKit: Checking for any remaining records...")
         
         // Query for any remaining Activity records
         let activityQuery = CKQuery(recordType: "Activity", predicate: NSPredicate(format: "createdBy == %@", userRecord.recordID))
         do {
             let (activityRecords, _) = try await privateDatabase.records(matching: activityQuery)
-            print("🗑️ CloudKit: Found \(activityRecords.count) remaining activity records")
             for (recordID, result) in activityRecords {
                 switch result {
                 case .success(let record):
                     try await privateDatabase.deleteRecord(withID: record.recordID)
-                    print("✅ CloudKit: Deleted remaining activity record")
-                case .failure(let error):
-                    print("⚠️ CloudKit: Could not fetch activity record \(recordID): \(error)")
+                case .failure(_):
+                    break
                 }
             }
         } catch {
-            print("⚠️ CloudKit: Could not query remaining activities: \(error)")
+            // Ignore errors during cleanup
         }
         
         // Query for any remaining BabyProfile records
         let profileQuery = CKQuery(recordType: "BabyProfile", predicate: NSPredicate(format: "createdBy == %@", userRecord.recordID))
         do {
             let (profileRecords, _) = try await privateDatabase.records(matching: profileQuery)
-            print("🗑️ CloudKit: Found \(profileRecords.count) remaining profile records")
             for (recordID, result) in profileRecords {
                 switch result {
                 case .success(let record):
                     try await privateDatabase.deleteRecord(withID: record.recordID)
-                    print("✅ CloudKit: Deleted remaining profile record")
-                case .failure(let error):
-                    print("⚠️ CloudKit: Could not fetch profile record \(recordID): \(error)")
+                case .failure(_):
+                    break
                 }
             }
         } catch {
-            print("⚠️ CloudKit: Could not query remaining profiles: \(error)")
+            // Ignore errors during cleanup
         }
         
         // Delete user record last
         try await privateDatabase.deleteRecord(withID: userRecord.recordID)
-        print("✅ CloudKit: Deleted user record")
         
         // Clear all local data completely
         let domain = Bundle.main.bundleIdentifier!
         UserDefaults.standard.removePersistentDomain(forName: domain)
         UserDefaults.standard.synchronize()
-        print("✅ CloudKit: Cleared all UserDefaults")
         
         // Reset CloudKit manager state
         await MainActor.run {
@@ -421,14 +380,12 @@ class CloudKitManager: ObservableObject {
             self.syncStatus = .idle
         }
         
-        print("🗑️ CloudKit: Account deletion completed - all iCloud data should be removed")
         
         // Small delay to ensure all cleanup is complete before notifying UI
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         
         // Notify app to show onboarding (single notification)
         await MainActor.run {
-            print("📢 Account deleted - posting user_signed_out notification")
             NotificationCenter.default.post(name: .init("user_signed_out"), object: nil)
         }
     }

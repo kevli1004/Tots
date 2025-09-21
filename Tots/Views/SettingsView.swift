@@ -13,14 +13,15 @@ struct SettingsView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingLogoutConfirmation = false
     @State private var familyMembers: [FamilyMember] = []
-    @State private var showingDebugAlert = false
-    @State private var debugMessage = ""
     @State private var shareDelegate: ShareControllerDelegate?
     @State private var profileImageUpdateTrigger = false
     @State private var showingExportSheet = false
     @State private var showingTrackingGoals = false
     @State private var showingTerms = false
     @State private var showingPrivacyPolicy = false
+    @State private var showingSchemaSetup = false
+    @State private var schemaSetupMessage = ""
+    @State private var isSettingUpSchema = false
     
     var body: some View {
         ZStack {
@@ -69,7 +70,6 @@ struct SettingsView: View {
                     do {
                         try await dataManager.deleteAccount()
                     } catch {
-                        print("❌ Failed to delete account: \(error)")
                         // Even if CloudKit deletion fails, still sign out locally
                         await dataManager.signOut()
                     }
@@ -81,21 +81,13 @@ struct SettingsView: View {
         }
         .confirmationDialog("Sign Out", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
-                print("🚪 Sign Out button tapped")
                 Task {
-                    print("🚪 Starting sign out...")
                     await dataManager.signOut()
-                    print("✅ Signed out successfully")
                 }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will sign you out and clear all local data. Your CloudKit data will remain safe.")
-        }
-        .alert("Debug Info", isPresented: $showingDebugAlert) {
-            Button("OK") { }
-        } message: {
-            Text(debugMessage)
         }
         .sheet(isPresented: $showingExportSheet) {
             ActivityViewController(activityItems: [generateCSVFile()])
@@ -110,10 +102,101 @@ struct SettingsView: View {
         .sheet(isPresented: $showingPrivacyPolicy) {
             PrivacyPolicyView()
         }
+        .alert("CloudKit Schema Setup", isPresented: $showingSchemaSetup) {
+            Button("Setup Now", role: .destructive) {
+                setupCloudKitSchema()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will create all record types in your CloudKit production container. This should only be done once.\n\nContainer: 'iCloud.com.mytotsapp.tots.DB'")
+        }
+        .alert("Schema Setup Result", isPresented: .constant(!schemaSetupMessage.isEmpty)) {
+            Button("OK") { 
+                schemaSetupMessage = ""
+            }
+        } message: {
+            Text(schemaSetupMessage)
+        }
     }
     
     private func exportDataAsCSV() {
         showingExportSheet = true
+    }
+    
+    private func setupCloudKitSchema() {
+        isSettingUpSchema = true
+        
+        Task {
+            do {
+                // First check CloudKit availability and account status
+                let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
+                
+                // Check account status
+                let accountStatus = try await container.accountStatus()
+                guard accountStatus == .available else {
+                    await MainActor.run {
+                        let statusMessage = switch accountStatus {
+                        case .couldNotDetermine: "Could not determine iCloud account status"
+                        case .available: "Available"
+                        case .restricted: "iCloud account is restricted"
+                        case .noAccount: "No iCloud account found"
+                        case .temporarilyUnavailable: "iCloud temporarily unavailable"
+                        @unknown default: "Unknown account status"
+                        }
+                        schemaSetupMessage = "❌ CloudKit Account Issue:\n\n\(statusMessage)\n\nPlease:\n1. Sign in to iCloud in Settings\n2. Enable iCloud for this app\n3. Try again"
+                        isSettingUpSchema = false
+                    }
+                    return
+                }
+                
+                // Check container accessibility
+                let database = container.privateCloudDatabase
+                
+                // Try a simple operation first to test container accessibility
+                let testQuery = CKQuery(recordType: "CloudKitMagicType", predicate: NSPredicate(format: "TRUEPREDICATE"))
+                do {
+                    _ = try await database.records(matching: testQuery)
+                } catch let ckError as CKError {
+                    if ckError.code == .unknownItem {
+                        // This is expected - the record type doesn't exist yet, container is accessible
+                    } else {
+                        throw ckError
+                    }
+                } catch {
+                    throw error
+                }
+                
+                // Create the comprehensive CloudKit schema
+                try await CloudKitSchemaSetup.shared.createProductionSchema()
+                
+                await MainActor.run {
+                    schemaSetupMessage = "✅ CloudKit Schema Setup Complete!\n\nAll record types have been created:\n• BabyProfile\n• Activity\n• Growth\n• Words\n• Milestones\n• FamilyMembers\n• UserPreferences\n\nYour app is ready for production!"
+                    isSettingUpSchema = false
+                }
+            } catch let ckError as CKError {
+                await MainActor.run {
+                    let errorDetails = """
+                    CloudKit Error Details:
+                    • Code: \(ckError.code.rawValue)
+                    • Description: \(ckError.localizedDescription)
+                    • Container: iCloud.com.mytotsapp.tots.DB
+                    
+                    Common Solutions:
+                    1. Ensure container exists in CloudKit Console
+                    2. Check iCloud account is signed in
+                    3. Verify app has CloudKit entitlements
+                    4. Try again in a few minutes
+                    """
+                    schemaSetupMessage = "❌ CloudKit Error:\n\n\(errorDetails)"
+                    isSettingUpSchema = false
+                }
+            } catch {
+                await MainActor.run {
+                    schemaSetupMessage = "❌ Schema Setup Failed:\n\n\(error.localizedDescription)\n\nContainer: iCloud.com.mytotsapp.tots.DB\n\nPlease ensure:\n1. Container exists in CloudKit Console\n2. You're signed in to iCloud\n3. App has CloudKit permissions"
+                    isSettingUpSchema = false
+                }
+            }
+        }
     }
     
     private func generateCSVFile() -> URL {
@@ -125,7 +208,7 @@ struct SettingsView: View {
         do {
             try csvContent.write(to: fileURL, atomically: true, encoding: .utf8)
         } catch {
-            print("Error writing CSV file: \(error)")
+            // Ignore file writing errors
         }
         
         return fileURL
@@ -517,49 +600,13 @@ struct SettingsView: View {
             Divider()
                 .padding(.vertical, 8)
             
-            // Hidden debug buttons
-            /*
-            SettingsRow(
-                icon: "ladybug.fill",
-                title: "Debug CloudKit Data",
-                subtitle: "Check what's in your CloudKit",
-                action: { 
-                    Task {
-                        do {
-                            let profiles = try await dataManager.cloudKitManager.fetchBabyProfiles()
-                            let message = "Found \(profiles.count) baby profiles\n\nApp State:\n• Baby Name: \(dataManager.babyName)\n• Activities: \(dataManager.recentActivities.count)"
-                            await MainActor.run {
-                                debugMessage = message
-                                showingDebugAlert = true
-                            }
-                        } catch {
-                            await MainActor.run {
-                                debugMessage = "CloudKit Error: \(error.localizedDescription)"
-                                showingDebugAlert = true
-                            }
-                        }
-                    }
-                }
-            )
             
             SettingsRow(
-                icon: "arrow.clockwise",
-                title: "Force Reload Profile",
-                subtitle: "Manually reload data from CloudKit",
-                action: { 
-                    Task {
-                        // Clear any cached record ID to force a fresh lookup
-                        UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
-                        await dataManager.loadExistingBabyProfile()
-                        
-                        await MainActor.run {
-                            debugMessage = "Profile reload complete!\n\n• Baby Name: \(dataManager.babyName)\n• Activities: \(dataManager.recentActivities.count)"
-                            showingDebugAlert = true
-                        }
-                    }
-                }
+                icon: "icloud.fill",
+                title: "Setup CloudKit Schema",
+                subtitle: "One-click setup for production CloudKit",
+                action: { showingSchemaSetup = true }
             )
-            */
             
             SettingsRow(
                 icon: "trash.fill",
@@ -587,10 +634,7 @@ struct SettingsView: View {
                 }
             }
         } catch {
-            await MainActor.run {
-                debugMessage = "❌ Sharing setup failed:\n\(error.localizedDescription)\n\nPlease try again."
-                showingDebugAlert = true
-            }
+            // Ignore sharing setup errors
         }
     }
     
@@ -603,7 +647,6 @@ struct SettingsView: View {
         let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
         
         // Always use the preparation handler to ensure proper setup
-        print("📱 Setting up CloudKit sharing UI...")
         let shareController = UICloudSharingController { controller, prepareCompletionHandler in
             // The share and container are prepared here
             prepareCompletionHandler(share, container, nil)
@@ -982,7 +1025,6 @@ struct PersonalDetailsView: View {
     
     private func exportData() {
         // Future: Implement data export functionality
-        print("Export data functionality would be implemented here")
     }
     
     private func clearAllData() {
@@ -1054,7 +1096,6 @@ struct FamilyManagerView: View {
                             dataManager.familySharingEnabled = true
                             UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
                             hasActiveShare = true
-                            print("✅ Family sharing enabled successfully")
                         }) {
                             HStack {
                                 Image(systemName: "person.3.fill")
@@ -1110,7 +1151,6 @@ struct FamilyManagerView: View {
                 hasActiveShare = await dataManager.cloudKitManager.activeShare != nil
                 isLoading = false
             } catch {
-                print("Failed to fetch family members: \(error)")
                 isLoading = false
             }
         }
@@ -1128,7 +1168,6 @@ struct FamilyManagerView: View {
             
             Button(action: {
                 Task {
-                    print("🔄 Manual Data Reload - Starting...")
                     await dataManager.loadExistingBabyProfile()
                 }
             }) {
@@ -1202,7 +1241,6 @@ struct FamilyMemberRow: View {
 // CloudKit sharing delegate
 class ShareControllerDelegate: NSObject, UICloudSharingControllerDelegate {
     func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: Error) {
-        print("❌ Failed to save share: \(error)")
     }
     
     func itemTitle(for csc: UICloudSharingController) -> String? {
@@ -1219,11 +1257,9 @@ class ShareControllerDelegate: NSObject, UICloudSharingControllerDelegate {
     }
     
     func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {
-        print("✅ Share saved successfully")
     }
     
     func cloudSharingControllerDidStopSharing(_ csc: UICloudSharingController) {
-        print("ℹ️ Sharing stopped")
     }
 }
 

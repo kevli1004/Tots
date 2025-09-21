@@ -452,9 +452,7 @@ struct OnboardingView: View {
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if granted {
-                print("Notification permission granted")
             } else {
-                print("Notification permission denied")
             }
         }
     }

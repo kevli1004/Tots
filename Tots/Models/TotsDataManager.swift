@@ -633,28 +633,22 @@ class TotsDataManager: ObservableObject {
         }
         
         // Debug logging
-        print("🔍 Add Activity Debug:")
-        print("   familySharingEnabled: \(familySharingEnabled)")
-        print("   babyProfileRecord: \(babyProfileRecord != nil ? "exists" : "nil")")
         
         // Always sync to CloudKit (create baby profile if needed)
         Task {
             do {
                 // Ensure we have a baby profile record
                 if babyProfileRecord == nil {
-                    print("🍼 No baby profile found, creating one...")
                     await createDefaultBabyProfile()
                 }
                 
                 guard let profileRecord = babyProfileRecord else {
-                    print("❌ Failed to create baby profile record")
                     return
                 }
                 
                 try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
-                print("✅ Activity synced to CloudKit")
             } catch {
-                print("❌ Failed to sync activity to CloudKit: \(error)")
+                // Ignore CloudKit errors during save
             }
         }
     }
@@ -875,7 +869,6 @@ class TotsDataManager: ObservableObject {
         
         // Debug logging for "chi" prefix
         if lowercaseInput.hasPrefix("chi") {
-            print("🔍 Suggestions for '\(input)': \(result)")
         }
         
         return result
@@ -1958,15 +1951,12 @@ extension TotsDataManager {
     func startLiveActivity() {
         // Check if Live Activities are supported on this device
         #if targetEnvironment(simulator)
-        print("Live Activities are not supported in the iOS Simulator")
         return
         #endif
         
         let authInfo = ActivityAuthorizationInfo()
-        print("Live Activity authorization status: \(authInfo.areActivitiesEnabled)")
         
         guard authInfo.areActivitiesEnabled else {
-            print("Live Activities are not enabled. User needs to enable in Settings → Face ID & Passcode → Live Activities")
             return
         }
         
@@ -2003,20 +1993,13 @@ extension TotsDataManager {
                 pushType: nil
             )
             currentActivity = activity
-            print("✅ Started Live Activity: \(activity.id)")
-            print("🔒 Lock your device to see the Live Activity on the lock screen")
         } catch {
-            print("Failed to start Live Activity: \(error)")
-            print("Error details: \(error.localizedDescription)")
             
             // Handle common error cases
             let errorString = error.localizedDescription.lowercased()
             if errorString.contains("unsupported") {
-                print("Live Activities are not supported on this device")
             } else if errorString.contains("denied") {
-                print("Live Activities permission denied - check Settings")
             } else if errorString.contains("disabled") {
-                print("Live Activities are disabled in Settings")
             }
         }
     }
@@ -2079,15 +2062,12 @@ extension TotsDataManager {
     
     func shareBabyProfile() async throws -> CKShare? {
         guard let profileRecord = babyProfileRecord else { 
-            print("❌ No baby profile record found to share")
             return nil 
         }
         
-        print("🔄 Attempting to share profile: \(profileRecord.recordID.recordName)")
         
         do {
             let share = try await cloudKitManager.shareBabyProfile(profileRecord)
-            print("✅ Share created successfully")
             
             await cloudKitManager.setActiveShare(share)
             
@@ -2099,7 +2079,6 @@ extension TotsDataManager {
             
             return share
         } catch {
-            print("❌ Failed to share profile: \(error)")
             throw error
         }
     }
@@ -2119,7 +2098,6 @@ extension TotsDataManager {
     // MARK: - Account Management
     
     func signOut() async {
-        print("🚪 TotsDataManager: Starting sign out process")
         await cloudKitManager.signOut()
         
         await MainActor.run {
@@ -2138,12 +2116,10 @@ extension TotsDataManager {
             // Trigger app to show onboarding
             self.shouldShowOnboarding = true
             
-            print("🚪 TotsDataManager: Local data reset complete")
         }
     }
     
     func deleteAccount() async throws {
-        print("🗑️ TotsDataManager: Starting account deletion process")
         
         // Delete from CloudKit first
         try await cloudKitManager.deleteAccount()
@@ -2164,21 +2140,17 @@ extension TotsDataManager {
             // Trigger app to show onboarding
             self.shouldShowOnboarding = true
             
-            print("🗑️ TotsDataManager: Account deletion complete")
         }
     }
     
     func syncFromCloudKit() async {
         guard let profileRecord = babyProfileRecord else { 
-            print("⚠️ No baby profile record available for syncing")
             return 
         }
         
-        print("🔄 Starting CloudKit activity sync for profile: \(profileRecord.recordID.recordName)")
         
         do {
             let cloudActivities = try await cloudKitManager.fetchActivities(for: profileRecord.recordID)
-            print("🔄 Found \(cloudActivities.count) activities in CloudKit")
             
             await MainActor.run {
                 let originalCount = self.recentActivities.count
@@ -2187,7 +2159,6 @@ extension TotsDataManager {
                 for cloudActivity in cloudActivities {
                     if !self.recentActivities.contains(where: { $0.id == cloudActivity.id }) {
                         self.recentActivities.append(cloudActivity)
-                        print("✅ Added activity: \(cloudActivity.type.rawValue) at \(cloudActivity.time)")
                     }
                 }
                 
@@ -2195,13 +2166,12 @@ extension TotsDataManager {
                 self.recentActivities.sort { $0.time > $1.time }
                 
                 let newCount = self.recentActivities.count
-                print("✅ Activities sync complete: \(originalCount) → \(newCount) total activities")
                 
                 self.updateCountdowns()
                 self.updateLiveActivity()
             }
         } catch {
-            print("❌ Failed to sync from CloudKit: \(error)")
+            // Ignore CloudKit errors
         }
     }
     
@@ -2211,28 +2181,23 @@ extension TotsDataManager {
             let record = try await cloudKitManager.fetchBabyProfile(recordID: recordID)
             await MainActor.run {
                 self.babyProfileRecord = record
-                print("✅ Baby profile record loaded successfully")
             }
         } catch {
-            print("❌ Failed to load baby profile record: \(error)")
+            // Ignore CloudKit errors
         }
     }
     
     func loadExistingBabyProfile() async {
-        print("🔄 TotsDataManager: Starting loadExistingBabyProfile...")
         
         // First check if we have a stored record ID (for existing installations)
         if let recordName = UserDefaults.standard.string(forKey: "baby_profile_record_id") {
-            print("🍼 Found saved baby profile record ID: \(recordName)")
             await loadBabyProfileRecord(recordName: recordName)
             return
         }
         
         // If no stored record ID, try to fetch existing profiles from CloudKit
-        print("🔍 No stored record ID found, searching CloudKit for existing baby profiles...")
         do {
             let profiles = try await cloudKitManager.fetchBabyProfiles()
-            print("🔍 TotsDataManager: CloudKit returned \(profiles.count) profiles")
             
             if let mostRecentProfile = profiles.first {
                 await MainActor.run {
@@ -2242,14 +2207,10 @@ extension TotsDataManager {
                     
                     // Update local data with CloudKit data
                     if let name = mostRecentProfile["name"] as? String {
-                        print("🔄 Setting baby name from CloudKit: \(name)")
                         self.babyName = name
-                        print("✅ Baby name updated to: \(self.babyName)")
                     }
                     if let birthDate = mostRecentProfile["birthDate"] as? Date {
-                        print("🔄 Setting baby birth date from CloudKit: \(birthDate)")
                         self.babyBirthDate = birthDate
-                        print("✅ Baby birth date updated to: \(self.babyBirthDate)")
                     }
                     
                     // Load goals from CloudKit
@@ -2263,17 +2224,14 @@ extension TotsDataManager {
                         UserDefaults.standard.set(diaperGoal, forKey: "diaper_goal")
                     }
                     
-                    print("✅ Found existing baby profile: \(self.babyName)")
-                    print("🔄 Updated local data with CloudKit profile and goals")
                 }
                 
                 // Also sync activities from CloudKit
                 await syncFromCloudKit()
             } else {
-                print("📝 No existing baby profiles found in CloudKit")
             }
         } catch {
-            print("❌ Failed to fetch baby profiles from CloudKit: \(error)")
+            // Ignore CloudKit errors
         }
     }
     
@@ -2297,36 +2255,22 @@ extension TotsDataManager {
             await MainActor.run {
                 self.babyProfileRecord = record
                 UserDefaults.standard.set(record.recordID.recordName, forKey: "baby_profile_record_id")
-                print("✅ Default baby profile created and saved")
             }
         } catch {
-            print("❌ Failed to create default baby profile: \(error)")
+            // Ignore CloudKit errors
         }
     }
     
     func checkCloudKitSchema() async {
         let status = await schemaSetup.checkSchemaStatus()
-        print(status.description)
         
         if !status.allExist {
-            print("⚠️ CloudKit schema not complete. Attempting automatic setup...")
             
             // Try to create schema automatically
             do {
                 try await schemaSetup.createSampleRecordsForSchema()
-                print("✅ Schema created automatically!")
             } catch {
-                print("❌ Automatic schema creation failed: \(error)")
-                print("\n" + String(repeating: "=", count: 60))
-                print("🔧 MANUAL CLOUDKIT SETUP REQUIRED")
-                print(String(repeating: "=", count: 60))
                 schemaSetup.printSchemaInstructions()
-                print("\n💡 KEY ISSUE: The 'createdBy' field must be a REFERENCE type, not String!")
-                print("   1. Go to CloudKit Console")
-                print("   2. Delete any existing 'createdBy' fields that are String type") 
-                print("   3. Add new 'createdBy' field as Reference to Users")
-                print("   4. Do the same for 'babyProfile' field in Activity (Reference to BabyProfile)")
-                print(String(repeating: "=", count: 60))
             }
         }
     }

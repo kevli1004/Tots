@@ -79,7 +79,6 @@ struct OnboardingView: View {
                 await MainActor.run {
                     if !profiles.isEmpty {
                         // Found existing data - load it and skip onboarding
-                        print("🎉 Found existing baby profiles, loading data and completing onboarding")
                         UserDefaults.standard.set(true, forKey: "onboarding_completed")
                         
                         // Load the profile data into the app
@@ -91,12 +90,10 @@ struct OnboardingView: View {
                         }
                     } else {
                         // No existing data - show registration steps
-                        print("ℹ️ No existing data found, showing registration steps")
                         proceedToRegistration()
                     }
                 }
             } catch {
-                print("⚠️ CloudKit check failed: \(error)")
                 await MainActor.run {
                     // On error, show registration steps
                     proceedToRegistration()
@@ -822,7 +819,6 @@ struct OnboardingView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
                     
-                    // Debug info (remove in production)
                     if babyName.isEmpty {
                         Text("⚠️ Baby name is required to continue")
                             .font(.system(.caption, design: .rounded))
@@ -921,7 +917,6 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
                 
-                // Debug info (remove in production)
                 if babyName.isEmpty {
                     Text("⚠️ Baby name is required to continue")
                         .font(.system(.caption, design: .rounded))
@@ -1016,13 +1011,11 @@ struct OnboardingView: View {
                 
                 isSignedIn = true
                 
-                print("✅ Apple Sign In successful for: \(userName)")
                 
                 // Now check for existing profiles
                 checkForExistingData()
             }
         case .failure(let error):
-            print("❌ Apple Sign In failed: \(error.localizedDescription)")
             // On sign in failure, show registration steps
             proceedToRegistration()
         }
@@ -1156,9 +1149,7 @@ struct OnboardingView: View {
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if granted {
-                print("Notification permission granted")
             } else {
-                print("Notification permission denied")
             }
         }
     }

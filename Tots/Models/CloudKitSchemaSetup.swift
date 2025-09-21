@@ -13,62 +13,7 @@ class CloudKitSchemaSetup {
     // MARK: - Schema Instructions
     
     func printSchemaInstructions() {
-        print("""
         
-        📋 CLOUDKIT SCHEMA SETUP INSTRUCTIONS
-        =====================================
-        
-        Follow these steps to set up your CloudKit schema:
-        
-        1. Open CloudKit Console: https://icloud.developer.apple.com/dashboard/
-        2. Select your app and Development environment
-        3. Go to Schema → Record Types
-        
-        4. Create "Users" record type with fields:
-           - displayName (String, Required)
-           - email (String, Optional)
-           - role (String, Required)
-           - joinedDate (Date/Time, Required)
-           - isActive (Int(64), Required)
-        
-        5. Create "BabyProfile" record type with fields:
-           - name (String, Required)
-           - birthDate (Date/Time, Required)
-           - feedingGoal (Int(64), Required)
-           - sleepGoal (Double, Required)
-           - diaperGoal (Int(64), Required)
-           - createdBy (Reference to Users, Required)
-        
-        6. Create "Activity" record type with fields:
-           - type (String, Required)
-           - time (Date/Time, Required)
-           - details (String, Required)
-           - mood (String, Required)
-           - duration (Int(64), Optional)
-           - notes (String, Optional)
-           - weight (Double, Optional)
-           - height (Double, Optional)
-           - babyProfile (Reference to BabyProfile, Required)
-           - createdBy (Reference to Users, Required)
-        
-        7. Create Indexes (IMPORTANT for queries):
-           - Activity: Index on "babyProfile" (QUERYABLE)
-           - Activity: Index on "time" (QUERYABLE, SORTABLE)
-           - BabyProfile: Index on "birthDate" (QUERYABLE, SORTABLE)
-           - BabyProfile: Index on "createdBy" (QUERYABLE)
-           - Users: Index on "email" (QUERYABLE)
-        
-        8. Deploy to Production:
-           - After testing in Development, deploy schema to Production
-           - Go to Schema → Deploy Schema Changes → Deploy to Production
-        
-        ⚠️  IMPORTANT: 
-        - Make sure iCloud is enabled in your app's capabilities
-        - Test thoroughly in Development before deploying to Production
-        - Schema changes in Production are permanent and cannot be undone
-        - ALL indexes are required for the app to work properly
-        
-        """)
     }
     
     // MARK: - Schema Validation
@@ -114,13 +59,11 @@ class CloudKitSchemaSetup {
     // MARK: - Development Helper (Creates sample records to establish schema)
     
     func createSampleRecordsForSchema() async throws {
-        print("🔧 Creating CloudKit schema step by step...")
         
         let uniqueID = UUID().uuidString.prefix(8)
         
         do {
             // Step 1: Create Users record type first
-            print("📝 Step 1: Creating Users record type...")
             let userRecordID = CKRecord.ID(recordName: "schema_user_\(uniqueID)")
             let userRecord = CKRecord(recordType: "Users", recordID: userRecordID)
             userRecord["displayName"] = "Schema User"
@@ -130,10 +73,8 @@ class CloudKitSchemaSetup {
             userRecord["isActive"] = 1
             
             let savedUser = try await privateDatabase.save(userRecord)
-            print("✅ Users record type created successfully")
             
             // Step 2: Create BabyProfile record type (without Reference first)
-            print("📝 Step 2: Creating BabyProfile record type...")
             let profileRecordID = CKRecord.ID(recordName: "schema_profile_\(uniqueID)")
             let profileRecord = CKRecord(recordType: "BabyProfile", recordID: profileRecordID)
             profileRecord["name"] = "Schema Baby"
@@ -146,7 +87,6 @@ class CloudKitSchemaSetup {
             do {
                 profileRecord["createdBy"] = CKRecord.Reference(recordID: savedUser.recordID, action: .none)
                 let savedProfile = try await privateDatabase.save(profileRecord)
-                print("✅ BabyProfile with Reference field created successfully")
                 
                 // Step 3: Create Activity record type
                 try await createActivityRecord(profileRecord: savedProfile, userRecord: savedUser, uniqueID: String(uniqueID))
@@ -155,7 +95,6 @@ class CloudKitSchemaSetup {
                 try await cleanupRecords(userID: savedUser.recordID, profileID: savedProfile.recordID)
                 
             } catch let error as CKError where error.code == .invalidArguments {
-                print("⚠️ Reference field not supported yet, creating basic record first...")
                 
                 // Create without Reference field first to establish the record type
                 let basicProfile = CKRecord(recordType: "BabyProfile")
@@ -166,7 +105,6 @@ class CloudKitSchemaSetup {
                 basicProfile["diaperGoal"] = 1
                 
                 let basicSaved = try await privateDatabase.save(basicProfile)
-                print("✅ Basic BabyProfile record type created")
                 
                 // Clean up and throw error with instructions
                 try await privateDatabase.deleteRecord(withID: basicSaved.recordID)
@@ -176,13 +114,11 @@ class CloudKitSchemaSetup {
             }
             
         } catch {
-            print("❌ Schema creation failed: \(error)")
             throw error
         }
     }
     
     private func createActivityRecord(profileRecord: CKRecord, userRecord: CKRecord, uniqueID: String) async throws {
-        print("📝 Step 3: Creating Activity record type...")
         let activityRecordID = CKRecord.ID(recordName: "schema_activity_\(uniqueID)")
         let activityRecord = CKRecord(recordType: "Activity", recordID: activityRecordID)
         activityRecord["type"] = "feeding"
@@ -195,15 +131,12 @@ class CloudKitSchemaSetup {
         activityRecord["createdBy"] = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
         
         _ = try await privateDatabase.save(activityRecord)
-        print("✅ Activity record type created successfully")
     }
     
     private func cleanupRecords(userID: CKRecord.ID, profileID: CKRecord.ID) async throws {
-        print("🧹 Cleaning up schema records...")
         // Note: Activity will be deleted automatically due to cascade delete
         try await privateDatabase.deleteRecord(withID: profileID)
         try await privateDatabase.deleteRecord(withID: userID)
-        print("✅ Schema setup complete and cleaned up!")
     }
 }
 
@@ -236,5 +169,197 @@ struct SchemaStatus {
         - BabyProfile: \(babyProfileExists ? "✅" : "❌") 
         - Activity: \(activityExists ? "✅" : "❌")
         """
+    }
+}
+
+// MARK: - Production Schema Setup Extension
+extension CloudKitSchemaSetup {
+    
+    func createProductionSchema() async throws {
+        // Create all record types for production by creating and deleting sample records
+        do {
+            try await createBabyProfileSchema()
+        } catch {
+            throw NSError(domain: "CloudKitSchemaSetup", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create BabyProfile schema: \(error.localizedDescription)"
+            ])
+        }
+        
+        do {
+            try await createActivitySchema()
+        } catch {
+            throw NSError(domain: "CloudKitSchemaSetup", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create Activity schema: \(error.localizedDescription)"
+            ])
+        }
+        
+        do {
+            try await createGrowthSchema()
+        } catch {
+            throw NSError(domain: "CloudKitSchemaSetup", code: 3, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create Growth schema: \(error.localizedDescription)"
+            ])
+        }
+        
+        do {
+            try await createWordsSchema()
+        } catch {
+            throw NSError(domain: "CloudKitSchemaSetup", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create Words schema: \(error.localizedDescription)"
+            ])
+        }
+        
+        do {
+            try await createMilestonesSchema()
+        } catch {
+            throw NSError(domain: "CloudKitSchemaSetup", code: 5, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create Milestones schema: \(error.localizedDescription)"
+            ])
+        }
+        
+        do {
+            try await createFamilyMembersSchema()
+        } catch {
+            throw NSError(domain: "CloudKitSchemaSetup", code: 6, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create FamilyMembers schema: \(error.localizedDescription)"
+            ])
+        }
+        
+        do {
+            try await createUserPreferencesSchema()
+        } catch {
+            throw NSError(domain: "CloudKitSchemaSetup", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create UserPreferences schema: \(error.localizedDescription)"
+            ])
+        }
+    }
+    
+    private func createBabyProfileSchema() async throws {
+        let record = CKRecord(recordType: "BabyProfile")
+        record["name"] = "Schema Setup" as CKRecordValue
+        record["primaryName"] = "Setup" as CKRecordValue
+        record["birthday"] = Date() as CKRecordValue
+        record["profileImageData"] = Data() as CKRecordValue
+        record["createdAt"] = Date() as CKRecordValue
+        record["updatedAt"] = Date() as CKRecordValue
+        record["familyID"] = "schema_family" as CKRecordValue
+        record["preferences"] = "{}" as CKRecordValue
+        
+        let saved = try await privateDatabase.save(record)
+        try await privateDatabase.deleteRecord(withID: saved.recordID)
+    }
+    
+    private func createActivitySchema() async throws {
+        let record = CKRecord(recordType: "Activity")
+        record["type"] = "feeding" as CKRecordValue
+        record["time"] = Date() as CKRecordValue
+        record["details"] = "Schema setup" as CKRecordValue
+        record["duration"] = 30 as CKRecordValue
+        record["mood"] = "content" as CKRecordValue
+        record["notes"] = "Setup" as CKRecordValue
+        record["location"] = "Home" as CKRecordValue
+        record["weather"] = "Clear" as CKRecordValue
+        record["feedingType"] = "bottle" as CKRecordValue
+        record["feedingAmount"] = 4.0 as CKRecordValue
+        record["diaperType"] = "wet" as CKRecordValue
+        record["activitySubType"] = "tummyTime" as CKRecordValue
+        record["createdAt"] = Date() as CKRecordValue
+        record["updatedAt"] = Date() as CKRecordValue
+        record["familyID"] = "schema_family" as CKRecordValue
+        
+        let saved = try await privateDatabase.save(record)
+        try await privateDatabase.deleteRecord(withID: saved.recordID)
+    }
+    
+    private func createGrowthSchema() async throws {
+        let record = CKRecord(recordType: "Growth")
+        record["date"] = Date() as CKRecordValue
+        record["weight"] = 3.5 as CKRecordValue
+        record["height"] = 50.0 as CKRecordValue
+        record["headCircumference"] = 35.0 as CKRecordValue
+        record["weightUnit"] = "kg" as CKRecordValue
+        record["heightUnit"] = "cm" as CKRecordValue
+        record["headCircumferenceUnit"] = "cm" as CKRecordValue
+        record["notes"] = "Schema setup" as CKRecordValue
+        record["percentileWeight"] = 50.0 as CKRecordValue
+        record["percentileHeight"] = 50.0 as CKRecordValue
+        record["percentileHeadCircumference"] = 50.0 as CKRecordValue
+        record["createdAt"] = Date() as CKRecordValue
+        record["updatedAt"] = Date() as CKRecordValue
+        record["familyID"] = "schema_family" as CKRecordValue
+        
+        let saved = try await privateDatabase.save(record)
+        try await privateDatabase.deleteRecord(withID: saved.recordID)
+    }
+    
+    private func createWordsSchema() async throws {
+        let record = CKRecord(recordType: "Words")
+        record["word"] = "mama" as CKRecordValue
+        record["category"] = "people" as CKRecordValue
+        record["dateFirstSaid"] = Date() as CKRecordValue
+        record["notes"] = "First word!" as CKRecordValue
+        record["isCustom"] = 0 as CKRecordValue
+        record["pronunciation"] = "ma-ma" as CKRecordValue
+        record["context"] = "Looking at mom" as CKRecordValue
+        record["createdAt"] = Date() as CKRecordValue
+        record["updatedAt"] = Date() as CKRecordValue
+        record["familyID"] = "schema_family" as CKRecordValue
+        
+        let saved = try await privateDatabase.save(record)
+        try await privateDatabase.deleteRecord(withID: saved.recordID)
+    }
+    
+    private func createMilestonesSchema() async throws {
+        let record = CKRecord(recordType: "Milestones")
+        record["title"] = "First Smile" as CKRecordValue
+        record["description"] = "Baby's first social smile" as CKRecordValue
+        record["ageGroup"] = "0-3 months" as CKRecordValue
+        record["minAgeWeeks"] = 4 as CKRecordValue
+        record["maxAgeWeeks"] = 12 as CKRecordValue
+        record["category"] = "social" as CKRecordValue
+        record["isCompleted"] = 0 as CKRecordValue
+        record["completedDate"] = Date() as CKRecordValue
+        record["isCustom"] = 0 as CKRecordValue
+        record["notes"] = "Schema setup" as CKRecordValue
+        record["createdAt"] = Date() as CKRecordValue
+        record["updatedAt"] = Date() as CKRecordValue
+        record["familyID"] = "schema_family" as CKRecordValue
+        
+        let saved = try await privateDatabase.save(record)
+        try await privateDatabase.deleteRecord(withID: saved.recordID)
+    }
+    
+    private func createFamilyMembersSchema() async throws {
+        let record = CKRecord(recordType: "FamilyMembers")
+        record["name"] = "Parent" as CKRecordValue
+        record["email"] = "parent@example.com" as CKRecordValue
+        record["role"] = "parent" as CKRecordValue
+        record["permissions"] = "{\"canEdit\": true}" as CKRecordValue
+        record["inviteStatus"] = "accepted" as CKRecordValue
+        record["invitedAt"] = Date() as CKRecordValue
+        record["joinedAt"] = Date() as CKRecordValue
+        record["familyID"] = "schema_family" as CKRecordValue
+        record["createdAt"] = Date() as CKRecordValue
+        record["updatedAt"] = Date() as CKRecordValue
+        
+        let saved = try await privateDatabase.save(record)
+        try await privateDatabase.deleteRecord(withID: saved.recordID)
+    }
+    
+    private func createUserPreferencesSchema() async throws {
+        let record = CKRecord(recordType: "UserPreferences")
+        record["useMetricUnits"] = 1 as CKRecordValue
+        record["trackingGoals"] = "{\"feeding\": 180, \"diaper\": 240}" as CKRecordValue
+        record["notificationSettings"] = "{}" as CKRecordValue
+        record["privacySettings"] = "{}" as CKRecordValue
+        record["appTheme"] = "auto" as CKRecordValue
+        record["language"] = "en" as CKRecordValue
+        record["timeZone"] = "UTC" as CKRecordValue
+        record["createdAt"] = Date() as CKRecordValue
+        record["updatedAt"] = Date() as CKRecordValue
+        record["familyID"] = "schema_family" as CKRecordValue
+        
+        let saved = try await privateDatabase.save(record)
+        try await privateDatabase.deleteRecord(withID: saved.recordID)
     }
 }

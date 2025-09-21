@@ -42,8 +42,6 @@ struct TotsApp: App {
                 checkForExistingUserData()
             }
             .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_out"))) { _ in
-                print("📱 TotsApp: Received user_signed_out notification - resetting to onboarding")
-                print("📱 TotsApp: Current showOnboarding = \(showOnboarding)")
                 
                 // Reset to show onboarding from the beginning
                 showOnboarding = true
@@ -52,11 +50,9 @@ struct TotsApp: App {
                 // Also make sure UserDefaults reflects this
                 UserDefaults.standard.set(false, forKey: "onboarding_completed")
                 
-                print("📱 TotsApp: Set showOnboarding = \(showOnboarding)")
             }
             .onChange(of: dataManager.shouldShowOnboarding) { shouldShow in
                 if shouldShow {
-                    print("📱 TotsApp: DataManager triggered onboarding - showing sign-in")
                     showOnboarding = true
                     isCheckingExistingData = false
                     UserDefaults.standard.set(false, forKey: "onboarding_completed")
