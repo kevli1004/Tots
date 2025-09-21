@@ -55,7 +55,7 @@ struct AddActivityView: View {
     @State private var leftPumpingTimer: Timer?
     @State private var leftPumpingMinutes: String = ""
     @State private var leftPumpingSeconds: String = ""
-
+    
     @State private var rightPumpingIsRunning = false
     @State private var rightPumpingStartTime: Date?
     @State private var rightPumpingElapsed: TimeInterval = 0
@@ -158,7 +158,7 @@ struct AddActivityView: View {
                         if hasActiveTimers {
                             showingCancelConfirmation = true
                         } else {
-                            dismiss()
+                        dismiss()
                         }
                     }
                 }
@@ -303,7 +303,7 @@ struct AddActivityView: View {
                 restoreBreastfeedingTimer()
                 restorePumpingTimers()
                 if let preselectedType = preselectedType {
-                    selectedActivityType = preselectedType
+                selectedActivityType = preselectedType
                     if let preselectedFeedingType = preselectedFeedingType {
                         feedingType = preselectedFeedingType
                     }
@@ -1336,10 +1336,10 @@ struct AddActivityView: View {
     private var pumpingDetailsView: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Text("Pumping Session")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+            Text("Pumping Session")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
                 
                 Spacer()
                 
@@ -1388,7 +1388,7 @@ struct AddActivityView: View {
             }
             
             HStack(spacing: 20) {
-                    // Left breast timer
+                // Left breast timer
                 VStack(spacing: 16) {
                     Text("Left Breast")
                         .font(.headline)
@@ -1440,55 +1440,55 @@ struct AddActivityView: View {
                             }
                         }
                     } else {
-                        VStack(spacing: 8) {
-                            Text(formatElapsedTime(leftPumpingElapsed))
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
-                                .foregroundColor(leftPumpingIsRunning ? .cyan : .primary)
-                            
+                    VStack(spacing: 8) {
+                        Text(formatTime(leftPumpingElapsed))
+                            .font(.system(size: 32, weight: .bold, design: .monospaced))
+                            .foregroundColor(leftPumpingIsRunning ? .cyan : .primary)
+                        
                             Text(leftPumpingIsRunning ? "Running" : (leftPumpingElapsed > 0 ? "Paused" : "Stopped"))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         }
                     }
                     
                     // Left timer controls - only show if not editing and not in manual mode
                     if editingActivity == nil && !pumpingManualMode {
-                        VStack(spacing: 8) {
-                            if leftPumpingIsRunning {
-                                Button(action: stopLeftPumping) {
-                                    HStack {
+                    VStack(spacing: 8) {
+                        if leftPumpingIsRunning {
+                            Button(action: stopLeftPumping) {
+                                HStack {
                                         Image(systemName: "pause.fill")
                                         Text("Pause")
-                                    }
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.red)
-                                    .cornerRadius(8)
                                 }
-                            } else {
-                                Button(action: startLeftPumping) {
-                                    HStack {
-                                        Image(systemName: "play.fill")
-                                        Text(leftPumpingElapsed > 0 ? "Resume" : "Start")
-                                    }
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.green)
-                                    .cornerRadius(8)
-                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.red)
+                                .cornerRadius(8)
                             }
-                            
-                            Button(action: resetLeftPumping) {
+                        } else {
+                            Button(action: startLeftPumping) {
                                 HStack {
-                                    Image(systemName: "arrow.counterclockwise")
-                                    Text("Reset")
+                                    Image(systemName: "play.fill")
+                                        Text(leftPumpingElapsed > 0 ? "Resume" : "Start")
                                 }
-                                .font(.caption)
-                                .foregroundColor(.blue)
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                    .background(Color.green)
+                                .cornerRadius(8)
+                            }
+                        }
+                        
+                        Button(action: resetLeftPumping) {
+                            HStack {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("Reset")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
                             }
                         }
                     }
@@ -1550,55 +1550,55 @@ struct AddActivityView: View {
                             }
                         }
                     } else {
-                        VStack(spacing: 8) {
-                            Text(formatElapsedTime(rightPumpingElapsed))
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
-                                .foregroundColor(rightPumpingIsRunning ? .cyan : .primary)
-                            
+                    VStack(spacing: 8) {
+                        Text(formatTime(rightPumpingElapsed))
+                            .font(.system(size: 32, weight: .bold, design: .monospaced))
+                            .foregroundColor(rightPumpingIsRunning ? .cyan : .primary)
+                        
                             Text(rightPumpingIsRunning ? "Running" : (rightPumpingElapsed > 0 ? "Paused" : "Stopped"))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         }
                     }
                     
                     // Right timer controls - only show if not editing and not in manual mode
                     if editingActivity == nil && !pumpingManualMode {
-                        VStack(spacing: 8) {
-                            if rightPumpingIsRunning {
-                                Button(action: stopRightPumping) {
-                                    HStack {
+                    VStack(spacing: 8) {
+                        if rightPumpingIsRunning {
+                            Button(action: stopRightPumping) {
+                                HStack {
                                         Image(systemName: "pause.fill")
                                         Text("Pause")
-                                    }
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.red)
-                                    .cornerRadius(8)
                                 }
-                            } else {
-                                Button(action: startRightPumping) {
-                                    HStack {
-                                        Image(systemName: "play.fill")
-                                        Text(rightPumpingElapsed > 0 ? "Resume" : "Start")
-                                    }
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.green)
-                                    .cornerRadius(8)
-                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.red)
+                                .cornerRadius(8)
                             }
-                            
-                            Button(action: resetRightPumping) {
+                        } else {
+                            Button(action: startRightPumping) {
                                 HStack {
-                                    Image(systemName: "arrow.counterclockwise")
-                                    Text("Reset")
+                                    Image(systemName: "play.fill")
+                                        Text(rightPumpingElapsed > 0 ? "Resume" : "Start")
                                 }
-                                .font(.caption)
-                                .foregroundColor(.blue)
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                    .background(Color.green)
+                                .cornerRadius(8)
+                            }
+                        }
+                        
+                        Button(action: resetRightPumping) {
+                            HStack {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("Reset")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
                             }
                         }
                     }
@@ -1615,7 +1615,7 @@ struct AddActivityView: View {
                     .font(.headline)
                     .fontWeight(.semibold)
                 
-                Text(formatElapsedTime(leftPumpingElapsed + rightPumpingElapsed))
+                Text(formatTime(leftPumpingElapsed + rightPumpingElapsed))
                     .font(.system(size: 24, weight: .bold, design: .monospaced))
                     .foregroundColor(.primary)
             }
@@ -1852,8 +1852,8 @@ struct AddActivityView: View {
             
         case .pumping:
             // Parse pumping session from details like "Left: 10m 30s, Right: 8m 45s, Total: 19m 15s"
-            let leftPattern = #"Left:\s*(\d+)m\s*(\d+)s"#
-            let rightPattern = #"Right:\s*(\d+)m\s*(\d+)s"#
+            let leftPattern = #"left:\s*(\d+)m\s*(\d+)s"#
+            let rightPattern = #"right:\s*(\d+)m\s*(\d+)s"#
             
             if let leftRegex = try? NSRegularExpression(pattern: leftPattern),
                let leftMatch = leftRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
@@ -1877,6 +1877,72 @@ struct AddActivityView: View {
                 // Populate text fields for editing
                 rightPumpingMinutes = String(rightMinutes)
                 rightPumpingSeconds = String(rightSeconds)
+            }
+            
+        case .growth:
+            // Parse growth measurements from details like "Weight: 7.5 kg, Height: 60.0 cm, Head: 40.0 cm"
+            // or "Weight: 16.5 lbs, Height: 2'0.0", Head: 15.7""
+            
+            // Check if metric or imperial based on presence of "kg" or "lbs"
+            if details.contains("kg") {
+                // Metric units
+                let weightPattern = #"weight:\s*([\d.]+)\s*kg"#
+                let heightPattern = #"height:\s*([\d.]+)\s*cm"#
+                let headPattern = #"head:\s*([\d.]+)\s*cm"#
+                
+                if let weightRegex = try? NSRegularExpression(pattern: weightPattern),
+                   let match = weightRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let range = Range(match.range(at: 1), in: details) {
+                    selectedWeightKg = Double(String(details[range])) ?? 0
+                    selectedWeightLbs = selectedWeightKg / 0.453592
+                }
+                
+                if let heightRegex = try? NSRegularExpression(pattern: heightPattern),
+                   let match = heightRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let range = Range(match.range(at: 1), in: details) {
+                    selectedHeightCm = Double(String(details[range])) ?? 0
+                    let totalInches = selectedHeightCm / 2.54
+                    selectedHeightFt = Int(totalInches / 12)
+                    selectedHeightIn = totalInches.truncatingRemainder(dividingBy: 12)
+                }
+                
+                if let headRegex = try? NSRegularExpression(pattern: headPattern),
+                   let match = headRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let range = Range(match.range(at: 1), in: details) {
+                    selectedHeadCircumferenceCm = Double(String(details[range])) ?? 0
+                    selectedHeadCircumferenceIn = selectedHeadCircumferenceCm / 2.54
+                }
+            } else {
+                // Imperial units
+                let weightPattern = #"weight:\s*([\d.]+)\s*lbs"#
+                let heightPattern = #"height:\s*(\d+)'([\d.]+)\""#
+                let headPattern = #"head:\s*([\d.]+)\""#
+                
+                if let weightRegex = try? NSRegularExpression(pattern: weightPattern),
+                   let match = weightRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let range = Range(match.range(at: 1), in: details) {
+                    let totalLbs = Double(String(details[range])) ?? 0
+                    selectedWeightLbs = floor(totalLbs)
+                    selectedWeightOz = (totalLbs - selectedWeightLbs) * 16
+                    selectedWeightKg = totalLbs * 0.453592
+                }
+                
+                if let heightRegex = try? NSRegularExpression(pattern: heightPattern),
+                   let match = heightRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let feetRange = Range(match.range(at: 1), in: details),
+                   let inchesRange = Range(match.range(at: 2), in: details) {
+                    selectedHeightFt = Int(String(details[feetRange])) ?? 0
+                    selectedHeightIn = Double(String(details[inchesRange])) ?? 0
+                    let totalInches = Double(selectedHeightFt) * 12 + selectedHeightIn
+                    selectedHeightCm = totalInches * 2.54
+                }
+                
+                if let headRegex = try? NSRegularExpression(pattern: headPattern),
+                   let match = headRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let range = Range(match.range(at: 1), in: details) {
+                    selectedHeadCircumferenceIn = Double(String(details[range])) ?? 0
+                    selectedHeadCircumferenceCm = selectedHeadCircumferenceIn * 2.54
+                }
             }
             
         default:
@@ -2054,11 +2120,8 @@ struct AddActivityView: View {
             leftPumpingIsRunning = true
             
             // Restart the timer
-            leftPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-                if let startTime = leftPumpingStartTime {
-                    leftPumpingElapsed = Date().timeIntervalSince(startTime)
-                    UserDefaults.standard.set(leftPumpingElapsed, forKey: "leftPumpingElapsed")
-                }
+            leftPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                updateLeftPumpingElapsed()
             }
         }
         
@@ -2073,11 +2136,8 @@ struct AddActivityView: View {
             rightPumpingIsRunning = true
             
             // Restart the timer
-            rightPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-                if let startTime = rightPumpingStartTime {
-                    rightPumpingElapsed = Date().timeIntervalSince(startTime)
-                    UserDefaults.standard.set(rightPumpingElapsed, forKey: "rightPumpingElapsed")
-                }
+            rightPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                updateRightPumpingElapsed()
             }
         }
     }
