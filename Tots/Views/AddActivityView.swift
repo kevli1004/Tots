@@ -75,6 +75,7 @@ struct AddActivityView: View {
     
     @State private var showingDeleteConfirmation = false
     @State private var showingCancelConfirmation = false
+    @State private var growthValuesPrepopulated = false
     
     // Background time tracking
     @State private var backgroundStartTime: Date?
@@ -307,6 +308,11 @@ struct AddActivityView: View {
                     if let preselectedFeedingType = preselectedFeedingType {
                         feedingType = preselectedFeedingType
                     }
+                }
+                
+                // For new growth entries, prepopulate with last recorded values
+                if selectedActivityType == .growth {
+                    prepopulateGrowthWithLastValues()
                 }
             }
         }
@@ -753,6 +759,20 @@ struct AddActivityView: View {
     
     private var growthDetailsView: some View {
         VStack(alignment: .leading, spacing: 20) {
+            
+            // Prepopulation message
+            if growthValuesPrepopulated && editingActivity == nil && editingGrowthEntry == nil {
+                HStack {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundColor(.blue)
+                    Text("Values pre-filled with your last recorded measurements. Adjust as needed.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(8)
+            }
             
             // Weight slider
             VStack(alignment: .leading, spacing: 12) {
@@ -1948,6 +1968,27 @@ struct AddActivityView: View {
         default:
             break
         }
+    }
+    
+    private func prepopulateGrowthWithLastValues() {
+        // Get the most recent growth entry
+        let sortedGrowthData = dataManager.growthData.sorted { $0.date > $1.date }
+        guard let lastEntry = sortedGrowthData.first else { return }
+        
+        // Prepopulate with last recorded values
+        selectedWeightKg = lastEntry.weight
+        selectedWeightLbs = lastEntry.weight / 0.453592
+        
+        let totalInches = lastEntry.height / 2.54
+        selectedHeightFt = Int(totalInches / 12)
+        selectedHeightIn = totalInches.truncatingRemainder(dividingBy: 12)
+        selectedHeightCm = lastEntry.height
+        
+        selectedHeadCircumferenceCm = lastEntry.headCircumference
+        selectedHeadCircumferenceIn = lastEntry.headCircumference / 2.54
+        
+        // Set flag to show prepopulation message
+        growthValuesPrepopulated = true
     }
     
     private func getDuration() -> Int? {
