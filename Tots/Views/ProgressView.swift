@@ -102,7 +102,7 @@ struct ProgressView: View {
                 LiquidBackground()
                 
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         // Ad Banner
                         AdBannerContainer()
                         
@@ -118,12 +118,12 @@ struct ProgressView: View {
                         // History section
                         growthHistorySection
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
                 }
             }
             .navigationTitle("")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     growthTitleView
