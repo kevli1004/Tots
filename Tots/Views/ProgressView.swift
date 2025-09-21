@@ -148,6 +148,7 @@ struct ProgressView: View {
                 }
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         .sheet(isPresented: $showingAddGrowth) {
             AddActivityView(preselectedType: .growth, editingActivity: nil, editingGrowthEntry: nil)
                 .environmentObject(dataManager)

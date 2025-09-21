@@ -325,6 +325,7 @@ struct AddActivityView: View {
             rightPumpingTimer?.invalidate()
             rightPumpingTimer = nil
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
     private var activityTypeSelectorView: some View {

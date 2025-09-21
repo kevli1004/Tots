@@ -241,6 +241,7 @@ struct HomeView: View {
                 }
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         .sheet(isPresented: $showingDatePicker) {
             DatePickerHistoryView(selectedDate: $selectedHistoryDate)
         }
@@ -409,14 +410,14 @@ struct HomeView: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
                 // Show feed card only if breastfeeding is not active
                 if !isBreastfeedingActive {
-                    CountdownCard(
-                        icon: "🍼",
-                        title: "Feed",
-                        countdownInterval: dataManager.nextFeedingCountdown,
-                        time: dataManager.nextFeedingTime,
-                        color: .pink
-                    )
-                    .environmentObject(dataManager)
+                CountdownCard(
+                    icon: "🍼",
+                    title: "Feed",
+                    countdownInterval: dataManager.nextFeedingCountdown,
+                    time: dataManager.nextFeedingTime,
+                    color: .pink
+                )
+                .environmentObject(dataManager)
                     .onTapGesture {
                         selectedActivityType = .feeding
                         showingAddActivity = true
@@ -631,9 +632,9 @@ struct HomeView: View {
     private var todaySummaryWithGoalsView: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Summary & Goals")
-                    .font(.headline)
-                    .fontWeight(.semibold)
+            Text("Summary & Goals")
+                .font(.headline)
+                .fontWeight(.semibold)
                 
                 Spacer()
                 
@@ -1800,66 +1801,66 @@ struct SummaryGoalCard: View {
         ZStack {
             // Front side - Current view
             if !isFlipped {
-                VStack(spacing: 12) {
-                    HStack {
-                        if icon.contains(".") {
-                            // SF Symbol
-                            Image(systemName: icon)
-                                .foregroundColor(color)
-                                .font(.title2)
-                        } else if isDiaperIcon {
-                            // Custom SVG diaper icon
-                            Image(icon)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 24, height: 24)
-                                .foregroundColor(.white)
-                        } else {
-                            // Regular Emoji
-                            Text(icon)
-                                .font(.title2)
-                        }
-                        
-                        Spacer()
-                    }
+        VStack(spacing: 12) {
+            HStack {
+                if icon.contains(".") {
+                    // SF Symbol
+                    Image(systemName: icon)
+                        .foregroundColor(color)
+                        .font(.title2)
+                } else if isDiaperIcon {
+                    // Custom SVG diaper icon
+                    Image(icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 24, height: 24)
+                        .foregroundColor(.white)
+                } else {
+                    // Regular Emoji
+                    Text(icon)
+                        .font(.title2)
+                }
+                
+                Spacer()
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("\(currentValue)\(unit)")
+                        .font(.title)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("\(currentValue)\(unit)")
-                                .font(.title)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                            Text("\(goalValue)\(unit)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                    Spacer()
+                    
+                    Text("\(goalValue)\(unit)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Progress bar
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .frame(height: 4)
+                            .cornerRadius(2)
                         
-                        // Progress bar
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                Rectangle()
-                                    .fill(Color(.systemGray5))
-                                    .frame(height: 4)
-                                    .cornerRadius(2)
-                                
-                                Rectangle()
-                                    .fill(color)
-                                    .frame(width: geometry.size.width * progress, height: 4)
-                                    .cornerRadius(2)
-                                    .animation(.easeInOut(duration: 0.3), value: progress)
-                            }
-                        }
-                        .frame(height: 4)
-                        
+                        Rectangle()
+                            .fill(color)
+                            .frame(width: geometry.size.width * progress, height: 4)
+                            .cornerRadius(2)
+                            .animation(.easeInOut(duration: 0.3), value: progress)
+                    }
+                }
+                .frame(height: 4)
+                
                         HStack {
-                            Text(title)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .textCase(.uppercase)
-                                .tracking(0.5)
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
                             
                             Spacer()
                             
@@ -2653,6 +2654,7 @@ struct MilestonesView: View {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
     private var milestonesTitleView: some View {
@@ -3273,6 +3275,7 @@ struct WordTrackerView: View {
                 AddWordView()
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
     private var wordTrackerTitleView: some View {
@@ -3403,9 +3406,10 @@ struct WordTrackerView: View {
         .padding(.bottom, 8)
     }
     
+    @ViewBuilder
     private var wordsList: some View {
-        ScrollView {
-            if filteredWords.isEmpty {
+        if filteredWords.isEmpty {
+            ScrollView {
                 VStack(spacing: 16) {
                     Image(systemName: "bubble.left.fill")
                         .font(.system(size: 48))
@@ -3428,17 +3432,17 @@ struct WordTrackerView: View {
                     .buttonStyle(.borderedProminent)
                 }
                 .padding(.top, 60)
-            } else {
-                LazyVStack(spacing: 12) {
-                    ForEach(filteredWords) { word in
-                        WordCard(word: word) {
-                            dataManager.deleteWord(word)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 20)
             }
+        } else {
+            List(filteredWords) { word in
+                WordCard(word: word) {
+                    dataManager.deleteWord(word)
+                }
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
+            .listStyle(PlainListStyle())
+            .scrollContentBackground(.hidden)
         }
     }
 }
@@ -3488,37 +3492,34 @@ struct WordCard: View {
     let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: 16) {
-            // Content
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(word.word.capitalized)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                    
-                    Text(word.category.rawValue)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(word.category.color)
-                        .clipShape(Capsule())
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(word.word.capitalized)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
                 
-                Text("First said \(word.dateFirstSaid, style: .date)")
+                Spacer()
+                
+                Text(word.category.rawValue)
                     .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(word.category.color)
+                    .clipShape(Capsule())
+            }
+            
+            Text("First said \(word.dateFirstSaid, style: .date)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            if !word.notes.isEmpty {
+                Text(word.notes)
+                    .font(.subheadline)
                     .foregroundColor(.secondary)
-                
-                if !word.notes.isEmpty {
-                    Text(word.notes)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
+                    .lineLimit(2)
             }
         }
         .padding(16)

@@ -96,6 +96,7 @@ class TotsDataManager: ObservableObject {
     @Published var todayMilestones: Int = 1
     @Published var todayTummyTime: Int = 45 // minutes
     @Published var todayPlayTime: Int = 120 // minutes
+    @Published var todayPumping: Int = 0
     
     // Weekly goals
     @Published var weeklyFeedingGoal: Int = 56 // 8 per day
@@ -754,8 +755,7 @@ class TotsDataManager: ObservableObject {
         case .feeding:
             todayFeedings += 1
         case .pumping:
-            // Pumping doesn't directly affect feeding count but could be tracked separately
-            break
+            todayPumping += 1
         case .diaper:
             todayDiapers += 1
         case .sleep:
@@ -845,9 +845,6 @@ class TotsDataManager: ObservableObject {
                 )
                 addActivity(activity)
             }
-            
-            updateDevelopmentScore()
-            generateAIInsights()
         }
     }
     
@@ -1916,7 +1913,7 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         // Dynamic properties that change during the activity
         public var todayFeedings: Int
-        public var todaySleepHours: Double
+        public var todayPumping: Int
         public var todayDiapers: Int
         public var todayTummyTime: Int
         public var lastUpdateTime: Date
@@ -1924,16 +1921,18 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
         // Timer countdowns for next activities
         public var nextFeedingTime: Date?
         public var nextDiaperTime: Date?
+        public var nextPumpingTime: Date?
         public var nextTummyTime: Date?
         
-        public init(todayFeedings: Int, todaySleepHours: Double, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextTummyTime: Date? = nil) {
+        public init(todayFeedings: Int, todayPumping: Int, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextPumpingTime: Date? = nil, nextTummyTime: Date? = nil) {
             self.todayFeedings = todayFeedings
-            self.todaySleepHours = todaySleepHours
+            self.todayPumping = todayPumping
             self.todayDiapers = todayDiapers
             self.todayTummyTime = todayTummyTime
             self.lastUpdateTime = lastUpdateTime
             self.nextFeedingTime = nextFeedingTime
             self.nextDiaperTime = nextDiaperTime
+            self.nextPumpingTime = nextPumpingTime
             self.nextTummyTime = nextTummyTime
         }
     }
@@ -1941,14 +1940,14 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
     // Fixed properties for the activity
     public var babyName: String
     public var feedingGoal: Int
-    public var sleepGoal: Double
+    public var pumpingGoal: Int
     public var diaperGoal: Int
     public var tummyTimeGoal: Int
     
-    public init(babyName: String, feedingGoal: Int, sleepGoal: Double, diaperGoal: Int, tummyTimeGoal: Int) {
+    public init(babyName: String, feedingGoal: Int, pumpingGoal: Int, diaperGoal: Int, tummyTimeGoal: Int) {
         self.babyName = babyName
         self.feedingGoal = feedingGoal
-        self.sleepGoal = sleepGoal
+        self.pumpingGoal = pumpingGoal
         self.diaperGoal = diaperGoal
         self.tummyTimeGoal = tummyTimeGoal
     }
@@ -1980,19 +1979,20 @@ extension TotsDataManager {
         let attributes = TotsLiveActivityAttributes(
             babyName: babyName,
             feedingGoal: 8,
-            sleepGoal: 15.0,
+            pumpingGoal: 3,
             diaperGoal: 6,
             tummyTimeGoal: 60
         )
         
         let initialState = TotsLiveActivityAttributes.ContentState(
             todayFeedings: todayFeedings,
-            todaySleepHours: todaySleepHours,
+            todayPumping: todayPumping,
             todayDiapers: todayDiapers,
             todayTummyTime: todayTummyTime,
             lastUpdateTime: Date(),
             nextFeedingTime: nextFeedingTime,
             nextDiaperTime: nextDiaperTime,
+            nextPumpingTime: nextPumpingTime,
             nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
         )
         
@@ -2026,12 +2026,13 @@ extension TotsDataManager {
         
         let updatedState = TotsLiveActivityAttributes.ContentState(
             todayFeedings: todayFeedings,
-            todaySleepHours: todaySleepHours,
+            todayPumping: todayPumping,
             todayDiapers: todayDiapers,
             todayTummyTime: todayTummyTime,
             lastUpdateTime: Date(),
             nextFeedingTime: nextFeedingTime,
             nextDiaperTime: nextDiaperTime,
+            nextPumpingTime: nextPumpingTime,
             nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
         )
         

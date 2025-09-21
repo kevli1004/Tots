@@ -310,7 +310,7 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         // Dynamic properties that change during the activity
         public var todayFeedings: Int
-        public var todaySleepHours: Double
+        public var todayPumping: Int
         public var todayDiapers: Int
         public var todayTummyTime: Int
         public var lastUpdateTime: Date
@@ -318,18 +318,18 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
         // Timer countdowns for next activities
         public var nextFeedingTime: Date?
         public var nextDiaperTime: Date?
-        public var nextSleepTime: Date?
+        public var nextPumpingTime: Date?
         public var nextTummyTime: Date?
         
-        public init(todayFeedings: Int, todaySleepHours: Double, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextSleepTime: Date? = nil, nextTummyTime: Date? = nil) {
+        public init(todayFeedings: Int, todayPumping: Int, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextPumpingTime: Date? = nil, nextTummyTime: Date? = nil) {
             self.todayFeedings = todayFeedings
-            self.todaySleepHours = todaySleepHours
+            self.todayPumping = todayPumping
             self.todayDiapers = todayDiapers
             self.todayTummyTime = todayTummyTime
             self.lastUpdateTime = lastUpdateTime
             self.nextFeedingTime = nextFeedingTime
             self.nextDiaperTime = nextDiaperTime
-            self.nextSleepTime = nextSleepTime
+            self.nextPumpingTime = nextPumpingTime
             self.nextTummyTime = nextTummyTime
         }
     }
@@ -337,14 +337,14 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
     // Fixed properties for the activity
     public var babyName: String
     public var feedingGoal: Int
-    public var sleepGoal: Double
+    public var pumpingGoal: Int
     public var diaperGoal: Int
     public var tummyTimeGoal: Int
     
-    public init(babyName: String, feedingGoal: Int, sleepGoal: Double, diaperGoal: Int, tummyTimeGoal: Int) {
+    public init(babyName: String, feedingGoal: Int, pumpingGoal: Int, diaperGoal: Int, tummyTimeGoal: Int) {
         self.babyName = babyName
         self.feedingGoal = feedingGoal
-        self.sleepGoal = sleepGoal
+        self.pumpingGoal = pumpingGoal
         self.diaperGoal = diaperGoal
         self.tummyTimeGoal = tummyTimeGoal
     }
@@ -353,11 +353,11 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
 // MARK: - Helper Functions
 func getNextActivity(from context: ActivityViewContext<TotsLiveActivityAttributes>) -> (label: String, time: Date?, color: Color)? {
     let now = Date()
-    // Include feeding, diaper, and sleep
+    // Include feeding, diaper, and pumping
     let activities: [(String, Date?, Color)] = [
         ("Feeding Time", context.state.nextFeedingTime, .pink),
         ("Diaper Change", context.state.nextDiaperTime, .orange),
-        ("Sleep Time", context.state.nextSleepTime, .indigo)
+        ("Pumping Time", context.state.nextPumpingTime, .cyan)
     ]
     
     // Find the next upcoming activity
@@ -507,15 +507,15 @@ struct TotsLockScreenView: View {
                     .frame(width: 1, height: 40)
                     .padding(.horizontal, 12)
                 
-                // Sleep section (center)
+                // Pumping section (center)
                 CleanLockScreenSection(
-                    icon: "moon.zzz.fill",
-                    count: Int(context.state.todaySleepHours),
-                    goal: Int(context.attributes.sleepGoal),
-                    nextTime: context.state.nextSleepTime,
-                    color: .indigo,
+                    icon: "PumpingIcon",
+                    count: context.state.todayPumping,
+                    goal: context.attributes.pumpingGoal,
+                    nextTime: context.state.nextPumpingTime,
+                    color: .cyan,
                     position: .center,
-                    unit: "h"
+                    unit: nil
                 )
                 
                 // Subtle divider
@@ -656,6 +656,13 @@ struct CleanLockScreenSection: View {
                         .foregroundColor(.black)
                         .offset(x: -0.5, y: 0.5)
                 )
+        } else if icon == "PumpingIcon" {
+            // Custom pumping icon
+            Image(icon)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 16, height: 16)
+                .foregroundColor(color)
         } else {
             // Regular emoji
             Text(icon)
@@ -668,8 +675,8 @@ struct CleanLockScreenSection: View {
             return "till feeding"
         } else if icon == "🩲" {
             return "till diaper"
-        } else if icon.contains("moon") {
-            return "till sleep"
+        } else if icon == "PumpingIcon" {
+            return "till pumping"
         } else {
             return "until next"
         }
@@ -763,7 +770,7 @@ extension TotsLiveActivityAttributes {
         TotsLiveActivityAttributes(
             babyName: "Emma",
             feedingGoal: 8,
-            sleepGoal: 15.0,
+            pumpingGoal: 3,
             diaperGoal: 6,
             tummyTimeGoal: 60
         )
@@ -774,13 +781,13 @@ extension TotsLiveActivityAttributes.ContentState {
     fileprivate static var morning: TotsLiveActivityAttributes.ContentState {
         TotsLiveActivityAttributes.ContentState(
             todayFeedings: 3,
-            todaySleepHours: 6.5,
+            todayPumping: 1,
             todayDiapers: 2,
             todayTummyTime: 15,
             lastUpdateTime: Date(),
             nextFeedingTime: Calendar.current.date(byAdding: .minute, value: 45, to: Date()),
             nextDiaperTime: Calendar.current.date(byAdding: .hour, value: 1, to: Date()),
-            nextSleepTime: Calendar.current.date(byAdding: .hour, value: 3, to: Date()),
+            nextPumpingTime: Calendar.current.date(byAdding: .hour, value: 3, to: Date()),
             nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
         )
     }
@@ -788,13 +795,13 @@ extension TotsLiveActivityAttributes.ContentState {
     fileprivate static var afternoon: TotsLiveActivityAttributes.ContentState {
         TotsLiveActivityAttributes.ContentState(
             todayFeedings: 6,
-            todaySleepHours: 12.0,
+            todayPumping: 2,
             todayDiapers: 4,
             todayTummyTime: 45,
             lastUpdateTime: Date(),
             nextFeedingTime: Calendar.current.date(byAdding: .minute, value: 30, to: Date()),
             nextDiaperTime: Calendar.current.date(byAdding: .minute, value: 20, to: Date()),
-            nextSleepTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date()),
+            nextPumpingTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date()),
             nextTummyTime: Calendar.current.date(byAdding: .minute, value: 90, to: Date())
         )
     }

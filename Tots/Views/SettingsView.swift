@@ -372,7 +372,8 @@ struct SettingsView: View {
     private var settingsOptionsView: some View {
         VStack(spacing: 16) {
             
-            // Live Activity toggle
+            // Live Activity toggle - hidden for now
+            /*
             HStack(spacing: 12) {
                 Image(systemName: "app.badge")
                     .font(.system(size: 18, weight: .medium))
@@ -414,6 +415,7 @@ struct SettingsView: View {
                     #endif
             }
             .padding(.vertical, 12)
+            */
             
             // Home Screen Widget toggle - hidden for now
             /*
@@ -598,7 +600,7 @@ struct SettingsView: View {
             return
         }
         
-        let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
+        let container = CKContainer(identifier: "iCloud.com.growwithtots.tots.DB")
         
         // Always use the preparation handler to ensure proper setup
         print("📱 Setting up CloudKit sharing UI...")
