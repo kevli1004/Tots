@@ -438,86 +438,234 @@ struct TotsLockScreenView: View {
                 
                 Spacer()
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, 8)
             
-            // Combined content area - show both active timers and upcoming activities
-            VStack(spacing: 12) {
-                // Active timers section (if any)
-                if context.state.isBreastfeedingActive || context.state.isPumpingLeftActive || context.state.isPumpingRightActive {
-                    VStack(spacing: 6) {
-                        Text("Active Sessions")
-                            .font(.system(size: 10, design: .rounded))
-                            .foregroundColor(.white.opacity(0.6))
-                        
-                        HStack(spacing: 12) {
-                            if context.state.isBreastfeedingActive {
-                                DynamicActiveTimerView(
-                                    icon: "🍼",
-                                    label: "Feeding",
-                                    startTime: Date().addingTimeInterval(-context.state.breastfeedingElapsed),
-                                    color: .pink
-                                )
-                            }
-                            
-                            if context.state.isPumpingLeftActive {
-                                DynamicActiveTimerView(
-                                    icon: "PumpingIcon",
-                                    label: "Pump L",
-                                    startTime: Date().addingTimeInterval(-context.state.pumpingLeftElapsed),
-                                    color: .cyan
-                                )
-                            }
-                            
-                            if context.state.isPumpingRightActive {
-                                DynamicActiveTimerView(
-                                    icon: "PumpingIcon",
-                                    label: "Pump R",
-                                    startTime: Date().addingTimeInterval(-context.state.pumpingRightElapsed),
-                                    color: .cyan
-                                )
-                            }
-                        }
-                    }
+            // Dynamic grid layout that utilizes full width
+            DynamicActivityGrid(context: context)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+    }
+}
+
+// MARK: - Dynamic Activity Grid
+struct DynamicActivityGrid: View {
+    let context: ActivityViewContext<TotsLiveActivityAttributes>
+    
+    private var activities: [ActivityItem] {
+        var items: [ActivityItem] = []
+        
+        // Active sessions
+        if context.state.isBreastfeedingActive {
+            items.append(ActivityItem(
+                type: .active,
+                label: "Feeding",
+                time: Date().addingTimeInterval(-context.state.breastfeedingElapsed),
+                color: .pink,
+                isTimer: true
+            ))
+        }
+        
+        if context.state.isPumpingLeftActive {
+            items.append(ActivityItem(
+                type: .active,
+                label: "Left Pump",
+                time: Date().addingTimeInterval(-context.state.pumpingLeftElapsed),
+                color: .cyan,
+                isTimer: true
+            ))
+        }
+        
+        if context.state.isPumpingRightActive {
+            items.append(ActivityItem(
+                type: .active,
+                label: "Right Pump",
+                time: Date().addingTimeInterval(-context.state.pumpingRightElapsed),
+                color: .cyan,
+                isTimer: true
+            ))
+        }
+        
+        // Upcoming activities
+        if let nextDiaperTime = context.state.nextDiaperTime, nextDiaperTime > Date() {
+            items.append(ActivityItem(
+                type: .upcoming,
+                label: "Diaper",
+                time: nextDiaperTime,
+                color: .orange,
+                isTimer: false
+            ))
+        }
+        
+        if let nextFeedingTime = context.state.nextFeedingTime, nextFeedingTime > Date() {
+            items.append(ActivityItem(
+                type: .upcoming,
+                label: "Feeding",
+                time: nextFeedingTime,
+                color: .pink,
+                isTimer: false
+            ))
+        }
+        
+        return items
+    }
+    
+    var body: some View {
+        let itemCount = activities.count
+        
+        if itemCount == 0 {
+            // No activities
+            Text("All caught up! 🎉")
+                .font(.system(size: 12, design: .rounded))
+                .foregroundColor(.white.opacity(0.6))
+                .italic()
+        } else if itemCount == 1 {
+            // Single item - center it
+            HStack {
+                Spacer()
+                CompactActivityCard(activity: activities[0])
+                Spacer()
+            }
+        } else if itemCount == 2 {
+            // Two items - side by side
+            HStack(spacing: 12) {
+                CompactActivityCard(activity: activities[0])
+                CompactActivityCard(activity: activities[1])
+            }
+        } else if itemCount == 3 {
+            // Three items - all in one row with tighter spacing
+            HStack(spacing: 8) {
+                CompactActivityCard(activity: activities[0])
+                CompactActivityCard(activity: activities[1])
+                CompactActivityCard(activity: activities[2])
+            }
+        } else {
+            // Four items - 2x2 grid
+            VStack(spacing: 6) {
+                HStack(spacing: 12) {
+                    CompactActivityCard(activity: activities[0])
+                    CompactActivityCard(activity: activities[1])
                 }
-                
-                // Upcoming activities section (always show but compact if timers are active)
-                VStack(spacing: 6) {
-                    if context.state.isBreastfeedingActive || context.state.isPumpingLeftActive || context.state.isPumpingRightActive {
-                        Text("Upcoming")
-                            .font(.system(size: 9, design: .rounded))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    
-                    HStack(spacing: 16) {
-                        // Feeding section with next due info
-                        CompactUpcomingSection(
-                            icon: "🍼",
-                            count: context.state.todayFeedings,
-                            goal: context.attributes.feedingGoal,
-                            nextTime: context.state.nextFeedingTime,
-                            color: .pink,
-                            isActive: context.state.isBreastfeedingActive,
-                            showNextDue: getNextActivity(from: context)?.label.contains("Feeding") == true,
-                            nextDueTime: getNextActivity(from: context)?.time
-                        )
-                        
-                        // Diaper section with next due info (fallback)
-                        CompactUpcomingSection(
-                            icon: "DiaperIcon",
-                            count: context.state.todayDiapers,
-                            goal: context.attributes.diaperGoal,
-                            nextTime: context.state.nextDiaperTime,
-                            color: .orange,
-                            isActive: false,
-                            showNextDue: getNextActivity(from: context)?.label.contains("Diaper") == true || (getNextActivity(from: context)?.label.contains("Feeding") != true),
-                            nextDueTime: getNextActivity(from: context)?.time
-                        )
-                    }
+                HStack(spacing: 12) {
+                    CompactActivityCard(activity: activities[2])
+                    CompactActivityCard(activity: activities[3])
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+    }
+}
+
+// MARK: - Activity Item Model
+struct ActivityItem {
+    let type: RowType
+    let label: String
+    let time: Date
+    let color: Color
+    let isTimer: Bool
+}
+
+// MARK: - Compact Activity Card
+struct CompactActivityCard: View {
+    let activity: ActivityItem
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            // Status indicator
+            HStack(spacing: 4) {
+                Text(activity.type.indicator)
+                    .font(.system(size: 8))
+                    .foregroundColor(activity.color)
+                
+                Text(activity.type.prefix.uppercased())
+                    .font(.system(size: 8, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.7))
+                    .tracking(0.3)
+            }
+            
+            // Activity label
+            Text(activity.label)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            
+            // Time
+            Text(activity.time, style: .timer)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(activity.color)
+                .monospacedDigit()
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(activity.color.opacity(0.25), lineWidth: 0.5)
+                )
+        )
+    }
+}
+
+// MARK: - Sleek Row View (beautiful and functional)
+enum RowType {
+    case active, upcoming
+    
+    var prefix: String {
+        switch self {
+        case .active: return "Active"
+        case .upcoming: return "Upcoming"
+        }
+    }
+    
+    var indicator: String {
+        switch self {
+        case .active: return "●"
+        case .upcoming: return "◐"
+        }
+    }
+}
+
+struct SleekRowView: View {
+    let type: RowType
+    let label: String
+    let time: Date
+    let color: Color
+    let isTimer: Bool
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            // Compact status indicator
+            Text(type.indicator)
+                .font(.system(size: 8))
+                .foregroundColor(color)
+            
+            // Activity label
+            Text("\(type.prefix): \(label)")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundColor(.white)
+            
+            Spacer()
+            
+            // Time display
+            Text(time, style: .timer)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(color)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(color.opacity(0.2), lineWidth: 0.5)
+                )
+        )
     }
 }
 
@@ -562,7 +710,59 @@ struct DynamicActiveTimerView: View {
     }
 }
 
-// MARK: - Compact Upcoming Section
+// MARK: - Glass Upcoming Section (new glass style)
+struct GlassUpcomingSection: View {
+    let label: String
+    let count: Int
+    let color: Color
+    let isActive: Bool
+    let showNextDue: Bool
+    let nextDueTime: Date?
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            // Label text (instead of icon)
+            Text(label)
+                .font(.system(size: 11, design: .rounded))
+                .fontWeight(.medium)
+                .foregroundColor(isActive ? .white.opacity(0.6) : .white)
+            
+            // Count only (no goal fraction)
+            Text("\(count)")
+                .font(.system(size: 16, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundColor(isActive ? color.opacity(0.6) : color)
+            
+            // Next time indicator or Next Due countdown
+            if showNextDue, let nextDueTime = nextDueTime, nextDueTime > Date() {
+                VStack(spacing: 1) {
+                    Text("Next Due")
+                        .font(.system(size: 7, design: .rounded))
+                        .foregroundColor(.white.opacity(0.6))
+                    Text(nextDueTime, style: .timer)
+                        .font(.system(size: 8, design: .rounded))
+                        .fontWeight(.medium)
+                        .foregroundColor(color)
+                        .monospacedDigit()
+                }
+            } else if !isActive {
+                Text("Due")
+                    .font(.system(size: 8, design: .rounded))
+                    .foregroundColor(color)
+            } else {
+                Text("Active")
+                    .font(.system(size: 8, design: .rounded))
+                    .foregroundColor(color.opacity(0.7))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(color.opacity(0.15))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - Compact Upcoming Section (legacy)
 struct CompactUpcomingSection: View {
     let icon: String
     let count: Int

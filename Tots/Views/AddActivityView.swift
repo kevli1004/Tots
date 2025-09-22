@@ -1218,12 +1218,16 @@ struct AddActivityView: View {
         // Reset timers after saving
         if selectedActivityType == .feeding && feedingType == .breastfeeding {
             resetBreastfeedingTimer()
+            // Update live activity immediately
+            dataManager.updateLiveActivity()
         } else if selectedActivityType == .pumping {
             // Stop and reset both pumping timers
             stopLeftPumping()
             stopRightPumping()
             resetLeftPumping()
             resetRightPumping()
+            // Update live activity immediately
+            dataManager.updateLiveActivity()
         }
         
         dismiss()
@@ -1705,6 +1709,9 @@ struct AddActivityView: View {
         UserDefaults.standard.set(leftPumpingStartTime, forKey: "leftPumpingStartTime")
         UserDefaults.standard.set(leftPumpingElapsed, forKey: "leftPumpingElapsed")
         UserDefaults.standard.set(true, forKey: "leftPumpingIsRunning")
+        
+        // Update live activity immediately
+        dataManager.updateLiveActivity()
     }
     
     private func stopLeftPumping() {
@@ -1716,6 +1723,9 @@ struct AddActivityView: View {
         UserDefaults.standard.removeObject(forKey: "leftPumpingStartTime")
         UserDefaults.standard.removeObject(forKey: "leftPumpingElapsed")
         UserDefaults.standard.set(false, forKey: "leftPumpingIsRunning")
+        
+        // Update live activity immediately
+        dataManager.updateLiveActivity()
     }
     
     private func resetLeftPumping() {
@@ -1755,6 +1765,9 @@ struct AddActivityView: View {
         UserDefaults.standard.set(rightPumpingStartTime, forKey: "rightPumpingStartTime")
         UserDefaults.standard.set(rightPumpingElapsed, forKey: "rightPumpingElapsed")
         UserDefaults.standard.set(true, forKey: "rightPumpingIsRunning")
+        
+        // Update live activity immediately
+        dataManager.updateLiveActivity()
     }
     
     private func stopRightPumping() {
@@ -1766,6 +1779,9 @@ struct AddActivityView: View {
         UserDefaults.standard.removeObject(forKey: "rightPumpingStartTime")
         UserDefaults.standard.removeObject(forKey: "rightPumpingElapsed")
         UserDefaults.standard.set(false, forKey: "rightPumpingIsRunning")
+        
+        // Update live activity immediately
+        dataManager.updateLiveActivity()
     }
     
     private func resetRightPumping() {
@@ -2103,6 +2119,9 @@ struct AddActivityView: View {
         UserDefaults.standard.set(breastfeedingStartTime, forKey: "breastfeedingStartTime")
         UserDefaults.standard.set(breastfeedingElapsed, forKey: "breastfeedingElapsed")
         UserDefaults.standard.set(true, forKey: "breastfeedingIsRunning")
+        
+        // Update live activity immediately
+        dataManager.updateLiveActivity()
     }
     
     private func stopBreastfeedingTimer() {
@@ -2114,6 +2133,9 @@ struct AddActivityView: View {
         UserDefaults.standard.removeObject(forKey: "breastfeedingStartTime")
         UserDefaults.standard.removeObject(forKey: "breastfeedingElapsed")
         UserDefaults.standard.set(false, forKey: "breastfeedingIsRunning")
+        
+        // Update live activity immediately
+        dataManager.updateLiveActivity()
     }
     
     private func resetBreastfeedingTimer() {
