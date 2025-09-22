@@ -300,79 +300,115 @@ class CloudKitManager: ObservableObject {
     }
     
     func deleteAccount() async throws {
+        print("🗑️ Starting account deletion...")
         
         // Fetch all user's records and delete them
         let userRecord = try await getOrCreateUserRecord()
+        print("🗑️ Found user record: \(userRecord.recordID)")
+        
+        // Collect all record IDs to delete in batches
+        var recordIDsToDelete: [CKRecord.ID] = []
         
         // Delete all baby profiles and associated data
         let profiles = try await fetchBabyProfiles()
+        print("🗑️ Found \(profiles.count) baby profiles")
         
         for profile in profiles {
+            print("🗑️ Processing profile: \(profile.recordID)")
             
             // Stop sharing first (this also deletes the share record)
             do {
                 try await stopSharingProfile(profile)
+                print("🗑️ Stopped sharing for profile")
             } catch {
+                print("🗑️ Error stopping sharing: \(error)")
             }
             
-            // Delete all activities for this profile
+            // Collect activities for batch deletion
             let activities = try await fetchActivities(for: profile.recordID)
-            
+            print("🗑️ Found \(activities.count) activities for profile")
             for activity in activities {
-                do {
-                    let activityRecord = try await privateDatabase.record(for: CKRecord.ID(recordName: activity.id.uuidString))
-                    try await privateDatabase.deleteRecord(withID: activityRecord.recordID)
-                } catch {
-                }
+                recordIDsToDelete.append(CKRecord.ID(recordName: activity.id.uuidString))
             }
             
-            // Delete the profile record
-            try await privateDatabase.deleteRecord(withID: profile.recordID)
+            // Add profile to deletion list
+            recordIDsToDelete.append(profile.recordID)
         }
         
-        // Delete any remaining records by querying all record types
-        
-        // Query for any remaining Activity records
-        let activityQuery = CKQuery(recordType: "Activity", predicate: NSPredicate(format: "createdBy == %@", userRecord.recordID))
+        // Also query for ALL activities directly (in case they're not linked to profiles)
+        let allActivitiesQuery = CKQuery(recordType: "Activity", predicate: NSPredicate(format: "TRUEPREDICATE"))
         do {
-            let (activityRecords, _) = try await privateDatabase.records(matching: activityQuery)
-            for (recordID, result) in activityRecords {
+            let (allActivityRecords, _) = try await privateDatabase.records(matching: allActivitiesQuery)
+            print("🗑️ Found \(allActivityRecords.count) total activities in database")
+            for (recordID, result) in allActivityRecords {
                 switch result {
-                case .success(let record):
-                    try await privateDatabase.deleteRecord(withID: record.recordID)
-                case .failure(_):
-                    break
+                case .success(_):
+                    if !recordIDsToDelete.contains(recordID) {
+                        recordIDsToDelete.append(recordID)
+                        print("🗑️ Added unlinked activity: \(recordID)")
+                    }
+                case .failure(let error):
+                    print("🗑️ Error fetching activity \(recordID): \(error)")
                 }
             }
         } catch {
-            // Ignore errors during cleanup
+            print("🗑️ Error querying all activities: \(error)")
         }
         
-        // Query for any remaining BabyProfile records
-        let profileQuery = CKQuery(recordType: "BabyProfile", predicate: NSPredicate(format: "createdBy == %@", userRecord.recordID))
-        do {
-            let (profileRecords, _) = try await privateDatabase.records(matching: profileQuery)
-            for (recordID, result) in profileRecords {
-                switch result {
-                case .success(let record):
-                    try await privateDatabase.deleteRecord(withID: record.recordID)
-                case .failure(_):
-                    break
+        // Query for all other record types
+        let recordTypes = ["Growth", "Words", "Milestones", "FamilyMembers", "UserPreferences"]
+        for recordType in recordTypes {
+            let query = CKQuery(recordType: recordType, predicate: NSPredicate(format: "TRUEPREDICATE"))
+            do {
+                let (records, _) = try await privateDatabase.records(matching: query)
+                print("🗑️ Found \(records.count) \(recordType) records")
+                for (recordID, result) in records {
+                    switch result {
+                    case .success(_):
+                        recordIDsToDelete.append(recordID)
+                    case .failure(let error):
+                        print("🗑️ Error fetching \(recordType) \(recordID): \(error)")
+                    }
+                }
+            } catch {
+                print("🗑️ Error querying \(recordType): \(error)")
+            }
+        }
+        
+        print("🗑️ Total records to delete: \(recordIDsToDelete.count)")
+        
+        if recordIDsToDelete.count > 0 {
+            // Batch delete records in groups of 400 (CloudKit limit)
+            let batchSize = 400
+            for i in stride(from: 0, to: recordIDsToDelete.count, by: batchSize) {
+                let endIndex = min(i + batchSize, recordIDsToDelete.count)
+                let batch = Array(recordIDsToDelete[i..<endIndex])
+                
+                print("🗑️ Deleting batch of \(batch.count) records...")
+                
+                let operation = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: batch)
+                operation.database = privateDatabase
+                
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    operation.modifyRecordsResultBlock = { result in
+                        switch result {
+                        case .success:
+                            print("🗑️ Successfully deleted batch of \(batch.count) records")
+                            continuation.resume()
+                        case .failure(let error):
+                            print("🗑️ Error deleting batch: \(error)")
+                            // Continue even if some deletions fail
+                            continuation.resume()
+                        }
+                    }
+                    privateDatabase.add(operation)
                 }
             }
-        } catch {
-            // Ignore errors during cleanup
+        } else {
+            print("🗑️ No CloudKit records found - data is stored locally only")
         }
         
-        // Delete user record last
-        try await privateDatabase.deleteRecord(withID: userRecord.recordID)
-        
-        // Clear all local data completely
-        let domain = Bundle.main.bundleIdentifier!
-        UserDefaults.standard.removePersistentDomain(forName: domain)
-        UserDefaults.standard.synchronize()
-        
-        // Reset CloudKit manager state
+        // Clear local CloudKit state
         await MainActor.run {
             self.isSignedIn = false
             self.familyMembers = []
@@ -380,14 +416,7 @@ class CloudKitManager: ObservableObject {
             self.syncStatus = .idle
         }
         
-        
-        // Small delay to ensure all cleanup is complete before notifying UI
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
-        // Notify app to show onboarding (single notification)
-        await MainActor.run {
-            NotificationCenter.default.post(name: .init("user_signed_out"), object: nil)
-        }
+        print("🗑️ Account deletion completed!")
     }
 }
 

@@ -126,11 +126,11 @@ struct AddActivityView: View {
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
-                ZStack {
-                    // Liquid animated background
-                    LiquidBackground()
-                    
-                    ScrollView {
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                ScrollView {
                     VStack(spacing: 24) {
                         // Ad Banner
                         AdBannerContainer()
@@ -155,7 +155,7 @@ struct AddActivityView: View {
                     .padding()
                     .frame(width: geometry.size.width)
                 }
-            }
+                }
             }
                 .navigationTitle(navigationTitle)
                 .navigationBarTitleDisplayMode(.inline)

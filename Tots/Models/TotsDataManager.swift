@@ -435,6 +435,12 @@ class TotsDataManager: ObservableObject {
     
     // MARK: - Data Persistence
     
+    func reloadLocalData() {
+        loadData()
+        updateCountdowns()
+        calculateStats()
+    }
+    
     private func loadData() {
         // Load basic settings
         babyName = UserDefaults.standard.string(forKey: babyNameKey) ?? "Baby"
@@ -1548,6 +1554,7 @@ class TotsDataManager: ObservableObject {
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
                 self?.updateCountdowns()
+                self?.updateLiveActivity() // Update live activity with countdown updates
             }
         }
     }
@@ -1917,7 +1924,15 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
         public var nextPumpingTime: Date?
         public var nextTummyTime: Date?
         
-        public init(todayFeedings: Int, todayPumping: Int, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextPumpingTime: Date? = nil, nextTummyTime: Date? = nil) {
+        // Active timer information
+        public var isBreastfeedingActive: Bool
+        public var isPumpingLeftActive: Bool
+        public var isPumpingRightActive: Bool
+        public var breastfeedingElapsed: TimeInterval
+        public var pumpingLeftElapsed: TimeInterval
+        public var pumpingRightElapsed: TimeInterval
+        
+        public init(todayFeedings: Int, todayPumping: Int, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextPumpingTime: Date? = nil, nextTummyTime: Date? = nil, isBreastfeedingActive: Bool = false, isPumpingLeftActive: Bool = false, isPumpingRightActive: Bool = false, breastfeedingElapsed: TimeInterval = 0, pumpingLeftElapsed: TimeInterval = 0, pumpingRightElapsed: TimeInterval = 0) {
             self.todayFeedings = todayFeedings
             self.todayPumping = todayPumping
             self.todayDiapers = todayDiapers
@@ -1927,6 +1942,12 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
             self.nextDiaperTime = nextDiaperTime
             self.nextPumpingTime = nextPumpingTime
             self.nextTummyTime = nextTummyTime
+            self.isBreastfeedingActive = isBreastfeedingActive
+            self.isPumpingLeftActive = isPumpingLeftActive
+            self.isPumpingRightActive = isPumpingRightActive
+            self.breastfeedingElapsed = breastfeedingElapsed
+            self.pumpingLeftElapsed = pumpingLeftElapsed
+            self.pumpingRightElapsed = pumpingRightElapsed
         }
     }
 
@@ -1974,6 +1995,33 @@ extension TotsDataManager {
             tummyTimeGoal: 60
         )
         
+        // Get active timer states from UserDefaults
+        let isBreastfeedingActive = UserDefaults.standard.bool(forKey: "breastfeedingIsRunning")
+        let isLeftPumpingActive = UserDefaults.standard.bool(forKey: "leftPumpingIsRunning")
+        let isRightPumpingActive = UserDefaults.standard.bool(forKey: "rightPumpingIsRunning")
+        
+        // Calculate elapsed times for active timers
+        let breastfeedingElapsed: TimeInterval = {
+            if isBreastfeedingActive, let startTime = UserDefaults.standard.object(forKey: "breastfeedingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            }
+            return 0
+        }()
+        
+        let pumpingLeftElapsed: TimeInterval = {
+            if isLeftPumpingActive, let startTime = UserDefaults.standard.object(forKey: "leftPumpingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            }
+            return 0
+        }()
+        
+        let pumpingRightElapsed: TimeInterval = {
+            if isRightPumpingActive, let startTime = UserDefaults.standard.object(forKey: "rightPumpingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            }
+            return 0
+        }()
+        
         let initialState = TotsLiveActivityAttributes.ContentState(
             todayFeedings: todayFeedings,
             todayPumping: todayPumping,
@@ -1983,7 +2031,13 @@ extension TotsDataManager {
             nextFeedingTime: nextFeedingTime,
             nextDiaperTime: nextDiaperTime,
             nextPumpingTime: nextPumpingTime,
-            nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
+            nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date()),
+            isBreastfeedingActive: isBreastfeedingActive,
+            isPumpingLeftActive: isLeftPumpingActive,
+            isPumpingRightActive: isRightPumpingActive,
+            breastfeedingElapsed: breastfeedingElapsed,
+            pumpingLeftElapsed: pumpingLeftElapsed,
+            pumpingRightElapsed: pumpingRightElapsed
         )
         
         do {
@@ -2007,6 +2061,33 @@ extension TotsDataManager {
     func updateLiveActivity() {
         guard let activity = currentActivity else { return }
         
+        // Get active timer states from UserDefaults
+        let isBreastfeedingActive = UserDefaults.standard.bool(forKey: "breastfeedingIsRunning")
+        let isLeftPumpingActive = UserDefaults.standard.bool(forKey: "leftPumpingIsRunning")
+        let isRightPumpingActive = UserDefaults.standard.bool(forKey: "rightPumpingIsRunning")
+        
+        // Calculate elapsed times for active timers
+        let breastfeedingElapsed: TimeInterval = {
+            if isBreastfeedingActive, let startTime = UserDefaults.standard.object(forKey: "breastfeedingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            }
+            return 0
+        }()
+        
+        let pumpingLeftElapsed: TimeInterval = {
+            if isLeftPumpingActive, let startTime = UserDefaults.standard.object(forKey: "leftPumpingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            }
+            return 0
+        }()
+        
+        let pumpingRightElapsed: TimeInterval = {
+            if isRightPumpingActive, let startTime = UserDefaults.standard.object(forKey: "rightPumpingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            }
+            return 0
+        }()
+        
         let updatedState = TotsLiveActivityAttributes.ContentState(
             todayFeedings: todayFeedings,
             todayPumping: todayPumping,
@@ -2016,7 +2097,13 @@ extension TotsDataManager {
             nextFeedingTime: nextFeedingTime,
             nextDiaperTime: nextDiaperTime,
             nextPumpingTime: nextPumpingTime,
-            nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
+            nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date()),
+            isBreastfeedingActive: isBreastfeedingActive,
+            isPumpingLeftActive: isLeftPumpingActive,
+            isPumpingRightActive: isRightPumpingActive,
+            breastfeedingElapsed: breastfeedingElapsed,
+            pumpingLeftElapsed: pumpingLeftElapsed,
+            pumpingRightElapsed: pumpingRightElapsed
         )
         
         Task {
@@ -2101,12 +2188,7 @@ extension TotsDataManager {
         await cloudKitManager.signOut()
         
         await MainActor.run {
-            // Reset all local data
-            self.recentActivities = []
-            self.milestones = []
-            self.growthData = []
-            self.babyName = "Baby"
-            self.babyBirthDate = Calendar.current.date(byAdding: .month, value: -8, to: Date()) ?? Date()
+            // Only reset CloudKit-related data, preserve local data
             self.babyProfileRecord = nil
             self.familySharingEnabled = false
             
@@ -2125,14 +2207,40 @@ extension TotsDataManager {
         try await cloudKitManager.deleteAccount()
         
         await MainActor.run {
-            // Clear all local data
+            // Clear all in-memory data
             self.recentActivities = []
             self.milestones = []
             self.growthData = []
+            self.words = []
             self.babyName = "Baby"
             self.babyBirthDate = Calendar.current.date(byAdding: .month, value: -8, to: Date()) ?? Date()
             self.babyProfileRecord = nil
             self.familySharingEnabled = false
+            
+            // Clear ALL UserDefaults data
+            UserDefaults.standard.removeObject(forKey: "baby_name")
+            UserDefaults.standard.removeObject(forKey: "baby_birth_date")
+            UserDefaults.standard.removeObject(forKey: "recent_activities")
+            UserDefaults.standard.removeObject(forKey: "milestones")
+            UserDefaults.standard.removeObject(forKey: "growth_data")
+            UserDefaults.standard.removeObject(forKey: "words")
+            UserDefaults.standard.removeObject(forKey: "widget_enabled")
+            UserDefaults.standard.removeObject(forKey: "use_metric_units")
+            UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
+            UserDefaults.standard.removeObject(forKey: "family_sharing_enabled")
+            
+            // Clear timer data
+            UserDefaults.standard.removeObject(forKey: "breastfeeding_start_time")
+            UserDefaults.standard.removeObject(forKey: "breastfeeding_elapsed_time")
+            UserDefaults.standard.removeObject(forKey: "pumping_left_start_time")
+            UserDefaults.standard.removeObject(forKey: "pumping_left_elapsed_time")
+            UserDefaults.standard.removeObject(forKey: "pumping_right_start_time")
+            UserDefaults.standard.removeObject(forKey: "pumping_right_elapsed_time")
+            
+            // Clear tracking goals
+            UserDefaults.standard.removeObject(forKey: "breastfeeding_countdown_interval")
+            UserDefaults.standard.removeObject(forKey: "pumping_countdown_interval")
+            UserDefaults.standard.removeObject(forKey: "diaper_countdown_interval")
             
             // Stop any running live activities
             self.stopLiveActivity()

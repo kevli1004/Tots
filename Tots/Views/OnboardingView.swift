@@ -16,8 +16,7 @@ struct OnboardingView: View {
     @State private var feedingGoal = 8
     @State private var sleepGoal = 15.0
     @State private var diaperGoal = 6
-    @State private var enableNotifications = true
-    @State private var enableLiveActivity = true
+    @State private var enableLiveActivity = false
     @State private var showingEmailComposer = false
     @State private var isComplete = false
     @State private var userEmail = ""
@@ -768,14 +767,6 @@ struct OnboardingView: View {
                 
                 VStack(spacing: 24) {
                     PermissionRow(
-                        icon: "bell.fill",
-                        title: "Push Notifications",
-                        description: "Get reminders for feeding, sleeping, and diaper changes",
-                        isEnabled: $enableNotifications,
-                        color: .blue
-                    )
-                    
-                    PermissionRow(
                         icon: "iphone",
                         title: "Live Activities",
                         description: "See real-time updates on your lock screen",
@@ -866,14 +857,6 @@ struct OnboardingView: View {
             }
             
             VStack(spacing: 24) {
-                PermissionRow(
-                    icon: "bell.fill",
-                    title: "Push Notifications",
-                    description: "Get reminders for feeding, sleeping, and diaper changes",
-                    isEnabled: $enableNotifications,
-                    color: .blue
-                )
-                
                 PermissionRow(
                     icon: "iphone",
                     title: "Live Activities",
@@ -1124,16 +1107,10 @@ struct OnboardingView: View {
         UserDefaults.standard.set(diaperGoal, forKey: "diaper_goal")
         
         // Save preferences
-        UserDefaults.standard.set(enableNotifications, forKey: "notifications_enabled")
         UserDefaults.standard.set(enableLiveActivity, forKey: "live_activity_enabled")
         
         // Mark onboarding as complete
         UserDefaults.standard.set(true, forKey: "onboarding_completed")
-        
-        // Request permissions if enabled
-        if enableNotifications {
-            requestNotificationPermission()
-        }
         
         if enableLiveActivity {
             // Live Activity permissions are handled automatically when first requested

@@ -321,7 +321,15 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
         public var nextPumpingTime: Date?
         public var nextTummyTime: Date?
         
-        public init(todayFeedings: Int, todayPumping: Int, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextPumpingTime: Date? = nil, nextTummyTime: Date? = nil) {
+        // Active timer information
+        public var isBreastfeedingActive: Bool
+        public var isPumpingLeftActive: Bool
+        public var isPumpingRightActive: Bool
+        public var breastfeedingElapsed: TimeInterval
+        public var pumpingLeftElapsed: TimeInterval
+        public var pumpingRightElapsed: TimeInterval
+        
+        public init(todayFeedings: Int, todayPumping: Int, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextPumpingTime: Date? = nil, nextTummyTime: Date? = nil, isBreastfeedingActive: Bool = false, isPumpingLeftActive: Bool = false, isPumpingRightActive: Bool = false, breastfeedingElapsed: TimeInterval = 0, pumpingLeftElapsed: TimeInterval = 0, pumpingRightElapsed: TimeInterval = 0) {
             self.todayFeedings = todayFeedings
             self.todayPumping = todayPumping
             self.todayDiapers = todayDiapers
@@ -331,6 +339,12 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
             self.nextDiaperTime = nextDiaperTime
             self.nextPumpingTime = nextPumpingTime
             self.nextTummyTime = nextTummyTime
+            self.isBreastfeedingActive = isBreastfeedingActive
+            self.isPumpingLeftActive = isPumpingLeftActive
+            self.isPumpingRightActive = isPumpingRightActive
+            self.breastfeedingElapsed = breastfeedingElapsed
+            self.pumpingLeftElapsed = pumpingLeftElapsed
+            self.pumpingRightElapsed = pumpingRightElapsed
         }
     }
 
@@ -378,68 +392,25 @@ struct TotsLiveActivity: Widget {
             TotsLockScreenView(context: context)
                 .activityBackgroundTint(Color.black.opacity(0.4))
                 .activitySystemActionForegroundColor(Color.white)
-
         } dynamicIsland: { context in
+            // Empty Dynamic Island - no camera island notifications
             DynamicIsland {
-                // Expanded UI
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack {
-                        Image("TotsIcon")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 20, height: 20)
-                        Text(context.attributes.babyName)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    EmptyView()
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("Today")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    EmptyView()
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    HStack(spacing: 16) {
-                        CompactStat(icon: "🍼", value: "\(context.state.todayFeedings)", label: "Feed")
-                        CompactStat(icon: "🧷", value: "\(context.state.todayDiapers)", label: "Diaper")
-                    }
-                    .padding(.top, 8)
+                    EmptyView()
                 }
             } compactLeading: {
-                Image("TotsIcon")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 16, height: 16)
+                EmptyView()
             } compactTrailing: {
-                if let nextActivity = getNextActivity(from: context), let nextTime = nextActivity.time {
-                    VStack(spacing: 1) {
-                        Text(nextTime, style: .timer)
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(nextActivity.color)
-                        Text("Next \(nextActivity.label.prefix(4))")
-                            .font(.system(size: 7))
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    VStack(spacing: 1) {
-                        Text("Activities Due")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.orange)
-                        Text("🍼\(context.state.todayFeedings) 🧷\(context.state.todayDiapers)")
-                            .font(.system(size: 8))
-                            .foregroundColor(.secondary)
-                    }
-                }
+                EmptyView()
             } minimal: {
-                Image("TotsIcon")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 16, height: 16)
+                EmptyView()
             }
-            .widgetURL(URL(string: "tots://home"))
-            .keylineTint(Color.pink)
         }
     }
 }
@@ -465,79 +436,262 @@ struct TotsLockScreenView: View {
                 
                 Spacer()
                 
-                // Next Due countdown with clear label
-                if let nextActivity = getNextActivity(from: context), let nextTime = nextActivity.time {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Next Due: \(nextActivity.label)")
-                            .font(.system(size: 9, design: .rounded))
-                            .foregroundColor(.white.opacity(0.7))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(nextActivity.color)
-                                .frame(width: 6, height: 6)
-                            Text(nextTime, style: .timer)
-                                .font(.system(.caption, design: .rounded))
-                                .fontWeight(.medium)
-                                .foregroundColor(nextActivity.color)
-                        }
-                    }
-                }
+                Spacer()
             }
             .padding(.bottom, 12)
             
-            // Clean main content area - three sections
-            HStack(spacing: 0) {
-                // Feeding section
-                CleanLockScreenSection(
-                    icon: "🍼",
-                    count: context.state.todayFeedings,
-                    goal: context.attributes.feedingGoal,
-                    nextTime: context.state.nextFeedingTime,
-                    color: .pink,
-                    position: .left,
-                    unit: nil
-                )
+            // Combined content area - show both active timers and upcoming activities
+            VStack(spacing: 12) {
+                // Active timers section (if any)
+                if context.state.isBreastfeedingActive || context.state.isPumpingLeftActive || context.state.isPumpingRightActive {
+                    VStack(spacing: 6) {
+                        Text("Active Sessions")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        HStack(spacing: 12) {
+                            if context.state.isBreastfeedingActive {
+                                DynamicActiveTimerView(
+                                    icon: "🍼",
+                                    label: "Feeding",
+                                    startTime: Date().addingTimeInterval(-context.state.breastfeedingElapsed),
+                                    color: .pink
+                                )
+                            }
+                            
+                            if context.state.isPumpingLeftActive {
+                                DynamicActiveTimerView(
+                                    icon: "PumpingIcon",
+                                    label: "Pump L",
+                                    startTime: Date().addingTimeInterval(-context.state.pumpingLeftElapsed),
+                                    color: .cyan
+                                )
+                            }
+                            
+                            if context.state.isPumpingRightActive {
+                                DynamicActiveTimerView(
+                                    icon: "PumpingIcon",
+                                    label: "Pump R",
+                                    startTime: Date().addingTimeInterval(-context.state.pumpingRightElapsed),
+                                    color: .cyan
+                                )
+                            }
+                        }
+                    }
+                }
                 
-                // Subtle divider
-                Rectangle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 1, height: 40)
-                    .padding(.horizontal, 12)
-                
-                // Pumping section (center)
-                CleanLockScreenSection(
-                    icon: "PumpingIcon",
-                    count: context.state.todayPumping,
-                    goal: context.attributes.pumpingGoal,
-                    nextTime: context.state.nextPumpingTime,
-                    color: .cyan,
-                    position: .center,
-                    unit: nil
-                )
-                
-                // Subtle divider
-                Rectangle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 1, height: 40)
-                    .padding(.horizontal, 12)
-                
-                // Diaper section
-                CleanLockScreenSection(
-                    icon: "🩲",
-                    count: context.state.todayDiapers,
-                    goal: context.attributes.diaperGoal,
-                    nextTime: context.state.nextDiaperTime,
-                    color: .orange,
-                    position: .right,
-                    unit: nil
-                )
+                // Upcoming activities section (always show but compact if timers are active)
+                VStack(spacing: 6) {
+                    if context.state.isBreastfeedingActive || context.state.isPumpingLeftActive || context.state.isPumpingRightActive {
+                        Text("Upcoming")
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    
+                    HStack(spacing: 16) {
+                        // Feeding section with next due info
+                        CompactUpcomingSection(
+                            icon: "🍼",
+                            count: context.state.todayFeedings,
+                            goal: context.attributes.feedingGoal,
+                            nextTime: context.state.nextFeedingTime,
+                            color: .pink,
+                            isActive: context.state.isBreastfeedingActive,
+                            showNextDue: getNextActivity(from: context)?.label.contains("Feeding") == true,
+                            nextDueTime: getNextActivity(from: context)?.time
+                        )
+                        
+                        // Diaper section with next due info (fallback)
+                        CompactUpcomingSection(
+                            icon: "DiaperIcon",
+                            count: context.state.todayDiapers,
+                            goal: context.attributes.diaperGoal,
+                            nextTime: context.state.nextDiaperTime,
+                            color: .orange,
+                            isActive: false,
+                            showNextDue: getNextActivity(from: context)?.label.contains("Diaper") == true || (getNextActivity(from: context)?.label.contains("Feeding") != true),
+                            nextDueTime: getNextActivity(from: context)?.time
+                        )
+                    }
+                }
             }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
+    }
+}
+
+// MARK: - Dynamic Active Timer View (auto-updating)
+struct DynamicActiveTimerView: View {
+    let icon: String
+    let label: String
+    let startTime: Date
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            // Icon
+            if icon == "PumpingIcon" {
+                Image(icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
+                    .foregroundColor(color)
+            } else {
+                Text(icon)
+                    .font(.system(size: 16))
+            }
+            
+            // Dynamic Timer (auto-updating)
+            Text(startTime, style: .timer)
+                .font(.system(.caption, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundColor(color)
+                .monospacedDigit()
+            
+            // Label
+            Text(label)
+                .font(.system(size: 9, design: .rounded))
+                .foregroundColor(.white.opacity(0.7))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.15))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - Compact Upcoming Section
+struct CompactUpcomingSection: View {
+    let icon: String
+    let count: Int
+    let goal: Int
+    let nextTime: Date?
+    let color: Color
+    let isActive: Bool
+    let showNextDue: Bool
+    let nextDueTime: Date?
+    
+    var body: some View {
+        VStack(spacing: 3) {
+            // Icon
+            if icon == "PumpingIcon" {
+                Image(icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 14, height: 14)
+                    .foregroundColor(isActive ? color.opacity(0.6) : color)
+            } else if icon == "DiaperIcon" {
+                Image(icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 14, height: 14)
+                    .foregroundColor(isActive ? color.opacity(0.6) : color)
+            } else if icon == "🩲" {
+                // Fallback emoji diaper
+                Text(icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white)
+                    .background(
+                        Text(icon)
+                            .font(.system(size: 14))
+                            .foregroundColor(.black)
+                            .offset(x: 0.5, y: 0.5)
+                    )
+                    .opacity(isActive ? 0.6 : 1.0)
+            } else {
+                Text(icon)
+                    .font(.system(size: 14))
+                    .opacity(isActive ? 0.6 : 1.0)
+            }
+            
+            // Count/Goal
+            Text("\(count)/\(goal)")
+                .font(.system(size: 10, design: .rounded))
+                .fontWeight(.medium)
+                .foregroundColor(isActive ? .white.opacity(0.5) : .white)
+            
+            // Next time indicator or Next Due countdown
+            if showNextDue, let nextDueTime = nextDueTime, nextDueTime > Date() {
+                VStack(spacing: 1) {
+                    Text("Next Due")
+                        .font(.system(size: 7, design: .rounded))
+                        .foregroundColor(.white.opacity(0.6))
+                    Text(nextDueTime, style: .timer)
+                        .font(.system(size: 8, design: .rounded))
+                        .fontWeight(.medium)
+                        .foregroundColor(color)
+                        .monospacedDigit()
+                }
+            } else if let nextTime = nextTime, nextTime > Date(), !isActive {
+                Text(nextTime, style: .timer)
+                    .font(.system(size: 8, design: .rounded))
+                    .foregroundColor(color)
+                    .monospacedDigit()
+            } else if !isActive {
+                Text("Due")
+                    .font(.system(size: 8, design: .rounded))
+                    .foregroundColor(color)
+            } else {
+                Text("Active")
+                    .font(.system(size: 8, design: .rounded))
+                    .foregroundColor(color.opacity(0.7))
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Legacy Active Timer View (kept for compatibility)
+struct ActiveTimerView: View {
+    let icon: String
+    let label: String
+    let elapsed: TimeInterval
+    let color: Color
+    
+    private var formattedTime: String {
+        let hours = Int(elapsed) / 3600
+        let minutes = (Int(elapsed) % 3600) / 60
+        let seconds = Int(elapsed) % 60
+        
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            return String(format: "%d:%02d", minutes, seconds)
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            // Icon
+            if icon == "PumpingIcon" {
+                Image(icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
+                    .foregroundColor(color)
+            } else {
+                Text(icon)
+                    .font(.system(size: 16))
+            }
+            
+            // Timer
+            Text(formattedTime)
+                .font(.system(.caption, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundColor(color)
+            
+            // Label
+            Text(label)
+                .font(.system(size: 9, design: .rounded))
+                .foregroundColor(.white.opacity(0.7))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.15))
+        .cornerRadius(8)
     }
 }
 
@@ -788,7 +942,13 @@ extension TotsLiveActivityAttributes.ContentState {
             nextFeedingTime: Calendar.current.date(byAdding: .minute, value: 45, to: Date()),
             nextDiaperTime: Calendar.current.date(byAdding: .hour, value: 1, to: Date()),
             nextPumpingTime: Calendar.current.date(byAdding: .hour, value: 3, to: Date()),
-            nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date())
+            nextTummyTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date()),
+            isBreastfeedingActive: false,
+            isPumpingLeftActive: false,
+            isPumpingRightActive: false,
+            breastfeedingElapsed: 0,
+            pumpingLeftElapsed: 0,
+            pumpingRightElapsed: 0
         )
     }
     
@@ -802,7 +962,13 @@ extension TotsLiveActivityAttributes.ContentState {
             nextFeedingTime: Calendar.current.date(byAdding: .minute, value: 30, to: Date()),
             nextDiaperTime: Calendar.current.date(byAdding: .minute, value: 20, to: Date()),
             nextPumpingTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date()),
-            nextTummyTime: Calendar.current.date(byAdding: .minute, value: 90, to: Date())
+            nextTummyTime: Calendar.current.date(byAdding: .minute, value: 90, to: Date()),
+            isBreastfeedingActive: true,
+            isPumpingLeftActive: false,
+            isPumpingRightActive: true,
+            breastfeedingElapsed: 1245, // 20 minutes 45 seconds
+            pumpingLeftElapsed: 0,
+            pumpingRightElapsed: 892 // 14 minutes 52 seconds
         )
     }
 }

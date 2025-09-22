@@ -31,6 +31,8 @@ struct TotsApp: App {
                     OnboardingView()
                         .environmentObject(dataManager)
                         .onReceive(NotificationCenter.default.publisher(for: .init("onboarding_completed"))) { _ in
+                            // Reload local data when onboarding completes
+                            dataManager.reloadLocalData()
                             showOnboarding = false
                         }
                 } else {

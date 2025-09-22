@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var showingFamilyManager = false
     @State private var showingDeleteConfirmation = false
     @State private var showingLogoutConfirmation = false
+    @State private var isDeletingAccount = false
     @State private var familyMembers: [FamilyMember] = []
     @State private var shareDelegate: ShareControllerDelegate?
     @State private var profileImageUpdateTrigger = false
@@ -19,9 +20,6 @@ struct SettingsView: View {
     @State private var showingTrackingGoals = false
     @State private var showingTerms = false
     @State private var showingPrivacyPolicy = false
-    @State private var showingSchemaSetup = false
-    @State private var schemaSetupMessage = ""
-    @State private var isSettingUpSchema = false
     
     var body: some View {
         ZStack {
@@ -66,12 +64,16 @@ struct SettingsView: View {
         }
         .confirmationDialog("Delete Account", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete Account", role: .destructive) {
+                isDeletingAccount = true
                 Task {
                     do {
                         try await dataManager.deleteAccount()
                     } catch {
                         // Even if CloudKit deletion fails, still sign out locally
                         await dataManager.signOut()
+                    }
+                    await MainActor.run {
+                        isDeletingAccount = false
                     }
                 }
             }
@@ -102,102 +104,12 @@ struct SettingsView: View {
         .sheet(isPresented: $showingPrivacyPolicy) {
             PrivacyPolicyView()
         }
-        .alert("CloudKit Schema Setup", isPresented: $showingSchemaSetup) {
-            Button("Setup Now", role: .destructive) {
-                setupCloudKitSchema()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This will create all record types in your CloudKit production container. This should only be done once.\n\nContainer: 'iCloud.com.mytotsapp.tots.DB'")
-        }
-        .alert("Schema Setup Result", isPresented: .constant(!schemaSetupMessage.isEmpty)) {
-            Button("OK") { 
-                schemaSetupMessage = ""
-            }
-        } message: {
-            Text(schemaSetupMessage)
-        }
     }
     
     private func exportDataAsCSV() {
         showingExportSheet = true
     }
     
-    private func setupCloudKitSchema() {
-        isSettingUpSchema = true
-        
-        Task {
-            do {
-                // First check CloudKit availability and account status
-                let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
-                
-                // Check account status
-                let accountStatus = try await container.accountStatus()
-                guard accountStatus == .available else {
-                    await MainActor.run {
-                        let statusMessage = switch accountStatus {
-                        case .couldNotDetermine: "Could not determine iCloud account status"
-                        case .available: "Available"
-                        case .restricted: "iCloud account is restricted"
-                        case .noAccount: "No iCloud account found"
-                        case .temporarilyUnavailable: "iCloud temporarily unavailable"
-                        @unknown default: "Unknown account status"
-                        }
-                        schemaSetupMessage = "❌ CloudKit Account Issue:\n\n\(statusMessage)\n\nPlease:\n1. Sign in to iCloud in Settings\n2. Enable iCloud for this app\n3. Try again"
-                        isSettingUpSchema = false
-                    }
-                    return
-                }
-                
-                // Check container accessibility
-                let database = container.privateCloudDatabase
-                
-                // Try a simple operation first to test container accessibility
-                let testQuery = CKQuery(recordType: "CloudKitMagicType", predicate: NSPredicate(format: "TRUEPREDICATE"))
-                do {
-                    _ = try await database.records(matching: testQuery)
-                } catch let ckError as CKError {
-                    if ckError.code == .unknownItem {
-                        // This is expected - the record type doesn't exist yet, container is accessible
-                    } else {
-                        throw ckError
-                    }
-                } catch {
-                    throw error
-                }
-                
-                // Create the comprehensive CloudKit schema
-                try await CloudKitSchemaSetup.shared.createProductionSchema()
-                
-                await MainActor.run {
-                    schemaSetupMessage = "✅ CloudKit Schema Setup Complete!\n\nAll record types have been created:\n• BabyProfile\n• Activity\n• Growth\n• Words\n• Milestones\n• FamilyMembers\n• UserPreferences\n\nYour app is ready for production!"
-                    isSettingUpSchema = false
-                }
-            } catch let ckError as CKError {
-                await MainActor.run {
-                    let errorDetails = """
-                    CloudKit Error Details:
-                    • Code: \(ckError.code.rawValue)
-                    • Description: \(ckError.localizedDescription)
-                    • Container: iCloud.com.mytotsapp.tots.DB
-                    
-                    Common Solutions:
-                    1. Ensure container exists in CloudKit Console
-                    2. Check iCloud account is signed in
-                    3. Verify app has CloudKit entitlements
-                    4. Try again in a few minutes
-                    """
-                    schemaSetupMessage = "❌ CloudKit Error:\n\n\(errorDetails)"
-                    isSettingUpSchema = false
-                }
-            } catch {
-                await MainActor.run {
-                    schemaSetupMessage = "❌ Schema Setup Failed:\n\n\(error.localizedDescription)\n\nContainer: iCloud.com.mytotsapp.tots.DB\n\nPlease ensure:\n1. Container exists in CloudKit Console\n2. You're signed in to iCloud\n3. App has CloudKit permissions"
-                    isSettingUpSchema = false
-                }
-            }
-        }
-    }
     
     private func generateCSVFile() -> URL {
         let csvContent = generateCSVContent()
@@ -455,8 +367,7 @@ struct SettingsView: View {
     private var settingsOptionsView: some View {
         VStack(spacing: 16) {
             
-            // Live Activity toggle - hidden for now
-            /*
+            // Live Activity toggle
             HStack(spacing: 12) {
                 Image(systemName: "app.badge")
                     .font(.system(size: 18, weight: .medium))
@@ -483,8 +394,9 @@ struct SettingsView: View {
                 Spacer()
                 
                 Toggle("", isOn: Binding(
-                    get: { dataManager.currentActivity != nil },
+                    get: { dataManager.widgetEnabled },
                     set: { enabled in
+                        dataManager.widgetEnabled = enabled
                         if enabled {
                             dataManager.startLiveActivity()
                         } else {
@@ -498,7 +410,6 @@ struct SettingsView: View {
                     #endif
             }
             .padding(.vertical, 12)
-            */
             
             // Home Screen Widget toggle - hidden for now
             /*
@@ -601,18 +512,16 @@ struct SettingsView: View {
                 .padding(.vertical, 8)
             
             
-            SettingsRow(
-                icon: "icloud.fill",
-                title: "Setup CloudKit Schema",
-                subtitle: "One-click setup for production CloudKit",
-                action: { showingSchemaSetup = true }
-            )
             
             SettingsRow(
                 icon: "trash.fill",
-                title: "Delete Account",
+                title: isDeletingAccount ? "Deleting Account..." : "Delete Account",
                 titleColor: .red,
-                action: { showingDeleteConfirmation = true }
+                action: { 
+                    if !isDeletingAccount {
+                        showingDeleteConfirmation = true 
+                    }
+                }
             )
             
             SettingsRow(
