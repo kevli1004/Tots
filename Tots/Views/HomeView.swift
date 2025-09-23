@@ -1029,7 +1029,7 @@ struct CountdownCard: View {
                                 .multilineTextAlignment(.center)
                         } else {
                             Text(countdownText)
-                                .font(.headline)
+                                .font(isFirstTime ? .subheadline : .headline)
                                 .fontWeight(.bold)
                                 .foregroundColor(color)
                             
@@ -3284,6 +3284,14 @@ struct WordTrackerView: View {
                 }
                 .padding(.top, 16)
                 .frame(width: geometry.size.width)
+                .background(
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // Additional keyboard dismissal on content area
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
+                )
             }
             }
             .navigationTitle("")

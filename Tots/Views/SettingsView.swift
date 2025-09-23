@@ -1,5 +1,6 @@
 import SwiftUI
 import CloudKit
+import AuthenticationServices
 
 
 struct SettingsView: View {
@@ -589,16 +590,26 @@ struct SettingsView: View {
             let isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
             
             if isLocalStorageOnly {
-                // For local storage users, show sign in option
-                SettingsRow(
-                    icon: "icloud.and.arrow.up.fill",
-                    title: "Sign in to sync data",
-                    titleColor: .blue,
-                    action: {
-                        // Use the existing sign in function from familySharingView
-                        self.signInToCloudKit()
-                    }
-                )
+                // For local storage users, show sign in with Apple option
+                VStack(spacing: 12) {
+                    SignInWithAppleButton(
+                        onRequest: { request in
+                            request.requestedScopes = [.fullName, .email]
+                        },
+                        onCompletion: { result in
+                            handleAppleSignInFromSettings(result)
+                        }
+                    )
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 50)
+                    .cornerRadius(12)
+                    
+                    Text("Sign in to sync your data across devices")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 16)
             } else {
                 // For CloudKit users, show delete and sign out options
                 SettingsRow(
@@ -697,6 +708,20 @@ struct SettingsView: View {
                     isSettingUpCloudKit = false
                 }
             }
+        }
+    }
+    
+    private func handleAppleSignInFromSettings(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                // Successfully signed in with Apple ID
+                // Now try to sign in to CloudKit
+                self.signInToCloudKit()
+            }
+        case .failure(let error):
+            cloudKitSetupMessage = "❌ Sign in cancelled or failed: \(error.localizedDescription)"
+            isSettingUpCloudKit = false
         }
     }
     
@@ -1351,6 +1376,11 @@ struct TrackingGoalsView: View {
     @State private var pumpingInterval: Double = 3.0 // hours
     @State private var diaperInterval: Double = 2.0 // hours
     
+    // Daily goals
+    @State private var sleepHoursGoal: Double = 15.0 // hours per day
+    @State private var diaperCountGoal: Double = 6.0 // diapers per day
+    @State private var feedingSessionsGoal: Double = 8.0 // feeding sessions per day
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -1394,6 +1424,50 @@ struct TrackingGoalsView: View {
                                 step: 0.5,
                                 unit: "hours"
                             )
+                            
+                            Divider()
+                                .padding(.vertical, 8)
+                            
+                            Text("Daily Goals")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                                .padding(.horizontal)
+                            
+                            Text("Set your daily targets for tracking progress.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal)
+                            
+                            // Sleep hours goal
+                            GoalSliderRow(
+                                title: "Sleep Hours",
+                                subtitle: "Total hours of sleep per day",
+                                value: $sleepHoursGoal,
+                                range: 8.0...20.0,
+                                step: 0.5,
+                                unit: "hours"
+                            )
+                            
+                            // Daily diaper count goal
+                            GoalSliderRow(
+                                title: "Diaper Changes",
+                                subtitle: "Number of diaper changes per day",
+                                value: $diaperCountGoal,
+                                range: 3.0...15.0,
+                                step: 1.0,
+                                unit: "diapers"
+                            )
+                            
+                            // Daily feeding sessions goal
+                            GoalSliderRow(
+                                title: "Feeding Sessions",
+                                subtitle: "Number of feeding sessions per day",
+                                value: $feedingSessionsGoal,
+                                range: 4.0...20.0,
+                                step: 1.0,
+                                unit: "sessions"
+                            )
                         }
                         .padding(.vertical)
                     }
@@ -1432,12 +1506,27 @@ struct TrackingGoalsView: View {
         
         diaperInterval = UserDefaults.standard.double(forKey: "diaper_interval")
         if diaperInterval == 0 { diaperInterval = 2.0 }
+        
+        // Load daily goals
+        sleepHoursGoal = UserDefaults.standard.double(forKey: "sleep_goal")
+        if sleepHoursGoal == 0 { sleepHoursGoal = 15.0 }
+        
+        diaperCountGoal = UserDefaults.standard.double(forKey: "diaper_goal")
+        if diaperCountGoal == 0 { diaperCountGoal = 6.0 }
+        
+        feedingSessionsGoal = UserDefaults.standard.double(forKey: "feeding_goal")
+        if feedingSessionsGoal == 0 { feedingSessionsGoal = 8.0 }
     }
     
     private func saveTrackingGoals() {
         UserDefaults.standard.set(feedingInterval, forKey: "feeding_interval")
         UserDefaults.standard.set(pumpingInterval, forKey: "pumping_interval")
         UserDefaults.standard.set(diaperInterval, forKey: "diaper_interval")
+        
+        // Save daily goals
+        UserDefaults.standard.set(sleepHoursGoal, forKey: "sleep_goal")
+        UserDefaults.standard.set(diaperCountGoal, forKey: "diaper_goal")
+        UserDefaults.standard.set(feedingSessionsGoal, forKey: "feeding_goal")
         
         // Trigger countdown update
         dataManager.updateCountdowns()
