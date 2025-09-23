@@ -120,6 +120,7 @@ struct ProgressView: View {
                         growthHistorySection
                     }
                     .padding(.horizontal)
+                    .padding(.top, 16)
                     .padding(.bottom, 8)
                     .frame(width: geometry.size.width)
                 }
@@ -737,7 +738,7 @@ struct GrowthPercentileChart: View {
         // Fixed y-axis range based on the data type - extended to fit 95th percentile
         switch title {
         case "Weight":
-            return useMetricUnits ? 0...20 : 0...45 // kg or lbs - extended for 95th percentile
+            return useMetricUnits ? 0...50 : 0...110 // kg or lbs
         case "Height":
             return useMetricUnits ? 40...120 : 15...48 // cm or inches
         case "Head Circumference":

@@ -48,15 +48,7 @@ struct AdBannerContainer: View {
     let height: CGFloat = 50 // Standard banner height
     
     var body: some View {
-        GeometryReader { geometry in
-            BannerAdView()
-                .frame(width: geometry.size.width - 8, height: height) // Responsive width
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-                .padding(.horizontal, 4) // Wider for popups
-                .padding(.top, 21) // ~0.75cm padding above ad
-        }
-        .frame(height: height + 21) // Total height including top padding
+        EmptyView()
     }
 }
 
@@ -64,15 +56,7 @@ struct AdBannerContainerWide: View {
     let height: CGFloat = 50 // Standard banner height
     
     var body: some View {
-        GeometryReader { geometry in
-            BannerAdView()
-                .frame(width: geometry.size.width, height: height) // Full responsive width
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-                .padding(.horizontal, 0) // Widest - no horizontal padding like milestone page
-                .padding(.top, 21) // ~0.75cm padding above ad
-        }
-        .frame(height: height + 21) // Total height including top padding
+        EmptyView()
     }
 }
 
@@ -80,15 +64,7 @@ struct AdBannerContainerMedium: View {
     let height: CGFloat = 50 // Standard banner height
     
     var body: some View {
-        GeometryReader { geometry in
-            BannerAdView()
-                .frame(width: geometry.size.width - 32, height: height) // Responsive width with medium padding
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-                .padding(.horizontal, 16) // Less wide for main milestone/word pages
-                .padding(.top, 21) // ~0.75cm padding above ad
-        }
-        .frame(height: height + 21) // Total height including top padding
+        EmptyView()
     }
 }
 

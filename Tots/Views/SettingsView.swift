@@ -35,6 +35,9 @@ struct SettingsView: View {
                     babyProfileView
                         .id(profileImageUpdateTrigger)
                     
+                    // Storage status indicator
+                    storageStatusView
+                    
                     // Family sharing - hidden for now
                     // familySharingView
                     
@@ -63,17 +66,19 @@ struct SettingsView: View {
                 .environmentObject(dataManager)
         }
         .confirmationDialog("Delete Account", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
-            Button("Delete Account", role: .destructive) {
-                isDeletingAccount = true
-                Task {
-                    do {
-                        try await dataManager.deleteAccount()
-                    } catch {
-                        // Even if CloudKit deletion fails, still sign out locally
-                        await dataManager.signOut()
-                    }
-                    await MainActor.run {
-                        isDeletingAccount = false
+            if !UserDefaults.standard.bool(forKey: "local_storage_only") {
+                Button("Delete Account", role: .destructive) {
+                    isDeletingAccount = true
+                    Task {
+                        do {
+                            try await dataManager.deleteAccount()
+                        } catch {
+                            // Even if CloudKit deletion fails, still sign out locally
+                            await dataManager.signOut()
+                        }
+                        await MainActor.run {
+                            isDeletingAccount = false
+                        }
                     }
                 }
             }
@@ -82,9 +87,11 @@ struct SettingsView: View {
             Text("This will permanently delete all your data from CloudKit and cannot be undone.")
         }
         .confirmationDialog("Sign Out", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
-            Button("Sign Out", role: .destructive) {
-                Task {
-                    await dataManager.signOut()
+            if !UserDefaults.standard.bool(forKey: "local_storage_only") {
+                Button("Sign Out", role: .destructive) {
+                    Task {
+                        await dataManager.signOut()
+                    }
                 }
             }
             Button("Cancel", role: .cancel) { }
@@ -262,10 +269,77 @@ struct SettingsView: View {
         .buttonStyle(PlainButtonStyle())
     }
     
+    private var storageStatusView: some View {
+        HStack(spacing: 12) {
+            Image(systemName: UserDefaults.standard.bool(forKey: "local_storage_only") ? "iphone" : "icloud.fill")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(UserDefaults.standard.bool(forKey: "local_storage_only") ? .orange : .blue)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(UserDefaults.standard.bool(forKey: "local_storage_only") ? "Local Storage" : "CloudKit Sync")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.primary)
+                
+                Text(UserDefaults.standard.bool(forKey: "local_storage_only") ? "Data stored on this device only" : "Data synced across devices")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding(16)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+    
     private var familySharingView: some View {
         VStack(spacing: 16) {
-            // CloudKit Setup Button
-            if !dataManager.familySharingEnabled {
+            // Check if user is using local storage only
+            let isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+            
+            if isLocalStorageOnly {
+                // Show sign in to CloudKit option for local-only users
+                Button(action: {
+                    self.signInToCloudKit()
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "icloud.and.arrow.up.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading) {
+                            Text("Sign in to CloudKit")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("Sync your data across devices")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        if isSettingUpCloudKit {
+                            SwiftUI.ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(16)
+                    .liquidGlassCard()
+                }
+                .disabled(isSettingUpCloudKit)
+                
+                if !cloudKitSetupMessage.isEmpty {
+                    Text(cloudKitSetupMessage)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
+            } else if !dataManager.familySharingEnabled {
+                // Show CloudKit setup for users who haven't enabled family sharing yet
                 Button(action: {
                     self.setupCloudKitSharing()
                 }) {
@@ -511,24 +585,39 @@ struct SettingsView: View {
             Divider()
                 .padding(.vertical, 8)
             
+            // Conditional account management based on storage type
+            let isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
             
-            
-            SettingsRow(
-                icon: "trash.fill",
-                title: isDeletingAccount ? "Deleting Account..." : "Delete Account",
-                titleColor: .red,
-                action: { 
-                    if !isDeletingAccount {
-                        showingDeleteConfirmation = true 
+            if isLocalStorageOnly {
+                // For local storage users, show sign in option
+                SettingsRow(
+                    icon: "icloud.and.arrow.up.fill",
+                    title: "Sign in to sync data",
+                    titleColor: .blue,
+                    action: {
+                        // Use the existing sign in function from familySharingView
+                        self.signInToCloudKit()
                     }
-                }
-            )
-            
-            SettingsRow(
-                icon: "rectangle.portrait.and.arrow.right.fill",
-                title: "Sign Out",
-                action: { showingLogoutConfirmation = true }
-            )
+                )
+            } else {
+                // For CloudKit users, show delete and sign out options
+                SettingsRow(
+                    icon: "trash.fill",
+                    title: isDeletingAccount ? "Deleting Account..." : "Delete Account",
+                    titleColor: .red,
+                    action: { 
+                        if !isDeletingAccount {
+                            showingDeleteConfirmation = true 
+                        }
+                    }
+                )
+                
+                SettingsRow(
+                    icon: "rectangle.portrait.and.arrow.right.fill",
+                    title: "Sign Out",
+                    action: { showingLogoutConfirmation = true }
+                )
+            }
         }
     }
     
@@ -573,6 +662,33 @@ struct SettingsView: View {
         }
         
         rootViewController?.present(shareController, animated: true)
+    }
+    
+    private func signInToCloudKit() {
+        self.isSettingUpCloudKit = true
+        cloudKitSetupMessage = "Signing in to CloudKit..."
+        
+        Task {
+            do {
+                // Sign in to CloudKit and upload local data
+                try await dataManager.signInToCloudKit()
+                
+                await MainActor.run {
+                    cloudKitSetupMessage = "✅ Successfully signed in! Your data is now syncing."
+                    isSettingUpCloudKit = false
+                }
+                
+                // Clear message after delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    cloudKitSetupMessage = ""
+                }
+            } catch {
+                await MainActor.run {
+                    cloudKitSetupMessage = "❌ Sign in failed: \(error.localizedDescription)"
+                    isSettingUpCloudKit = false
+                }
+            }
+        }
     }
     
     private func setupCloudKitSharing() {

@@ -160,7 +160,32 @@ struct OnboardingView: View {
                     .scaleEffect(1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentStep)
                     
-                    Text("Sign in to sync your data across devices and share with family")
+                    // Continue without signing in button
+                    Button(action: {
+                        continueWithoutSignIn()
+                    }) {
+                        HStack {
+                            Image(systemName: "iphone")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Continue without signing in")
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemGray6))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color(.systemGray4), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Text("Sign in to sync your data across devices and share with family. You can always sign in later in Settings.")
                         .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -272,6 +297,7 @@ struct OnboardingView: View {
                                     .stroke(babyName.isEmpty ? Color.clear : Color.purple.opacity(0.4), lineWidth: 2)
                                     .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty)
                             )
+                            .contentShape(Rectangle())
                     }
                     
                     VStack(alignment: .leading, spacing: 16) {
@@ -371,6 +397,7 @@ struct OnboardingView: View {
                                 .stroke(babyName.isEmpty ? Color.clear : Color.purple.opacity(0.4), lineWidth: 2)
                                 .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty)
                         )
+                        .contentShape(Rectangle())
                 }
                 
                 VStack(alignment: .leading, spacing: 16) {
@@ -467,6 +494,7 @@ struct OnboardingView: View {
                         .padding(.vertical, 14)
                         .background(Color(.systemGray6))
                         .cornerRadius(16)
+                        .contentShape(Rectangle())
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
                                 .stroke(primaryCaregiverName.isEmpty ? Color.clear : Color.pink.opacity(0.3), lineWidth: 2)
@@ -1012,6 +1040,15 @@ struct OnboardingView: View {
         case 3: return true
         default: return false
         }
+    }
+    
+    private func continueWithoutSignIn() {
+        // Set flag to indicate user is using local storage only
+        UserDefaults.standard.set(false, forKey: "cloudkit_enabled")
+        UserDefaults.standard.set(true, forKey: "local_storage_only")
+        
+        // Proceed to registration steps without CloudKit
+        proceedToRegistration()
     }
     
     // MARK: - Age-based Recommendations

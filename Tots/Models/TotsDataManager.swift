@@ -2184,6 +2184,47 @@ extension TotsDataManager {
     
     // MARK: - Account Management
     
+    func signInToCloudKit() async throws {
+        // Check if user is currently using local storage only
+        let isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+        
+        if isLocalStorageOnly {
+            // User was using local storage, now wants to sync to CloudKit
+            // Create a CloudKit profile with existing local data
+            let goals = BabyGoals(
+                feeding: UserDefaults.standard.integer(forKey: "feeding_goal"),
+                sleep: UserDefaults.standard.double(forKey: "sleep_goal"),
+                diaper: UserDefaults.standard.integer(forKey: "diaper_goal")
+            )
+            
+            babyProfileRecord = try await cloudKitManager.createBabyProfile(
+                name: babyName,
+                birthDate: babyBirthDate,
+                goals: goals
+            )
+            
+            // Upload existing local activities to CloudKit
+            for activity in recentActivities {
+                if let profileRecord = babyProfileRecord {
+                    try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
+                }
+            }
+            
+            // Note: Growth data, milestones, and words are not currently synced to CloudKit
+            // They remain as local data only for now
+            
+            await MainActor.run {
+                familySharingEnabled = true
+                UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+                UserDefaults.standard.set(false, forKey: "local_storage_only")
+                UserDefaults.standard.set(babyProfileRecord!.recordID.recordName, forKey: "baby_profile_record_id")
+            }
+        } else {
+            // User was already signed in, just refresh the connection
+            try await cloudKitManager.checkAccountStatus()
+        }
+    }
+    
     func signOut() async {
         await cloudKitManager.signOut()
         

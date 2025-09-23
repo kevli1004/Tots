@@ -206,6 +206,7 @@ struct HomeView: View {
                         recentActivitiesView
                     }
                     .padding(.horizontal)
+                    .padding(.top, 16)
                     .padding(.bottom, 8)
                     .frame(width: geometry.size.width)
                 }
@@ -2620,7 +2621,12 @@ struct MilestonesView: View {
                     // Milestones list
                     milestonesList
                 }
+                .padding(.top, 16)
                 .frame(width: geometry.size.width)
+                .onTapGesture {
+                    // Dismiss keyboard when tapping outside search field
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
             }
             }
             .navigationTitle("")
@@ -3258,7 +3264,12 @@ struct WordTrackerView: View {
                     // Words list
                     wordsList
                 }
+                .padding(.top, 16)
                 .frame(width: geometry.size.width)
+                .onTapGesture {
+                    // Dismiss keyboard when tapping outside search field
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
             }
             }
             .navigationTitle("")
