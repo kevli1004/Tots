@@ -53,6 +53,18 @@ class CloudKitManager: ObservableObject {
         }
     }
     
+    func checkAccountStatus() async throws -> CKAccountStatus {
+        return try await withCheckedThrowingContinuation { continuation in
+            container.accountStatus { status, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: status)
+                }
+            }
+        }
+    }
+    
     // MARK: - User Management
     
     func getOrCreateUserRecord() async throws -> CKRecord {

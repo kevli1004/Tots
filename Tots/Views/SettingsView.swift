@@ -684,7 +684,16 @@ struct SettingsView: View {
                 }
             } catch {
                 await MainActor.run {
-                    cloudKitSetupMessage = "❌ Sign in failed: \(error.localizedDescription)"
+                    let errorMessage = error.localizedDescription
+                    if errorMessage.contains("No iCloud account found") {
+                        cloudKitSetupMessage = "❌ Please sign in to iCloud in Settings app first, then try again."
+                    } else if errorMessage.contains("restricted") {
+                        cloudKitSetupMessage = "❌ iCloud access is restricted. Check parental controls or device restrictions."
+                    } else if errorMessage.contains("temporarily unavailable") {
+                        cloudKitSetupMessage = "❌ iCloud is temporarily unavailable. Please try again later."
+                    } else {
+                        cloudKitSetupMessage = "❌ Sign in failed: \(errorMessage)"
+                    }
                     isSettingUpCloudKit = false
                 }
             }

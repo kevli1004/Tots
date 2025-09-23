@@ -2185,6 +2185,25 @@ extension TotsDataManager {
     // MARK: - Account Management
     
     func signInToCloudKit() async throws {
+        // First check CloudKit account status
+        let accountStatus = try await cloudKitManager.checkAccountStatus()
+        
+        switch accountStatus {
+        case .couldNotDetermine:
+            throw NSError(domain: "CloudKitSignIn", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not determine iCloud account status. Please check your internet connection."])
+        case .noAccount:
+            throw NSError(domain: "CloudKitSignIn", code: 2, userInfo: [NSLocalizedDescriptionKey: "No iCloud account found. Please sign in to iCloud in Settings app first."])
+        case .restricted:
+            throw NSError(domain: "CloudKitSignIn", code: 3, userInfo: [NSLocalizedDescriptionKey: "iCloud account is restricted. Please check parental controls or device restrictions."])
+        case .temporarilyUnavailable:
+            throw NSError(domain: "CloudKitSignIn", code: 4, userInfo: [NSLocalizedDescriptionKey: "iCloud is temporarily unavailable. Please try again later."])
+        case .available:
+            // Account is available, proceed with sign in
+            break
+        @unknown default:
+            throw NSError(domain: "CloudKitSignIn", code: 5, userInfo: [NSLocalizedDescriptionKey: "Unknown iCloud account status."])
+        }
+        
         // Check if user is currently using local storage only
         let isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
         
@@ -2269,6 +2288,7 @@ extension TotsDataManager {
             UserDefaults.standard.removeObject(forKey: "use_metric_units")
             UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
             UserDefaults.standard.removeObject(forKey: "family_sharing_enabled")
+            UserDefaults.standard.removeObject(forKey: "baby_profile_image")
             
             // Clear timer data
             UserDefaults.standard.removeObject(forKey: "breastfeeding_start_time")

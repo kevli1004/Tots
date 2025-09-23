@@ -942,6 +942,18 @@ struct CountdownCard: View {
     }
     
     private var countdownText: String {
+        if isFirstTime {
+            switch title.lowercased() {
+            case "feed":
+                return "Log Feeding"
+            case "diaper":
+                return "Log Diaper"
+            case "pumping":
+                return "Log Pumping"
+            default:
+                return "Start Logging"
+            }
+        }
         return dataManager.formatCountdown(countdownInterval)
     }
     
@@ -1021,10 +1033,12 @@ struct CountdownCard: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(color)
                             
-                            Text("until next \(title.lowercased())")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .fontWeight(.medium)
+                            if !isFirstTime {
+                                Text("until next \(title.lowercased())")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .fontWeight(.medium)
+                            }
                         }
                     }
                 }
