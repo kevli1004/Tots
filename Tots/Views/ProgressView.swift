@@ -738,7 +738,7 @@ struct GrowthPercentileChart: View {
         // Fixed y-axis range based on the data type - extended to fit 95th percentile
         switch title {
         case "Weight":
-            return useMetricUnits ? 0...50 : 0...110 // kg or lbs
+            return useMetricUnits ? 0...25 : 0...55 // kg or lbs
         case "Height":
             return useMetricUnits ? 40...120 : 15...48 // cm or inches
         case "Head Circumference":

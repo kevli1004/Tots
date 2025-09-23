@@ -2602,8 +2602,12 @@ struct MilestonesView: View {
         NavigationView {
             GeometryReader { geometry in
                 ZStack {
-                    // Liquid animated background
+                    // Liquid animated background with tap gesture for keyboard dismissal
                     LiquidBackground()
+                        .onTapGesture {
+                            // Dismiss keyboard when tapping background
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
                     
                     VStack(spacing: 16) {
                         // Ad Banner
@@ -2623,10 +2627,6 @@ struct MilestonesView: View {
                 }
                 .padding(.top, 16)
                 .frame(width: geometry.size.width)
-                .onTapGesture {
-                    // Dismiss keyboard when tapping outside search field
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                }
             }
             }
             .navigationTitle("")
@@ -3245,8 +3245,12 @@ struct WordTrackerView: View {
         NavigationView {
             GeometryReader { geometry in
                 ZStack {
-                    // Liquid animated background
+                    // Liquid animated background with tap gesture for keyboard dismissal
                     LiquidBackground()
+                        .onTapGesture {
+                            // Dismiss keyboard when tapping background
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
                     
                     VStack(spacing: 16) {
                         // Ad Banner
@@ -3266,10 +3270,6 @@ struct WordTrackerView: View {
                 }
                 .padding(.top, 16)
                 .frame(width: geometry.size.width)
-                .onTapGesture {
-                    // Dismiss keyboard when tapping outside search field
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                }
             }
             }
             .navigationTitle("")
@@ -3662,6 +3662,7 @@ struct AddWordView: View {
                                         .cornerRadius(12)
                                         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                                         .autocapitalization(.words)
+                                        .contentShape(Rectangle())
                                         .onChange(of: word) { newValue in
                                             if !isTextFieldFocused {
                                                 isTextFieldFocused = true

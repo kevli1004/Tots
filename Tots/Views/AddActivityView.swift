@@ -800,12 +800,12 @@ struct AddActivityView: View {
                                 .font(.headline)
                                 .fontWeight(.semibold)
                             Spacer()
-                            Text("50 kg")
+                            Text("25 kg")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         
-                        Slider(value: $selectedWeightKg, in: 2...50, step: 0.1)
+                        Slider(value: $selectedWeightKg, in: 2...25, step: 0.1)
                             .accentColor(.blue)
                     }
                     .padding()
@@ -824,7 +824,7 @@ struct AddActivityView: View {
                                 .font(.headline)
                                 .fontWeight(.semibold)
                             Spacer()
-                            Text("110 lbs")
+                            Text("55 lbs")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -836,7 +836,7 @@ struct AddActivityView: View {
                                     .foregroundColor(.secondary)
                                 Spacer()
                             }
-                            Slider(value: $selectedWeightLbs, in: 4...110, step: 0.1)
+                            Slider(value: $selectedWeightLbs, in: 4...55, step: 0.1)
                                 .accentColor(.blue)
                             
                             HStack {

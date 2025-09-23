@@ -1561,7 +1561,7 @@ class TotsDataManager: ObservableObject {
     
     func formatCountdown(_ timeInterval: TimeInterval) -> String {
         if timeInterval <= 0 {
-            return "Now"
+            return "Due Now"
         }
         
         let hours = Int(timeInterval) / 3600
@@ -2304,9 +2304,16 @@ extension TotsDataManager {
             await MainActor.run {
                 let originalCount = self.recentActivities.count
                 
-                // Merge cloud activities with local ones
+                // Merge cloud activities with local ones (deduplicate by content, not ID)
                 for cloudActivity in cloudActivities {
-                    if !self.recentActivities.contains(where: { $0.id == cloudActivity.id }) {
+                    let isDuplicate = self.recentActivities.contains { localActivity in
+                        localActivity.type == cloudActivity.type &&
+                        abs(localActivity.time.timeIntervalSince(cloudActivity.time)) < 60 && // Within 1 minute
+                        localActivity.details == cloudActivity.details &&
+                        localActivity.mood == cloudActivity.mood
+                    }
+                    
+                    if !isDuplicate {
                         self.recentActivities.append(cloudActivity)
                     }
                 }
