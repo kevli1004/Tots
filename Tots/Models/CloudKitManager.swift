@@ -108,6 +108,17 @@ class CloudKitManager: ObservableObject {
         return try await privateDatabase.save(record)
     }
     
+    func updateBabyProfile(_ record: CKRecord, name: String, birthDate: Date, goals: BabyGoals) async throws -> CKRecord {
+        // Update the existing record
+        record["name"] = name
+        record["birthDate"] = birthDate
+        record["feedingGoal"] = goals.feeding
+        record["sleepGoal"] = goals.sleep
+        record["diaperGoal"] = goals.diaper
+        
+        return try await privateDatabase.save(record)
+    }
+    
     func fetchBabyProfiles() async throws -> [CKRecord] {
         // First ensure user record exists
         let userRecord = try await getOrCreateUserRecord()

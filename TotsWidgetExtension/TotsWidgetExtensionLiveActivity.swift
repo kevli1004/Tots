@@ -486,8 +486,8 @@ struct DynamicActivityGrid: View {
             ))
         }
         
-        // Upcoming activities
-        if let nextDiaperTime = context.state.nextDiaperTime, nextDiaperTime > Date() {
+        // Upcoming activities (including due activities)
+        if let nextDiaperTime = context.state.nextDiaperTime {
             items.append(ActivityItem(
                 type: .upcoming,
                 label: "Diaper",
@@ -497,7 +497,7 @@ struct DynamicActivityGrid: View {
             ))
         }
         
-        if let nextFeedingTime = context.state.nextFeedingTime, nextFeedingTime > Date() {
+        if let nextFeedingTime = context.state.nextFeedingTime {
             items.append(ActivityItem(
                 type: .upcoming,
                 label: "Feeding",
@@ -590,11 +590,18 @@ struct CompactActivityCard: View {
                 .minimumScaleFactor(0.8)
             
             // Time
-            Text(activity.time, style: .timer)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(activity.color)
-                .monospacedDigit()
-                .multilineTextAlignment(.center)
+            if activity.isTimer || activity.time > Date() {
+                Text(activity.time, style: .timer)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(activity.color)
+                    .monospacedDigit()
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("Due Now")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(activity.color)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 8)

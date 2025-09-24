@@ -1138,9 +1138,22 @@ struct PersonalDetailsView: View {
     }
     
     private func saveSettings() {
-        dataManager.babyName = babyName
-        dataManager.babyBirthDate = birthDate
+        // Save primary caregiver name locally (not synced to CloudKit)
         UserDefaults.standard.set(primaryCaregiverName, forKey: "primary_caregiver_name")
+        
+        // Update baby profile (both locally and in CloudKit if available)
+        Task {
+            do {
+                try await dataManager.updateBabyProfile(name: babyName, birthDate: birthDate)
+            } catch {
+                // If CloudKit update fails, still update locally
+                await MainActor.run {
+                    dataManager.babyName = babyName
+                    dataManager.babyBirthDate = birthDate
+                }
+                print("Failed to update CloudKit profile: \(error)")
+            }
+        }
     }
     
     private func loadProfileImage() {

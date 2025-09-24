@@ -65,34 +65,195 @@ struct ProgressView: View {
     }
     
     private func getPercentileValue(for type: String, month: Int, percentile: Int, isMale: Bool, useMetricUnits: Bool) -> Double {
-        // Simplified percentile data - in a real app, you'd use WHO/CDC growth charts
-        let baseValues: [String: [Double]] = [
-            "weight": isMale ? [3.3, 4.3, 5.3, 6.0, 6.7, 7.3, 7.8, 8.2, 8.6, 9.0, 9.3, 9.6, 9.9, 10.2, 10.5, 10.8, 11.1, 11.4, 11.7, 12.0, 12.3, 12.6, 12.9, 13.2, 13.5, 13.8, 14.1, 14.4, 14.7, 15.0, 15.3, 15.6, 15.9, 16.2, 16.5, 16.8, 17.1] : [3.2, 4.2, 5.1, 5.8, 6.4, 6.9, 7.3, 7.7, 8.0, 8.3, 8.6, 8.9, 9.2, 9.5, 9.8, 10.1, 10.4, 10.7, 11.0, 11.3, 11.6, 11.9, 12.2, 12.5, 12.8, 13.1, 13.4, 13.7, 14.0, 14.3, 14.6, 14.9, 15.2, 15.5, 15.8, 16.1, 16.4],
-            "height": isMale ? [49.9, 54.7, 58.4, 61.4, 63.9, 65.9, 67.6, 69.2, 70.6, 72.0, 73.4, 74.7, 76.1, 77.4, 78.7, 80.0, 81.3, 82.5, 83.8, 85.0, 86.2, 87.4, 88.6, 89.8, 91.0, 92.2, 93.4, 94.6, 95.8, 97.0, 98.2, 99.4, 100.6, 101.8, 103.0, 104.2, 105.4] : [49.1, 53.7, 57.1, 59.8, 62.1, 64.0, 65.7, 67.3, 68.7, 70.1, 71.4, 72.8, 74.1, 75.4, 76.7, 78.0, 79.3, 80.5, 81.8, 83.0, 84.2, 85.4, 86.6, 87.8, 89.0, 90.2, 91.4, 92.6, 93.8, 95.0, 96.2, 97.4, 98.6, 99.8, 101.0, 102.2, 103.4],
-            "headCircumference": isMale ? [33.2, 35.7, 37.8, 39.5, 40.9, 42.1, 43.1, 44.0, 44.8, 45.5, 46.1, 46.6, 47.1, 47.5, 47.9, 48.3, 48.6, 48.9, 49.2, 49.5, 49.8, 50.0, 50.3, 50.5, 50.8, 51.0, 51.3, 51.5, 51.8, 52.0, 52.3, 52.5, 52.8, 53.0, 53.3, 53.5, 53.8] : [32.6, 35.1, 37.1, 38.7, 40.0, 41.1, 42.0, 42.8, 43.5, 44.1, 44.6, 45.1, 45.5, 45.9, 46.3, 46.6, 47.0, 47.3, 47.6, 47.9, 48.2, 48.5, 48.8, 49.0, 49.3, 49.6, 49.8, 50.1, 50.3, 50.6, 50.8, 51.1, 51.3, 51.6, 51.8, 52.1, 52.3]
-        ]
-        
-        guard let values = baseValues[type], month < values.count else { return 0 }
-        let baseValue = values[month]
-        
-        // Apply percentile adjustment (simplified)
-        let adjustment = Double(percentile - 50) * 0.1
-        let adjustedValue = baseValue + adjustment
+        // WHO Growth Standards - proper percentile data
+        let value = getWHOPercentileValue(for: type, month: month, percentile: percentile, isMale: isMale)
         
         // Convert units if needed
         if !useMetricUnits {
             switch type {
             case "weight":
-                return adjustedValue * 2.20462 // kg to lbs
+                return value * 2.20462 // kg to lbs
             case "height", "headCircumference":
-                return adjustedValue * 0.393701 // cm to inches
+                return value * 0.393701 // cm to inches
             default:
-                return adjustedValue
+                return value
             }
         }
         
-        return adjustedValue
+        return value
     }
+    
+    private func getWHOPercentileValue(for type: String, month: Int, percentile: Int, isMale: Bool) -> Double {
+        // Use gender-specific data for charts
+        let median = getExpectedValue(for: type, month: month, isMale: isMale)
+        let standardDeviation = getStandardDeviation(for: type, month: month, isMale: isMale)
+        
+        // Convert percentile to z-score
+        let zScore = getZScore(for: percentile)
+        
+        // Calculate the percentile value
+        return median + (zScore * standardDeviation)
+    }
+    
+    private func getExpectedValue(for type: String, month: Int, isMale: Bool) -> Double {
+        switch type {
+        case "weight":
+            return getExpectedWeight(month: month, isMale: isMale)
+        case "height":
+            return getExpectedHeight(month: month, isMale: isMale)
+        case "headCircumference":
+            return getExpectedHeadCircumference(month: month, isMale: isMale)
+        default:
+            return 0
+        }
+    }
+    
+    private func getExpectedWeight(month: Int, isMale: Bool) -> Double {
+        // WHO weight-for-age 50th percentile (kg) - more complete data
+        let maleWeights: [Double] = [
+            3.3, 4.5, 5.6, 6.4, 7.0, 7.5, 7.9, 8.3, 8.6, 8.9, 9.2, 9.4, 9.6, 9.9, 10.1, 10.3, 10.5, 10.7, 10.9, 11.1, 11.3, 11.5, 11.8, 12.0, 12.2, 12.4, 12.7, 12.9, 13.1, 13.4, 13.6, 13.8, 14.1, 14.3, 14.6, 14.8, 15.1
+        ]
+        let femaleWeights: [Double] = [
+            3.2, 4.2, 5.1, 5.8, 6.4, 6.9, 7.3, 7.6, 7.9, 8.2, 8.5, 8.7, 8.9, 9.2, 9.4, 9.6, 9.8, 10.0, 10.2, 10.4, 10.6, 10.9, 11.1, 11.3, 11.5, 11.7, 12.0, 12.2, 12.4, 12.7, 12.9, 13.1, 13.4, 13.6, 13.9, 14.1, 14.4
+        ]
+        
+        let weights = isMale ? maleWeights : femaleWeights
+        if month < weights.count {
+            return weights[month]
+        } else {
+            // Extrapolate for older ages
+            let lastWeight = weights.last ?? 15.0
+            let monthlyGain = isMale ? 0.15 : 0.14
+            return lastWeight + Double(month - weights.count + 1) * monthlyGain
+        }
+    }
+    
+    private func getExpectedHeight(month: Int, isMale: Bool) -> Double {
+        // WHO length/height-for-age 50th percentile (cm)
+        let maleHeights: [Double] = [
+            49.9, 54.7, 58.4, 61.4, 63.9, 65.9, 67.6, 69.2, 70.6, 72.0, 73.3, 74.5, 75.7, 76.9, 78.0, 79.1, 80.2, 81.2, 82.3, 83.2, 84.2, 85.1, 86.0, 86.9, 87.8, 88.7, 89.6, 90.4, 91.2, 92.1, 92.9, 93.7, 94.4, 95.2, 95.9, 96.6, 97.4
+        ]
+        let femaleHeights: [Double] = [
+            49.1, 53.7, 57.1, 59.8, 62.1, 64.0, 65.7, 67.3, 68.7, 70.1, 71.4, 72.6, 73.8, 75.0, 76.0, 77.1, 78.1, 79.1, 80.0, 81.0, 81.9, 82.8, 83.7, 84.6, 85.4, 86.3, 87.1, 87.9, 88.7, 89.5, 90.3, 91.1, 91.8, 92.6, 93.3, 94.1, 94.8
+        ]
+        
+        let heights = isMale ? maleHeights : femaleHeights
+        if month < heights.count {
+            return heights[month]
+        } else {
+            // Extrapolate for older ages
+            let lastHeight = heights.last ?? 95.0
+            let monthlyGain = isMale ? 0.5 : 0.45
+            return lastHeight + Double(month - heights.count + 1) * monthlyGain
+        }
+    }
+    
+    private func getExpectedHeadCircumference(month: Int, isMale: Bool) -> Double {
+        // WHO head circumference-for-age 50th percentile (cm)
+        let maleHeadCirc: [Double] = [
+            34.5, 37.3, 39.1, 40.5, 41.6, 42.6, 43.3, 43.9, 44.5, 45.0, 45.4, 45.8, 46.1, 46.4, 46.7, 47.0, 47.2, 47.4, 47.6, 47.8, 48.0, 48.2, 48.4, 48.5, 48.7, 48.9, 49.0, 49.2, 49.3, 49.5, 49.6, 49.8, 49.9, 50.1, 50.2, 50.4, 50.5
+        ]
+        let femaleHeadCirc: [Double] = [
+            33.9, 36.5, 38.3, 39.5, 40.4, 41.2, 41.8, 42.4, 42.9, 43.3, 43.7, 44.0, 44.3, 44.6, 44.9, 45.1, 45.4, 45.6, 45.8, 46.0, 46.2, 46.4, 46.5, 46.7, 46.9, 47.0, 47.2, 47.3, 47.5, 47.6, 47.8, 47.9, 48.1, 48.2, 48.4, 48.5, 48.7
+        ]
+        
+        let headCircs = isMale ? maleHeadCirc : femaleHeadCirc
+        if month < headCircs.count {
+            return headCircs[month]
+        } else {
+            // Extrapolate for older ages
+            let lastCirc = headCircs.last ?? 50.0
+            let monthlyGain = isMale ? 0.08 : 0.07
+            return lastCirc + Double(month - headCircs.count + 1) * monthlyGain
+        }
+    }
+    
+    private func getStandardDeviation(for type: String, month: Int, isMale: Bool) -> Double {
+        // Use actual WHO standard deviations (same as TotsDataManager)
+        switch type {
+        case "weight":
+            return getWeightStandardDeviation(ageInMonths: month)
+        case "height":
+            return getHeightStandardDeviation(ageInMonths: month)
+        case "headCircumference":
+            return getHeadCircumferenceStandardDeviation(ageInMonths: month)
+        default:
+            return 1.0
+        }
+    }
+    
+    private func getWeightStandardDeviation(ageInMonths: Int) -> Double {
+        // WHO weight standard deviations (kg)
+        let whoWeightSD: [Double] = [
+            0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.0, 1.1, 1.1, 1.2, 1.2, 1.3, 1.3, // 0-12 months
+            1.3, 1.4, 1.4, 1.4, 1.5, 1.5, 1.5, 1.6, 1.6, 1.6, 1.7, 1.7 // 13-24 months
+        ]
+        
+        if ageInMonths < whoWeightSD.count {
+            return whoWeightSD[ageInMonths]
+        } else {
+            return 1.8 // Default for older ages
+        }
+    }
+    
+    private func getHeightStandardDeviation(ageInMonths: Int) -> Double {
+        // WHO height standard deviations (cm)
+        let whoHeightSD: [Double] = [
+            1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.4, 2.5, 2.5, 2.6, 2.6, 2.7, 2.7, // 0-12 months
+            2.8, 2.8, 2.9, 2.9, 3.0, 3.0, 3.1, 3.1, 3.2, 3.2, 3.3, 3.3 // 13-24 months
+        ]
+        
+        if ageInMonths < whoHeightSD.count {
+            return whoHeightSD[ageInMonths]
+        } else {
+            return 3.5 // Default for older ages
+        }
+    }
+    
+    private func getHeadCircumferenceStandardDeviation(ageInMonths: Int) -> Double {
+        // WHO head circumference standard deviations (cm)
+        let whoHeadCircSD: [Double] = [
+            1.1, 1.2, 1.3, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, // 0-12 months
+            1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4 // 13-24 months
+        ]
+        
+        if ageInMonths < whoHeadCircSD.count {
+            return whoHeadCircSD[ageInMonths]
+        } else {
+            return 1.5 // Default for older ages
+        }
+    }
+    
+    private func getZScore(for percentile: Int) -> Double {
+        // Convert percentile to z-score using inverse normal distribution
+        let p = Double(percentile) / 100.0
+        return inverseNormalCDF(p)
+    }
+    
+    private func inverseNormalCDF(_ p: Double) -> Double {
+        // Approximation of inverse normal CDF (Beasley-Springer-Moro algorithm)
+        let a = [0, -3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00]
+        let b = [0, -5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01]
+        let c = [0, -7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00]
+        let d = [0, 7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00]
+        
+        let pLow = 0.02425
+        let pHigh = 1 - pLow
+        
+        if p < pLow {
+            let q = sqrt(-2 * log(p))
+            return (((((c[1]*q+c[2])*q+c[3])*q+c[4])*q+c[5])*q+c[6]) / ((((d[1]*q+d[2])*q+d[3])*q+d[4])*q+1)
+        } else if p <= pHigh {
+            let q = p - 0.5
+            let r = q * q
+            return (((((a[1]*r+a[2])*r+a[3])*r+a[4])*r+a[5])*r+a[6])*q / (((((b[1]*r+b[2])*r+b[3])*r+b[4])*r+b[5])*r+1)
+        } else {
+            let q = sqrt(-2 * log(1-p))
+            return -(((((c[1]*q+c[2])*q+c[3])*q+c[4])*q+c[5])*q+c[6]) / ((((d[1]*q+d[2])*q+d[3])*q+d[4])*q+1)
+        }
+    }
+    
+    
     
     
     var body: some View {
@@ -107,8 +268,8 @@ struct ProgressView: View {
                         // Ad Banner
                         AdBannerContainerWide()
                         
-                        // Unit toggle at top
-                        unitToggleRow
+                        // Combined toggles row
+                        combinedTogglesRow
                         
                         // Growth overview cards
                         growthOverviewCards
@@ -174,31 +335,59 @@ struct ProgressView: View {
         }
     }
     
-    private var unitToggleRow: some View {
-                HStack {
-                    Spacer()
-                    
-            HStack(spacing: 6) {
-                    Text("cm/kg")
+    
+    private var combinedTogglesRow: some View {
+        HStack {
+            // Gender toggle on the left
+            HStack(spacing: 8) {
+                Button(action: { isMale = true }) {
+                    Text("Boy")
                         .font(.caption)
-                        .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
-                        .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
-                    
-                    Toggle("", isOn: Binding(
-                        get: { !dataManager.useMetricUnits },
-                        set: { dataManager.useMetricUnits = !$0 }
-                    ))
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
-                    .scaleEffect(0.8)
-                    .fixedSize()
-                    
-                    Text("in/lb")
+                        .fontWeight(isMale ? .semibold : .regular)
+                        .foregroundColor(isMale ? .blue : .secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(isMale ? Color.blue.opacity(0.1) : Color.clear)
+                        .cornerRadius(8)
+                }
+                
+                Button(action: { isMale = false }) {
+                    Text("Girl")
                         .font(.caption)
-                        .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
-                        .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
-            }
+                        .fontWeight(!isMale ? .semibold : .regular)
+                        .foregroundColor(!isMale ? .blue : .secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(!isMale ? Color.blue.opacity(0.1) : Color.clear)
+                        .cornerRadius(8)
                 }
             }
+            
+            Spacer()
+            
+            // Unit toggle on the right
+            HStack(spacing: 6) {
+                Text("cm/kg")
+                    .font(.caption)
+                    .fontWeight(dataManager.useMetricUnits ? .semibold : .regular)
+                    .foregroundColor(dataManager.useMetricUnits ? .blue : .secondary)
+                
+                Toggle("", isOn: Binding(
+                    get: { !dataManager.useMetricUnits },
+                    set: { dataManager.useMetricUnits = !$0 }
+                ))
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
+                .scaleEffect(0.8)
+                .fixedSize()
+                
+                Text("in/lb")
+                    .font(.caption)
+                    .fontWeight(!dataManager.useMetricUnits ? .semibold : .regular)
+                    .foregroundColor(!dataManager.useMetricUnits ? .blue : .secondary)
+            }
+        }
+        .padding(.horizontal)
+    }
             
     private var growthOverviewCards: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -239,7 +428,7 @@ struct ProgressView: View {
                         GrowthCard(
                             title: "Weight",
                             value: dataManager.formatWeight(dataManager.currentWeight),
-                            subtitle: "\(dataManager.getWeightPercentile())th percentile",
+                            subtitle: "\(dataManager.getWeightPercentile(isMale: isMale))th percentile",
                             color: .green,
                             onTap: {
                                 if let latestEntry = dataManager.growthData.sorted(by: { $0.date > $1.date }).first {
@@ -251,7 +440,7 @@ struct ProgressView: View {
                         GrowthCard(
                             title: "Height",
                             value: dataManager.formatHeight(dataManager.currentHeight),
-                            subtitle: "\(dataManager.getHeightPercentile())th percentile",
+                            subtitle: "\(dataManager.getHeightPercentile(isMale: isMale))th percentile",
                             color: .blue,
                             onTap: {
                                 if let latestEntry = dataManager.growthData.sorted(by: { $0.date > $1.date }).first {
@@ -277,7 +466,7 @@ struct ProgressView: View {
                         GrowthCard(
                             title: "Head Circumference",
                             value: dataManager.formatHeadCircumference(dataManager.currentHeadCircumference),
-                            subtitle: "Latest measurement",
+                            subtitle: "\(dataManager.getHeadCircumferencePercentile(isMale: isMale))th percentile",
                             color: .orange,
                             onTap: {
                                 if let latestEntry = dataManager.growthData.sorted(by: { $0.date > $1.date }).first {
@@ -299,31 +488,6 @@ struct ProgressView: View {
                     .fontWeight(.semibold)
                 
                 Spacer()
-                
-                // Gender toggle
-                HStack(spacing: 8) {
-                    Button(action: { isMale = true }) {
-                        Text("Boy")
-                            .font(.caption)
-                            .fontWeight(isMale ? .semibold : .regular)
-                            .foregroundColor(isMale ? .blue : .secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(isMale ? Color.blue.opacity(0.1) : Color.clear)
-                            .cornerRadius(8)
-                    }
-                    
-                    Button(action: { isMale = false }) {
-                        Text("Girl")
-                            .font(.caption)
-                            .fontWeight(!isMale ? .semibold : .regular)
-                            .foregroundColor(!isMale ? .blue : .secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(!isMale ? Color.blue.opacity(0.1) : Color.clear)
-                            .cornerRadius(8)
-                    }
-                }
             }
             
             // Show all charts stacked vertically or single empty state

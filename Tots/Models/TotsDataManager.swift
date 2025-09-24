@@ -991,14 +991,34 @@ class TotsDataManager: ObservableObject {
         return getWeightPercentile(for: latestGrowth)
     }
     
+    func getWeightPercentile(isMale: Bool) -> Int {
+        guard let latestGrowth = growthData.last else { return 50 }
+        return getWeightPercentile(for: latestGrowth, isMale: isMale)
+    }
+    
     func getHeightPercentile() -> Int {
         guard let latestGrowth = growthData.last else { return 50 }
         return getHeightPercentile(for: latestGrowth)
     }
     
+    func getHeightPercentile(isMale: Bool) -> Int {
+        guard let latestGrowth = growthData.last else { return 50 }
+        return getHeightPercentile(for: latestGrowth, isMale: isMale)
+    }
+    
     func getBMIPercentile() -> Int {
         guard let latestGrowth = growthData.last else { return 50 }
         return getBMIPercentile(for: latestGrowth)
+    }
+    
+    func getHeadCircumferencePercentile() -> Int {
+        guard let latestGrowth = growthData.last else { return 50 }
+        return getHeadCircumferencePercentile(for: latestGrowth)
+    }
+    
+    func getHeadCircumferencePercentile(isMale: Bool) -> Int {
+        guard let latestGrowth = growthData.last else { return 50 }
+        return getHeadCircumferencePercentile(for: latestGrowth, isMale: isMale)
     }
     
     func getWeightPercentile(for entry: GrowthEntry) -> Int {
@@ -1007,6 +1027,17 @@ class TotsDataManager: ObservableObject {
         
         // WHO growth standards with age-appropriate standard deviation
         let expectedWeight = getExpectedWeight(ageInMonths: ageInMonths)
+        let standardDeviation = getWeightStandardDeviation(ageInMonths: ageInMonths)
+        let percentile = calculatePercentile(value: weightKg, expected: expectedWeight, standardDeviation: standardDeviation)
+        return percentile
+    }
+    
+    func getWeightPercentile(for entry: GrowthEntry, isMale: Bool) -> Int {
+        let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
+        let weightKg = convertWeightToKg(entry.weight)
+        
+        // WHO growth standards with gender-specific data
+        let expectedWeight = getExpectedWeight(ageInMonths: ageInMonths, isMale: isMale)
         let standardDeviation = getWeightStandardDeviation(ageInMonths: ageInMonths)
         let percentile = calculatePercentile(value: weightKg, expected: expectedWeight, standardDeviation: standardDeviation)
         return percentile
@@ -1023,6 +1054,17 @@ class TotsDataManager: ObservableObject {
         return percentile
     }
     
+    func getHeightPercentile(for entry: GrowthEntry, isMale: Bool) -> Int {
+        let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
+        let heightCm = convertHeightToCm(entry.height)
+        
+        // WHO growth standards with gender-specific data
+        let expectedHeight = getExpectedHeight(ageInMonths: ageInMonths, isMale: isMale)
+        let standardDeviation = getHeightStandardDeviation(ageInMonths: ageInMonths)
+        let percentile = calculatePercentile(value: heightCm, expected: expectedHeight, standardDeviation: standardDeviation)
+        return percentile
+    }
+    
     func getBMIPercentile(for entry: GrowthEntry) -> Int {
         let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
         let weightKg = convertWeightToKg(entry.weight)
@@ -1033,6 +1075,28 @@ class TotsDataManager: ObservableObject {
         let expectedBMI = getExpectedBMI(ageInMonths: ageInMonths)
         let standardDeviation = getBMIStandardDeviation(ageInMonths: ageInMonths)
         let percentile = calculatePercentile(value: bmi, expected: expectedBMI, standardDeviation: standardDeviation)
+        return percentile
+    }
+    
+    func getHeadCircumferencePercentile(for entry: GrowthEntry) -> Int {
+        let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
+        let headCircumferenceCm = convertHeadCircumferenceToCm(entry.headCircumference)
+        
+        // WHO growth standards with age-appropriate standard deviation (averaged)
+        let expectedHeadCircumference = getExpectedHeadCircumference(ageInMonths: ageInMonths)
+        let standardDeviation = getHeadCircumferenceStandardDeviation(ageInMonths: ageInMonths)
+        let percentile = calculatePercentile(value: headCircumferenceCm, expected: expectedHeadCircumference, standardDeviation: standardDeviation)
+        return percentile
+    }
+    
+    func getHeadCircumferencePercentile(for entry: GrowthEntry, isMale: Bool) -> Int {
+        let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
+        let headCircumferenceCm = convertHeadCircumferenceToCm(entry.headCircumference)
+        
+        // WHO growth standards with gender-specific data
+        let expectedHeadCircumference = getExpectedHeadCircumference(ageInMonths: ageInMonths, isMale: isMale)
+        let standardDeviation = getHeadCircumferenceStandardDeviation(ageInMonths: ageInMonths)
+        let percentile = calculatePercentile(value: headCircumferenceCm, expected: expectedHeadCircumference, standardDeviation: standardDeviation)
         return percentile
     }
     
@@ -1078,6 +1142,60 @@ class TotsDataManager: ObservableObject {
         }
     }
     
+    private func getHeadCircumferenceStandardDeviation(ageInMonths: Int) -> Double {
+        // WHO head circumference standard deviations (cm)
+        let whoHeadCircSD: [Double] = [
+            1.1, 1.2, 1.3, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, // 0-12 months
+            1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4 // 13-24 months
+        ]
+        
+        if ageInMonths < whoHeadCircSD.count {
+            return whoHeadCircSD[ageInMonths]
+        } else {
+            return 1.5 // Default for older ages
+        }
+    }
+    
+    private func getExpectedHeadCircumference(ageInMonths: Int) -> Double {
+        // WHO head circumference-for-age 50th percentile average (cm)
+        let whoHeadCircData: [Double] = [
+            34.2, 36.9, 38.7, 40.0, 41.0, 41.9, 42.5, 43.1, 43.7, 44.1, 44.5, 44.9, 45.2, // 0-12 months
+            45.5, 45.8, 46.0, 46.3, 46.5, 46.7, 46.9, 47.1, 47.3, 47.4, 47.6, 47.8 // 13-24 months
+        ]
+        
+        if ageInMonths < whoHeadCircData.count {
+            return whoHeadCircData[ageInMonths]
+        } else {
+            // Extrapolate for older ages
+            return 47.8 + Double(ageInMonths - 24) * 0.08
+        }
+    }
+    
+    private func getExpectedHeadCircumference(ageInMonths: Int, isMale: Bool) -> Double {
+        // WHO head circumference-for-age 50th percentile (cm) - gender-specific data
+        let maleHeadCirc: [Double] = [
+            34.5, 37.3, 39.1, 40.5, 41.6, 42.6, 43.3, 43.9, 44.5, 45.0, 45.4, 45.8, 46.1, 46.4, 46.7, 47.0, 47.2, 47.4, 47.6, 47.8, 48.0, 48.2, 48.4, 48.5, 48.7, 48.9, 49.0, 49.2, 49.3, 49.5, 49.6, 49.8, 49.9, 50.1, 50.2, 50.4, 50.5
+        ]
+        let femaleHeadCirc: [Double] = [
+            33.9, 36.5, 38.3, 39.5, 40.4, 41.2, 41.8, 42.4, 42.9, 43.3, 43.7, 44.0, 44.3, 44.6, 44.9, 45.1, 45.4, 45.6, 45.8, 46.0, 46.2, 46.4, 46.5, 46.7, 46.9, 47.0, 47.2, 47.3, 47.5, 47.6, 47.8, 47.9, 48.1, 48.2, 48.4, 48.5, 48.7
+        ]
+        
+        let headCircs = isMale ? maleHeadCirc : femaleHeadCirc
+        if ageInMonths < headCircs.count {
+            return headCircs[ageInMonths]
+        } else {
+            // Extrapolate for older ages
+            let lastCirc = headCircs.last ?? 50.0
+            let monthlyGain = isMale ? 0.08 : 0.07
+            return lastCirc + Double(ageInMonths - headCircs.count + 1) * monthlyGain
+        }
+    }
+    
+    private func convertHeadCircumferenceToCm(_ headCircumference: Double) -> Double {
+        // Assume stored in cm, convert if needed
+        return headCircumference
+    }
+    
     var growthPercentileHistory: [(date: Date, weightPercentile: Int, heightPercentile: Int, bmiPercentile: Int)] {
         return growthData.map { entry in
             (
@@ -1109,6 +1227,26 @@ class TotsDataManager: ObservableObject {
         }
     }
     
+    private func getExpectedWeight(ageInMonths: Int, isMale: Bool) -> Double {
+        // WHO weight-for-age 50th percentile (kg) - gender-specific data
+        let maleWeights: [Double] = [
+            3.3, 4.5, 5.6, 6.4, 7.0, 7.5, 7.9, 8.3, 8.6, 8.9, 9.2, 9.4, 9.6, 9.9, 10.1, 10.3, 10.5, 10.7, 10.9, 11.1, 11.3, 11.5, 11.8, 12.0, 12.2, 12.4, 12.7, 12.9, 13.1, 13.4, 13.6, 13.8, 14.1, 14.3, 14.6, 14.8, 15.1
+        ]
+        let femaleWeights: [Double] = [
+            3.2, 4.2, 5.1, 5.8, 6.4, 6.9, 7.3, 7.6, 7.9, 8.2, 8.5, 8.7, 8.9, 9.2, 9.4, 9.6, 9.8, 10.0, 10.2, 10.4, 10.6, 10.9, 11.1, 11.3, 11.5, 11.7, 12.0, 12.2, 12.4, 12.7, 12.9, 13.1, 13.4, 13.6, 13.9, 14.1, 14.4
+        ]
+        
+        let weights = isMale ? maleWeights : femaleWeights
+        if ageInMonths < weights.count {
+            return weights[ageInMonths]
+        } else {
+            // Extrapolate for older ages
+            let lastWeight = weights.last ?? 15.0
+            let monthlyGain = isMale ? 0.15 : 0.14
+            return lastWeight + Double(ageInMonths - weights.count + 1) * monthlyGain
+        }
+    }
+    
     private func getExpectedHeight(ageInMonths: Int) -> Double {
         // WHO growth standards 50th percentile for boys/girls average (in cm)
         let whoHeightData: [Double] = [
@@ -1121,6 +1259,26 @@ class TotsDataManager: ObservableObject {
         } else {
             // Extrapolate for older ages
             return 87.8 + Double(ageInMonths - 24) * 0.5
+        }
+    }
+    
+    private func getExpectedHeight(ageInMonths: Int, isMale: Bool) -> Double {
+        // WHO length/height-for-age 50th percentile (cm) - gender-specific data
+        let maleHeights: [Double] = [
+            49.9, 54.7, 58.4, 61.4, 63.9, 65.9, 67.6, 69.2, 70.6, 72.0, 73.3, 74.5, 75.7, 76.9, 78.0, 79.1, 80.2, 81.2, 82.3, 83.2, 84.2, 85.1, 86.0, 86.9, 87.8, 88.7, 89.6, 90.4, 91.2, 92.1, 92.9, 93.7, 94.4, 95.2, 95.9, 96.6, 97.4
+        ]
+        let femaleHeights: [Double] = [
+            49.1, 53.7, 57.1, 59.8, 62.1, 64.0, 65.7, 67.3, 68.7, 70.1, 71.4, 72.6, 73.8, 75.0, 76.0, 77.1, 78.1, 79.1, 80.0, 81.0, 81.9, 82.8, 83.7, 84.6, 85.4, 86.3, 87.1, 87.9, 88.7, 89.5, 90.3, 91.1, 91.8, 92.6, 93.3, 94.1, 94.8
+        ]
+        
+        let heights = isMale ? maleHeights : femaleHeights
+        if ageInMonths < heights.count {
+            return heights[ageInMonths]
+        } else {
+            // Extrapolate for older ages
+            let lastHeight = heights.last ?? 95.0
+            let monthlyGain = isMale ? 0.5 : 0.45
+            return lastHeight + Double(ageInMonths - heights.count + 1) * monthlyGain
         }
     }
     
@@ -1522,10 +1680,9 @@ class TotsDataManager: ObservableObject {
             nextFeedingTime = nextFeeding
             nextFeedingCountdown = max(0, nextFeeding.timeIntervalSince(now))
         } else {
-            // Default to 2 minutes from now for demo purposes to see seconds timer
-            let defaultNextFeeding = now.addingTimeInterval(2 * 60)
-            nextFeedingTime = defaultNextFeeding
-            nextFeedingCountdown = max(0, defaultNextFeeding.timeIntervalSince(now))
+            // No previous feeding - show as due
+            nextFeedingTime = now
+            nextFeedingCountdown = 0
         }
         
         // Calculate next pumping time
@@ -1533,6 +1690,10 @@ class TotsDataManager: ObservableObject {
             let nextPumping = lastPumping.time.addingTimeInterval(pumpingInterval)
             nextPumpingTime = nextPumping
             nextPumpingCountdown = max(0, nextPumping.timeIntervalSince(now))
+        } else {
+            // No previous pumping - don't show pumping in live activity
+            nextPumpingTime = nil
+            nextPumpingCountdown = 0
         }
         
         // Calculate next diaper change
@@ -1541,10 +1702,9 @@ class TotsDataManager: ObservableObject {
             nextDiaperTime = nextDiaper
             nextDiaperCountdown = max(0, nextDiaper.timeIntervalSince(now))
         } else {
-            // Default to 3 minutes from now for demo purposes to see seconds timer
-            let defaultNextDiaper = now.addingTimeInterval(3 * 60)
-            nextDiaperTime = defaultNextDiaper
-            nextDiaperCountdown = max(0, defaultNextDiaper.timeIntervalSince(now))
+            // No previous diaper change - show as due
+            nextDiaperTime = now
+            nextDiaperCountdown = 0
         }
         
     }
@@ -2241,6 +2401,38 @@ extension TotsDataManager {
         } else {
             // User was already signed in, just refresh the connection
             try await cloudKitManager.checkAccountStatus()
+        }
+    }
+    
+    func updateBabyProfile(name: String, birthDate: Date) async throws {
+        guard let profileRecord = babyProfileRecord else { 
+            // If no CloudKit profile exists, just update local data
+            await MainActor.run {
+                self.babyName = name
+                self.babyBirthDate = birthDate
+            }
+            return 
+        }
+        
+        // Update CloudKit record
+        let goals = BabyGoals(
+            feeding: UserDefaults.standard.integer(forKey: "feeding_goal"),
+            sleep: UserDefaults.standard.double(forKey: "sleep_goal"),
+            diaper: UserDefaults.standard.integer(forKey: "diaper_goal")
+        )
+        
+        let updatedRecord = try await cloudKitManager.updateBabyProfile(
+            profileRecord,
+            name: name,
+            birthDate: birthDate,
+            goals: goals
+        )
+        
+        // Update local data and record reference
+        await MainActor.run {
+            self.babyName = name
+            self.babyBirthDate = birthDate
+            self.babyProfileRecord = updatedRecord
         }
     }
     

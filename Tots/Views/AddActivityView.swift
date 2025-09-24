@@ -33,10 +33,8 @@ struct AddActivityView: View {
     @State private var weight = ""
     @State private var height = ""
     @State private var selectedWeightLbs: Double = 8.0
-    @State private var selectedWeightOz: Double = 0.0
     @State private var selectedWeightKg: Double = 3.6
-    @State private var selectedHeightFt: Int = 1
-    @State private var selectedHeightIn: Double = 8.0
+    @State private var selectedHeightIn: Double = 20.0  // Total inches
     @State private var selectedHeightCm: Double = 50.8
     @State private var selectedHeadCircumferenceCm: Double = 35.0
     @State private var selectedHeadCircumferenceIn: Double = 13.8
@@ -297,10 +295,8 @@ struct AddActivityView: View {
                 selectedWeightKg = editingGrowthEntry.weight
                 selectedWeightLbs = editingGrowthEntry.weight / 0.453592 // Convert kg to lbs
                 
-                // Convert height from cm to feet and inches
-                let totalInches = editingGrowthEntry.height / 2.54 // Convert cm to inches
-                selectedHeightFt = Int(totalInches / 12)
-                selectedHeightIn = totalInches.truncatingRemainder(dividingBy: 12)
+                // Convert height from cm to total inches
+                selectedHeightIn = editingGrowthEntry.height / 2.54 // Convert cm to inches
                 selectedHeightCm = editingGrowthEntry.height // Already in cm
                 
                 selectedHeadCircumferenceCm = editingGrowthEntry.headCircumference
@@ -750,7 +746,23 @@ struct AddActivityView: View {
                 
                 Toggle("", isOn: Binding(
                     get: { !dataManager.useMetricUnits },
-                    set: { dataManager.useMetricUnits = !$0 }
+                    set: { newValue in 
+                        let wasMetric = dataManager.useMetricUnits
+                        dataManager.useMetricUnits = !newValue
+                        
+                        // Convert values when switching units
+                        if wasMetric && !dataManager.useMetricUnits {
+                            // Converting from metric to imperial
+                            selectedWeightLbs = selectedWeightKg * 2.20462
+                            selectedHeightIn = selectedHeightCm / 2.54
+                            selectedHeadCircumferenceIn = selectedHeadCircumferenceCm / 2.54
+                        } else if !wasMetric && dataManager.useMetricUnits {
+                            // Converting from imperial to metric
+                            selectedWeightKg = selectedWeightLbs * 0.453592
+                            selectedHeightCm = selectedHeightIn * 2.54
+                            selectedHeadCircumferenceCm = selectedHeadCircumferenceIn * 2.54
+                        }
+                    }
                 ))
                 .toggleStyle(SwitchToggleStyle(tint: .blue))
                 .scaleEffect(0.8)
@@ -820,7 +832,7 @@ struct AddActivityView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text(String(format: "%.1f lbs %.0f oz", selectedWeightLbs, selectedWeightOz))
+                            Text(String(format: "%.1f lbs", selectedWeightLbs))
                                 .font(.headline)
                                 .fontWeight(.semibold)
                             Spacer()
@@ -837,15 +849,6 @@ struct AddActivityView: View {
                                 Spacer()
                             }
                             Slider(value: $selectedWeightLbs, in: 4...55, step: 0.1)
-                                .accentColor(.blue)
-                            
-                            HStack {
-                                Text("Ounces")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                            }
-                            Slider(value: $selectedWeightOz, in: 0...15, step: 0.5)
                                 .accentColor(.blue)
                         }
                     }
@@ -875,12 +878,12 @@ struct AddActivityView: View {
                                 .font(.headline)
                                 .fontWeight(.semibold)
                             Spacer()
-                            Text("100 cm")
+                            Text("150 cm")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         
-                        Slider(value: $selectedHeightCm, in: 30...100, step: 0.5)
+                        Slider(value: $selectedHeightCm, in: 30...150, step: 0.5)
                             .accentColor(.blue)
                     }
                     .padding()
@@ -891,39 +894,27 @@ struct AddActivityView: View {
                     // Imperial height (feet/inches)
                     VStack(spacing: 12) {
                         HStack {
-                            Text("1' 0\"")
+                            Text("12\"")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text(String(format: "%d' %.1f\"", selectedHeightFt, selectedHeightIn))
+                            Text(String(format: "%.1f\"", selectedHeightIn))
                                 .font(.headline)
                                 .fontWeight(.semibold)
                             Spacer()
-                            Text("3' 0\"")
+                            Text("59\"")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         
                         VStack(spacing: 8) {
                             HStack {
-                                Text("Feet")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                            }
-                            Slider(value: Binding(
-                                get: { Double(selectedHeightFt) },
-                                set: { selectedHeightFt = Int($0) }
-                            ), in: 1...3, step: 1)
-                                .accentColor(.blue)
-                            
-                            HStack {
                                 Text("Inches")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                                 Spacer()
                             }
-                            Slider(value: $selectedHeightIn, in: 0...11.5, step: 0.5)
+                            Slider(value: $selectedHeightIn, in: 12...59, step: 0.1)
                                 .accentColor(.blue)
                         }
                     }
@@ -1146,9 +1137,8 @@ struct AddActivityView: View {
                 details = String(format: "Weight: %.1f kg, Height: %.1f cm, Head: %.1f cm", 
                                selectedWeightKg, selectedHeightCm, selectedHeadCircumferenceCm)
             } else {
-                let totalWeightLbs = selectedWeightLbs + (selectedWeightOz / 16.0)
-                details = String(format: "Weight: %.1f lbs, Height: %d'%.1f\", Head: %.1f\"", 
-                               totalWeightLbs, selectedHeightFt, selectedHeightIn, selectedHeadCircumferenceIn)
+                details = String(format: "Weight: %.1f lbs, Height: %.1f\", Head: %.1f\"", 
+                               selectedWeightLbs, selectedHeightIn, selectedHeadCircumferenceIn)
             }
         }
         
@@ -1944,9 +1934,7 @@ struct AddActivityView: View {
                    let match = heightRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
                    let range = Range(match.range(at: 1), in: details) {
                     selectedHeightCm = Double(String(details[range])) ?? 0
-                    let totalInches = selectedHeightCm / 2.54
-                    selectedHeightFt = Int(totalInches / 12)
-                    selectedHeightIn = totalInches.truncatingRemainder(dividingBy: 12)
+                    selectedHeightIn = selectedHeightCm / 2.54
                 }
                 
                 if let headRegex = try? NSRegularExpression(pattern: headPattern),
@@ -1958,26 +1946,21 @@ struct AddActivityView: View {
             } else {
                 // Imperial units
                 let weightPattern = #"weight:\s*([\d.]+)\s*lbs"#
-                let heightPattern = #"height:\s*(\d+)'([\d.]+)\""#
+                let heightPattern = #"height:\s*([\d.]+)\""#
                 let headPattern = #"head:\s*([\d.]+)\""#
                 
                 if let weightRegex = try? NSRegularExpression(pattern: weightPattern),
                    let match = weightRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
                    let range = Range(match.range(at: 1), in: details) {
-                    let totalLbs = Double(String(details[range])) ?? 0
-                    selectedWeightLbs = floor(totalLbs)
-                    selectedWeightOz = (totalLbs - selectedWeightLbs) * 16
-                    selectedWeightKg = totalLbs * 0.453592
+                    selectedWeightLbs = Double(String(details[range])) ?? 0
+                    selectedWeightKg = selectedWeightLbs * 0.453592
                 }
                 
                 if let heightRegex = try? NSRegularExpression(pattern: heightPattern),
                    let match = heightRegex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
-                   let feetRange = Range(match.range(at: 1), in: details),
-                   let inchesRange = Range(match.range(at: 2), in: details) {
-                    selectedHeightFt = Int(String(details[feetRange])) ?? 0
-                    selectedHeightIn = Double(String(details[inchesRange])) ?? 0
-                    let totalInches = Double(selectedHeightFt) * 12 + selectedHeightIn
-                    selectedHeightCm = totalInches * 2.54
+                   let range = Range(match.range(at: 1), in: details) {
+                    selectedHeightIn = Double(String(details[range])) ?? 0
+                    selectedHeightCm = selectedHeightIn * 2.54
                 }
                 
                 if let headRegex = try? NSRegularExpression(pattern: headPattern),
@@ -2002,9 +1985,7 @@ struct AddActivityView: View {
         selectedWeightKg = lastEntry.weight
         selectedWeightLbs = lastEntry.weight / 0.453592
         
-        let totalInches = lastEntry.height / 2.54
-        selectedHeightFt = Int(totalInches / 12)
-        selectedHeightIn = totalInches.truncatingRemainder(dividingBy: 12)
+        selectedHeightIn = lastEntry.height / 2.54  // Convert cm to total inches
         selectedHeightCm = lastEntry.height
         
         selectedHeadCircumferenceCm = lastEntry.headCircumference
@@ -2072,8 +2053,7 @@ struct AddActivityView: View {
             return selectedWeightKg
         } else {
             // Convert imperial to kg for storage
-            let totalWeightLbs = selectedWeightLbs + (selectedWeightOz / 16.0)
-            return dataManager.convertWeightToKg(totalWeightLbs, fromImperial: true)
+            return dataManager.convertWeightToKg(selectedWeightLbs, fromImperial: true)
         }
     }
     
@@ -2082,8 +2062,7 @@ struct AddActivityView: View {
             return selectedHeightCm
         } else {
             // Convert imperial to cm for storage
-            let totalHeightInches = Double(selectedHeightFt * 12) + selectedHeightIn
-            return dataManager.convertHeightToCm(totalHeightInches, fromImperial: true)
+            return dataManager.convertHeightToCm(selectedHeightIn, fromImperial: true)
         }
     }
     

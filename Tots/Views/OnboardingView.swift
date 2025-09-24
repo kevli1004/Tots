@@ -71,13 +71,25 @@ struct OnboardingView: View {
     
     
     private func checkForExistingData() {
+        // First check for local storage data
+        let babyName = UserDefaults.standard.string(forKey: "baby_name")
+        let hasLocalData = !(babyName?.isEmpty ?? true)
+        
+        if hasLocalData {
+            // Found existing local data - skip onboarding
+            UserDefaults.standard.set(true, forKey: "onboarding_completed")
+            NotificationCenter.default.post(name: .init("onboarding_completed"), object: nil)
+            return
+        }
+        
+        // No local data, check CloudKit if user is signed in
         Task {
             do {
                 let profiles = try await dataManager.cloudKitManager.fetchBabyProfiles()
                 
                 await MainActor.run {
                     if !profiles.isEmpty {
-                        // Found existing data - load it and skip onboarding
+                        // Found existing CloudKit data - load it and skip onboarding
                         UserDefaults.standard.set(true, forKey: "onboarding_completed")
                         
                         // Load the profile data into the app

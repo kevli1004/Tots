@@ -46,6 +46,7 @@ struct HomeView: View {
     @State private var selectedHistoryDate = Date()
     @State private var showingActivitySelector = false
     @State private var showingAddActivity = false
+    @State private var showingTrackingGoals = false
     @State private var selectedActivityType: ActivityType = .feeding
     @State private var selectedFeedingType: AddActivityView.FeedingType?
     @State private var editingActivity: TotsActivity?
@@ -294,6 +295,10 @@ struct HomeView: View {
             } else {
                 AddActivityView(preselectedType: selectedActivityType, preselectedFeedingType: selectedFeedingType)
             }
+        }
+        .sheet(isPresented: $showingTrackingGoals) {
+            TrackingGoalsView()
+                .environmentObject(dataManager)
         }
         .onChange(of: showingAddActivity) { isShowing in
             if !isShowing {
@@ -681,10 +686,12 @@ struct HomeView: View {
                 
                 Spacer()
                 
-                Text("tap for details")
-                    .font(.caption2)
-                    .foregroundColor(.secondary.opacity(0.7))
-                    .fontWeight(.medium)
+                Button("Update Tracking Goals") {
+                    showingTrackingGoals = true
+                }
+                .font(.caption2)
+                .foregroundColor(.secondary.opacity(0.7))
+                .fontWeight(.medium)
             }
             
             // Swipeable TabView for different summary layouts
@@ -728,7 +735,8 @@ struct HomeView: View {
                 title: "Feedings",
                 current: dataManager.todayFeedings,
                 goal: dailyFeedingGoal,
-                color: .pink
+                color: .pink,
+                onSettingsTap: { showingTrackingGoals = true }
             )
             
             SummaryGoalCard(
@@ -737,7 +745,8 @@ struct HomeView: View {
                 current: dataManager.todaySleepHours,
                 goal: dailySleepGoal,
                 color: .purple,
-                unit: "h"
+                unit: "h",
+                onSettingsTap: { showingTrackingGoals = true }
             )
             
             SummaryGoalCard(
@@ -745,7 +754,8 @@ struct HomeView: View {
                 title: "Diapers",
                 current: dataManager.todayDiapers,
                 goal: dailyDiaperGoal,
-                color: .white
+                color: .white,
+                onSettingsTap: { showingTrackingGoals = true }
             )
             
             SummaryGoalCard(
@@ -754,7 +764,8 @@ struct HomeView: View {
                 current: dataManager.todayTummyTime,
                 goal: 60,
                 color: .green,
-                unit: "m"
+                unit: "m",
+                onSettingsTap: { showingTrackingGoals = true }
             )
         }
     }
@@ -1497,16 +1508,18 @@ struct SummaryGoalCard: View {
     let goal: Any
     let color: Color
     let unit: String
+    let onSettingsTap: () -> Void
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var isFlipped = false
     
-    init(icon: String, title: String, current: Any, goal: Any, color: Color, unit: String = "") {
+    init(icon: String, title: String, current: Any, goal: Any, color: Color, unit: String = "", onSettingsTap: @escaping () -> Void = {}) {
         self.icon = icon
         self.title = title
         self.current = current
         self.goal = goal
         self.color = color
         self.unit = unit
+        self.onSettingsTap = onSettingsTap
     }
     
     private var isDiaperIcon: Bool {
@@ -1899,10 +1912,12 @@ struct SummaryGoalCard: View {
                             
                             Spacer()
                             
-                            Text("tap for details")
-                                .font(.caption2)
-                                .foregroundColor(.secondary.opacity(0.7))
-                                .fontWeight(.medium)
+                            Button("Update Tracking Goals") {
+                                onSettingsTap()
+                            }
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.7))
+                            .fontWeight(.medium)
                         }
                     }
                     
