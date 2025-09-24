@@ -1059,8 +1059,18 @@ struct OnboardingView: View {
         UserDefaults.standard.set(false, forKey: "cloudkit_enabled")
         UserDefaults.standard.set(true, forKey: "local_storage_only")
         
-        // Proceed to registration steps without CloudKit
-        proceedToRegistration()
+        // Check if there's already local data
+        let babyName = UserDefaults.standard.string(forKey: "baby_name")
+        let hasLocalData = !(babyName?.isEmpty ?? true)
+        
+        if hasLocalData {
+            // Found existing local data - skip onboarding
+            UserDefaults.standard.set(true, forKey: "onboarding_completed")
+            NotificationCenter.default.post(name: .init("onboarding_completed"), object: nil)
+        } else {
+            // No local data - proceed to registration steps
+            proceedToRegistration()
+        }
     }
     
     // MARK: - Age-based Recommendations

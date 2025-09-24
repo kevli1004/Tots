@@ -1912,12 +1912,10 @@ struct SummaryGoalCard: View {
                             
                             Spacer()
                             
-                            Button("Update Tracking Goals") {
-                                onSettingsTap()
-                            }
-                            .font(.caption2)
-                            .foregroundColor(.secondary.opacity(0.7))
-                            .fontWeight(.medium)
+                            Text("click for details")
+                                .font(.caption2)
+                                .foregroundColor(.secondary.opacity(0.7))
+                                .fontWeight(.medium)
                         }
                     }
                     
