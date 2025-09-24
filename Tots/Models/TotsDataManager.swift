@@ -443,7 +443,7 @@ class TotsDataManager: ObservableObject {
     
     private func loadData() {
         // Load basic settings
-        babyName = UserDefaults.standard.string(forKey: babyNameKey) ?? "Baby"
+        babyName = UserDefaults.standard.string(forKey: babyNameKey) ?? ""
         if let birthDate = UserDefaults.standard.object(forKey: babyBirthDateKey) as? Date {
             babyBirthDate = birthDate
         } else {
@@ -2464,7 +2464,7 @@ extension TotsDataManager {
             self.milestones = []
             self.growthData = []
             self.words = []
-            self.babyName = "Baby"
+            self.babyName = ""
             self.babyBirthDate = Calendar.current.date(byAdding: .month, value: -8, to: Date()) ?? Date()
             self.babyProfileRecord = nil
             self.familySharingEnabled = false

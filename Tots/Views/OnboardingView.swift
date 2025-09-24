@@ -71,12 +71,12 @@ struct OnboardingView: View {
     
     
     private func checkForExistingData() {
-        // First check for local storage data
-        let babyName = UserDefaults.standard.string(forKey: "baby_name")
-        let hasLocalData = !(babyName?.isEmpty ?? true)
+        // Check for baby name only - simplest and most reliable indicator
+        let babyName = UserDefaults.standard.string(forKey: "tots_baby_name")
+        let hasProfileData = !(babyName?.isEmpty ?? true)
         
-        if hasLocalData {
-            // Found existing local data - skip onboarding
+        if hasProfileData {
+            // Found existing baby name - skip onboarding
             UserDefaults.standard.set(true, forKey: "onboarding_completed")
             NotificationCenter.default.post(name: .init("onboarding_completed"), object: nil)
             return
@@ -1059,16 +1059,16 @@ struct OnboardingView: View {
         UserDefaults.standard.set(false, forKey: "cloudkit_enabled")
         UserDefaults.standard.set(true, forKey: "local_storage_only")
         
-        // Check if there's already local data
-        let babyName = UserDefaults.standard.string(forKey: "baby_name")
-        let hasLocalData = !(babyName?.isEmpty ?? true)
+        // Check for baby name only - simplest and most reliable indicator
+        let babyName = UserDefaults.standard.string(forKey: "tots_baby_name")
+        let hasProfileData = !(babyName?.isEmpty ?? true)
         
-        if hasLocalData {
-            // Found existing local data - skip onboarding
+        if hasProfileData {
+            // Found existing baby name - skip onboarding
             UserDefaults.standard.set(true, forKey: "onboarding_completed")
             NotificationCenter.default.post(name: .init("onboarding_completed"), object: nil)
         } else {
-            // No local data - proceed to registration steps
+            // No baby name found - proceed to registration steps
             proceedToRegistration()
         }
     }
