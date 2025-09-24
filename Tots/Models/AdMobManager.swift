@@ -48,7 +48,9 @@ struct AdBannerContainer: View {
     let height: CGFloat = 50 // Standard banner height
     
     var body: some View {
-        EmptyView()
+        BannerAdView()
+            .frame(height: height)
+            .padding(.horizontal, 16)
     }
 }
 
@@ -56,7 +58,9 @@ struct AdBannerContainerWide: View {
     let height: CGFloat = 50 // Standard banner height
     
     var body: some View {
-        EmptyView()
+        BannerAdView()
+            .frame(height: height)
+            .padding(.horizontal, 8)
     }
 }
 
@@ -64,7 +68,9 @@ struct AdBannerContainerMedium: View {
     let height: CGFloat = 50 // Standard banner height
     
     var body: some View {
-        EmptyView()
+        BannerAdView()
+            .frame(height: height)
+            .padding(.horizontal, 32)
     }
 }
 
