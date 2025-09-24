@@ -20,7 +20,7 @@ struct TrackingCard: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .frame(height: 120)
-            .background(Color(.systemGray6))
+            .background(.regularMaterial)
             .cornerRadius(16)
         }
         .buttonStyle(PlainButtonStyle())
@@ -108,7 +108,7 @@ struct StatCard: View {
                 .foregroundColor(color)
         }
         .padding(16)
-        .background(Color(.systemGray6))
+        .background(.regularMaterial)
         .cornerRadius(12)
     }
 }

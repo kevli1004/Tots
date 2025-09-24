@@ -21,7 +21,7 @@ struct GlassEffect: ViewModifier {
             }
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(.white.opacity(0.2), lineWidth: borderWidth)
+                    .stroke(.primary.opacity(0.1), lineWidth: borderWidth)
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
@@ -42,11 +42,11 @@ struct LiquidGlassCard: ViewModifier {
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(.regularMaterial, style: .continuous)
-                    .shadow(color: .black.opacity(0.1), radius: shadowRadius, x: 0, y: 4)
+                    .shadow(color: .primary.opacity(0.15), radius: shadowRadius, x: 0, y: 4)
             }
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(.white.opacity(0.3), lineWidth: 1)
+                    .stroke(.primary.opacity(0.2), lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
@@ -66,15 +66,11 @@ extension View {
 // MARK: - Animated Background
 struct LiquidBackground: View {
     @State private var animateGradient = false
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         LinearGradient(
-            colors: [
-                Color.blue.opacity(0.6),
-                Color.purple.opacity(0.4),
-                Color.pink.opacity(0.3),
-                Color.orange.opacity(0.5)
-            ],
+            colors: colorScheme == .dark ? darkModeColors : lightModeColors,
             startPoint: animateGradient ? .topLeading : .bottomTrailing,
             endPoint: animateGradient ? .bottomTrailing : .topLeading
         )
@@ -84,6 +80,24 @@ struct LiquidBackground: View {
                 animateGradient.toggle()
             }
         }
+    }
+    
+    private var lightModeColors: [Color] {
+        [
+            Color.blue.opacity(0.6),
+            Color.purple.opacity(0.4),
+            Color.pink.opacity(0.3),
+            Color.orange.opacity(0.5)
+        ]
+    }
+    
+    private var darkModeColors: [Color] {
+        [
+            Color.blue.opacity(0.3),
+            Color.purple.opacity(0.2),
+            Color.pink.opacity(0.15),
+            Color.orange.opacity(0.25)
+        ]
     }
 }
 

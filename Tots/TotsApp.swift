@@ -42,6 +42,7 @@ struct TotsApp: App {
             }
             .onAppear {
                 checkForExistingUserData()
+                applyAppearanceMode()
             }
             .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_out"))) { _ in
                 
@@ -74,5 +75,23 @@ struct TotsApp: App {
         // For first-time users, just show onboarding directly
         // No automatic CloudKit checking - let them choose
         showOnboarding = true
+    }
+    
+    private func applyAppearanceMode() {
+        let savedMode = UserDefaults.standard.string(forKey: "appearance_mode") ?? "light"
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            switch savedMode {
+            case "light":
+                window.overrideUserInterfaceStyle = .light
+            case "dark":
+                window.overrideUserInterfaceStyle = .dark
+            case "system":
+                window.overrideUserInterfaceStyle = .unspecified
+            default:
+                window.overrideUserInterfaceStyle = .light // Default to light mode
+            }
+        }
     }
 }

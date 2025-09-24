@@ -17,28 +17,6 @@ extension View {
     }
 }
 
-struct LiquidBackground: View {
-    @State private var animateGradient = false
-    
-    var body: some View {
-        LinearGradient(
-            colors: [
-                Color.blue.opacity(0.4),
-                Color.purple.opacity(0.35),
-                Color.pink.opacity(0.3),
-                Color.orange.opacity(0.35)
-            ],
-            startPoint: animateGradient ? .topLeading : .bottomTrailing,
-            endPoint: animateGradient ? .bottomTrailing : .topLeading
-        )
-        .ignoresSafeArea()
-        .onAppear {
-            withAnimation(.easeInOut(duration: 20).repeatForever(autoreverses: true)) {
-                animateGradient.toggle()
-            }
-        }
-    }
-}
 
 struct HomeView: View {
     @EnvironmentObject var dataManager: TotsDataManager
@@ -1217,7 +1195,7 @@ struct CountdownCard: View {
         .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(.white.opacity(0.9))
+                .fill(.regularMaterial)
                 .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 4)
         )
         .background(
@@ -2107,6 +2085,8 @@ struct DatePickerHistoryView: View {
                 VStack(spacing: 0) {
                         // Ad Banner
                         AdBannerContainerWide()
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
                     
                     // Horizontal date selector
                     dateScrollerView
@@ -2414,7 +2394,7 @@ struct TimelineActivityRow: View {
             }
             .padding(.vertical, 8)
         .padding(.horizontal, 12)
-        .background(Color(.systemBackground))
+        .background(.regularMaterial)
         .cornerRadius(8)
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3)
     }
@@ -2433,7 +2413,7 @@ struct EmptyDayView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
-        .background(Color(.systemBackground))
+        .background(.regularMaterial)
             .cornerRadius(12)
         .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
     }
@@ -3060,8 +3040,8 @@ struct MilestoneCard: View {
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(milestone.isCompleted ? 
-                      Color(.systemGray6) : 
-                      Color(.systemBackground))
+                      .ultraThinMaterial : 
+                      .regularMaterial)
                 .shadow(
                     color: milestone.isCompleted ? .clear : .black.opacity(0.08), 
                     radius: milestone.isCompleted ? 0 : 12, 
@@ -3595,10 +3575,9 @@ struct WordCard: View {
             }
         }
         .padding(16)
-        .background(Color(.systemBackground))
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-        .opacity(0.7)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button("Delete", role: .destructive) {
                 onDelete()
@@ -4238,7 +4217,7 @@ struct OngoingSessionCard: View {
             // Status indicator
             HStack(spacing: 6) {
                 Circle()
-                    .fill(color)
+                    .fill(.green)
                     .frame(width: 8, height: 8)
                     .scaleEffect(1.0)
                     .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: elapsedTime)

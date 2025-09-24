@@ -2,6 +2,11 @@ import SwiftUI
 import CloudKit
 import AuthenticationServices
 
+enum AppearanceMode: String, CaseIterable {
+    case light = "light"
+    case dark = "dark"
+    case system = "system"
+}
 
 struct SettingsView: View {
     @EnvironmentObject var dataManager: TotsDataManager
@@ -23,6 +28,7 @@ struct SettingsView: View {
     @State private var showingTrackingGoals = false
     @State private var showingTerms = false
     @State private var showingPrivacyPolicy = false
+    @State private var appearanceMode: AppearanceMode = .light
     
     var body: some View {
         ZStack {
@@ -50,7 +56,7 @@ struct SettingsView: View {
                     // Support section
                     supportSectionView
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.top, 10)
             }
         }
@@ -121,6 +127,57 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingPrivacyPolicy) {
             PrivacyPolicyView()
+        }
+        .preferredColorScheme(preferredColorScheme)
+        .onAppear {
+            loadAppearanceMode()
+        }
+    }
+    
+    // MARK: - Appearance Mode Properties
+    private var preferredColorScheme: ColorScheme? {
+        switch appearanceMode {
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        case .system:
+            return nil
+        }
+    }
+    
+    private var currentAppearanceText: String {
+        switch appearanceMode {
+        case .light:
+            return "Light"
+        case .dark:
+            return "Dark"
+        case .system:
+            return "System"
+        }
+    }
+    
+    // MARK: - Appearance Mode Methods
+    private func loadAppearanceMode() {
+        let savedMode = UserDefaults.standard.string(forKey: "appearance_mode") ?? "light"
+        appearanceMode = AppearanceMode(rawValue: savedMode) ?? .light
+    }
+    
+    private func setAppearanceMode(_ mode: AppearanceMode) {
+        appearanceMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: "appearance_mode")
+        
+        // Apply to the entire app
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            switch mode {
+            case .light:
+                window.overrideUserInterfaceStyle = .light
+            case .dark:
+                window.overrideUserInterfaceStyle = .dark
+            case .system:
+                window.overrideUserInterfaceStyle = .unspecified
+            }
         }
     }
     
@@ -274,7 +331,7 @@ struct SettingsView: View {
                 Spacer()
             }
             .padding(20)
-            .background(Color(.systemGray6))
+            .background(.regularMaterial)
             .cornerRadius(16)
         }
         .buttonStyle(PlainButtonStyle())
@@ -299,7 +356,7 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(16)
-        .background(Color(.systemGray6))
+        .background(.regularMaterial)
         .cornerRadius(12)
     }
     
@@ -451,6 +508,49 @@ struct SettingsView: View {
     
     private var settingsOptionsView: some View {
         VStack(spacing: 16) {
+            
+            // Appearance mode toggle
+            HStack(spacing: 12) {
+                Image(systemName: "moon.circle")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .frame(width: 24)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Appearance")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Text("Choose between light and dark mode")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Menu {
+                    Button("Light") {
+                        setAppearanceMode(.light)
+                    }
+                    Button("Dark") {
+                        setAppearanceMode(.dark)
+                    }
+                    Button("System") {
+                        setAppearanceMode(.system)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(currentAppearanceText)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.blue)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .padding(.vertical, 12)
             
             // Live Activity toggle
             HStack(spacing: 12) {
@@ -1039,9 +1139,15 @@ struct PersonalDetailsView: View {
                                         .fontWeight(.medium)
                                         .foregroundColor(.secondary)
                                     TextField("Baby's name", text: $babyName)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .font(.title2)
-                                        .fontWeight(.medium)
+                                        .font(.system(.body, design: .rounded))
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 16)
+                                        .liquidGlassCard()
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(babyName.isEmpty ? Color.clear : Color.purple.opacity(0.4), lineWidth: 2)
+                                                .animation(.easeInOut(duration: 0.2), value: babyName.isEmpty)
+                                        )
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 8) {
@@ -1077,9 +1183,15 @@ struct PersonalDetailsView: View {
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
                                 TextField("Your name", text: $primaryCaregiverName)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .font(.title2)
-                                    .fontWeight(.medium)
+                                    .font(.system(.body, design: .rounded))
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 16)
+                                    .liquidGlassCard()
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 20)
+                                            .stroke(primaryCaregiverName.isEmpty ? Color.clear : Color.pink.opacity(0.4), lineWidth: 2)
+                                            .animation(.easeInOut(duration: 0.2), value: primaryCaregiverName.isEmpty)
+                                    )
                             }
                         }
                         .padding(20)
@@ -1330,7 +1442,7 @@ struct FamilyManagerView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(.regularMaterial)
         .cornerRadius(16)
     }
 }
@@ -1381,7 +1493,7 @@ struct FamilyMemberRow: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(.regularMaterial)
         .cornerRadius(12)
     }
 }

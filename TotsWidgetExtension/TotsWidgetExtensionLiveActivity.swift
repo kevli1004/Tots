@@ -590,13 +590,22 @@ struct CompactActivityCard: View {
                             .minimumScaleFactor(0.8)
                         
             // Time
-            if activity.isTimer || activity.time > Date() {
+            if activity.isTimer {
+                // For active timers (counting up), always show timer
+                Text(activity.time, style: .timer)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(activity.color)
+                    .monospacedDigit()
+                    .multilineTextAlignment(.center)
+            } else if activity.time > Date() {
+                // For upcoming activities that are not yet due, show countdown timer
                 Text(activity.time, style: .timer)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(activity.color)
                     .monospacedDigit()
                     .multilineTextAlignment(.center)
             } else {
+                // For upcoming activities that are now due (time <= Date()), show "Due Now"
                 Text("Due Now")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(activity.color)

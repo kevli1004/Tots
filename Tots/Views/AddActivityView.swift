@@ -1,6 +1,43 @@
 import SwiftUI
 import Combine
 
+// MARK: - Liquid Background (if not available from GlassModifier)
+struct LiquidBackground: View {
+    @State private var animateGradient = false
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        LinearGradient(
+            colors: colorScheme == .dark ? darkModeColors : lightModeColors,
+            startPoint: animateGradient ? .topLeading : .bottomTrailing,
+            endPoint: animateGradient ? .bottomTrailing : .topLeading
+        )
+        .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                animateGradient.toggle()
+            }
+        }
+    }
+    
+    private var lightModeColors: [Color] {
+        [
+            Color.blue.opacity(0.6),
+            Color.purple.opacity(0.4),
+            Color.pink.opacity(0.3),
+            Color.orange.opacity(0.5)
+        ]
+    }
+    
+    private var darkModeColors: [Color] {
+        [
+            Color.blue.opacity(0.3),
+            Color.purple.opacity(0.2),
+            Color.pink.opacity(0.15),
+            Color.orange.opacity(0.25)
+        ]
+    }
+}
 
 struct AddActivityView: View {
     @Environment(\.dismiss) private var dismiss
@@ -319,13 +356,19 @@ struct AddActivityView: View {
             }
         }
         .onDisappear {
-            // Clean up all timers when view disappears
+            // Clean up timers when view disappears, but preserve paused timer state
             activityTimer?.invalidate()
             activityTimer = nil
+            
+            // For pumping timers, only clean up the Timer objects but preserve the state
+            // This allows paused timers to maintain their elapsed time
             leftPumpingTimer?.invalidate()
             leftPumpingTimer = nil
             rightPumpingTimer?.invalidate()
             rightPumpingTimer = nil
+            
+            // Save paused timer states to UserDefaults for restoration
+            savePumpingTimerStates()
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }
@@ -789,8 +832,9 @@ struct AddActivityView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding()
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(8)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             }
             
             // Weight slider
@@ -2157,9 +2201,85 @@ struct AddActivityView: View {
         }
     }
     
+    private func savePumpingTimerStates() {
+        // Save left pumping state (whether running or paused)
+        UserDefaults.standard.set(leftPumpingElapsed, forKey: "leftPumpingElapsed_saved")
+        UserDefaults.standard.set(leftPumpingIsRunning, forKey: "leftPumpingIsRunning_saved")
+        if let startTime = leftPumpingStartTime {
+            UserDefaults.standard.set(startTime, forKey: "leftPumpingStartTime_saved")
+        }
+        
+        // Save right pumping state (whether running or paused)
+        UserDefaults.standard.set(rightPumpingElapsed, forKey: "rightPumpingElapsed_saved")
+        UserDefaults.standard.set(rightPumpingIsRunning, forKey: "rightPumpingIsRunning_saved")
+        if let startTime = rightPumpingStartTime {
+            UserDefaults.standard.set(startTime, forKey: "rightPumpingStartTime_saved")
+        }
+    }
+    
     private func restorePumpingTimers() {
-        // Restore left pumping timer
-        if UserDefaults.standard.bool(forKey: "leftPumpingIsRunning"),
+        // First try to restore from saved states (paused or running)
+        restoreFromSavedStates()
+        
+        // Then try to restore from active background timers (only for running timers)
+        restoreFromBackgroundTimers()
+    }
+    
+    private func restoreFromSavedStates() {
+        // Restore left pumping timer from saved state
+        if UserDefaults.standard.object(forKey: "leftPumpingElapsed_saved") != nil {
+            leftPumpingElapsed = UserDefaults.standard.double(forKey: "leftPumpingElapsed_saved")
+            let wasRunning = UserDefaults.standard.bool(forKey: "leftPumpingIsRunning_saved")
+            
+            if let savedStartTime = UserDefaults.standard.object(forKey: "leftPumpingStartTime_saved") as? Date {
+                leftPumpingStartTime = savedStartTime
+            }
+            
+            // Only restart timer if it was running when saved
+            if wasRunning {
+                leftPumpingIsRunning = true
+                leftPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                    updateLeftPumpingElapsed()
+                }
+            } else {
+                leftPumpingIsRunning = false
+            }
+            
+            // Clear saved state
+            UserDefaults.standard.removeObject(forKey: "leftPumpingElapsed_saved")
+            UserDefaults.standard.removeObject(forKey: "leftPumpingIsRunning_saved")
+            UserDefaults.standard.removeObject(forKey: "leftPumpingStartTime_saved")
+        }
+        
+        // Restore right pumping timer from saved state
+        if UserDefaults.standard.object(forKey: "rightPumpingElapsed_saved") != nil {
+            rightPumpingElapsed = UserDefaults.standard.double(forKey: "rightPumpingElapsed_saved")
+            let wasRunning = UserDefaults.standard.bool(forKey: "rightPumpingIsRunning_saved")
+            
+            if let savedStartTime = UserDefaults.standard.object(forKey: "rightPumpingStartTime_saved") as? Date {
+                rightPumpingStartTime = savedStartTime
+            }
+            
+            // Only restart timer if it was running when saved
+            if wasRunning {
+                rightPumpingIsRunning = true
+                rightPumpingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                    updateRightPumpingElapsed()
+                }
+            } else {
+                rightPumpingIsRunning = false
+            }
+            
+            // Clear saved state
+            UserDefaults.standard.removeObject(forKey: "rightPumpingElapsed_saved")
+            UserDefaults.standard.removeObject(forKey: "rightPumpingIsRunning_saved")
+            UserDefaults.standard.removeObject(forKey: "rightPumpingStartTime_saved")
+        }
+    }
+    
+    private func restoreFromBackgroundTimers() {
+        // Restore left pumping timer from background (only if not already restored from saved state)
+        if leftPumpingElapsed == 0 && UserDefaults.standard.bool(forKey: "leftPumpingIsRunning"),
            let startTime = UserDefaults.standard.object(forKey: "leftPumpingStartTime") as? Date {
             
             // Calculate elapsed time including background time
@@ -2174,8 +2294,8 @@ struct AddActivityView: View {
             }
         }
         
-        // Restore right pumping timer
-        if UserDefaults.standard.bool(forKey: "rightPumpingIsRunning"),
+        // Restore right pumping timer from background (only if not already restored from saved state)
+        if rightPumpingElapsed == 0 && UserDefaults.standard.bool(forKey: "rightPumpingIsRunning"),
            let startTime = UserDefaults.standard.object(forKey: "rightPumpingStartTime") as? Date {
             
             // Calculate elapsed time including background time
