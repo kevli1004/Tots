@@ -1,5 +1,6 @@
 import SwiftUI
 import GoogleMobileAds
+import StoreKit
 
 // MARK: - AdMob Manager
 class AdMobManager: NSObject, ObservableObject {
@@ -78,11 +79,23 @@ struct AdBannerContainer: View {
     let height: CGFloat = 50 // Standard banner height
     @StateObject private var orientationMonitor = OrientationMonitor()
     
+    private var shouldShowAds: Bool {
+        // Quick check from UserDefaults for immediate response
+        return !UserDefaults.standard.bool(forKey: "ad_removal_purchased")
+    }
+    
     var body: some View {
-        BannerAdView()
-            .frame(height: height)
-            .padding(.horizontal, 16)
-            .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+        Group {
+            if shouldShowAds {
+                BannerAdView()
+                    .frame(height: height)
+                    .padding(.horizontal, 16)
+                    .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+            } else {
+                // Show empty space or nothing when ads are removed
+                EmptyView()
+            }
+        }
     }
 }
 
@@ -90,11 +103,23 @@ struct AdBannerContainerWide: View {
     let height: CGFloat = 50 // Standard banner height
     @StateObject private var orientationMonitor = OrientationMonitor()
     
+    private var shouldShowAds: Bool {
+        // Quick check from UserDefaults for immediate response
+        return !UserDefaults.standard.bool(forKey: "ad_removal_purchased")
+    }
+    
     var body: some View {
-        BannerAdView()
-            .frame(height: height)
-            .padding(.horizontal, 0)
-            .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+        Group {
+            if shouldShowAds {
+                BannerAdView()
+                    .frame(height: height)
+                    .padding(.horizontal, 0)
+                    .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+            } else {
+                // Show empty space or nothing when ads are removed
+                EmptyView()
+            }
+        }
     }
 }
 
@@ -102,11 +127,23 @@ struct AdBannerContainerMedium: View {
     let height: CGFloat = 50 // Standard banner height
     @StateObject private var orientationMonitor = OrientationMonitor()
     
+    private var shouldShowAds: Bool {
+        // Quick check from UserDefaults for immediate response
+        return !UserDefaults.standard.bool(forKey: "ad_removal_purchased")
+    }
+    
     var body: some View {
-        BannerAdView()
-            .frame(height: height)
-            .padding(.horizontal, 16)
-            .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+        Group {
+            if shouldShowAds {
+                BannerAdView()
+                    .frame(height: height)
+                    .padding(.horizontal, 16)
+                    .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+            } else {
+                // Show empty space or nothing when ads are removed
+                EmptyView()
+            }
+        }
     }
 }
 
