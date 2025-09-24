@@ -13,7 +13,9 @@ struct SettingsView: View {
     @State private var showingFamilyManager = false
     @State private var showingDeleteConfirmation = false
     @State private var showingLogoutConfirmation = false
+    @State private var showingClearDataConfirmation = false
     @State private var isDeletingAccount = false
+    @State private var isClearingData = false
     @State private var familyMembers: [FamilyMember] = []
     @State private var shareDelegate: ShareControllerDelegate?
     @State private var profileImageUpdateTrigger = false
@@ -98,6 +100,14 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will sign you out and clear all local data. Your CloudKit data will remain safe.")
+        }
+        .confirmationDialog("Clear Local Data", isPresented: $showingClearDataConfirmation, titleVisibility: .visible) {
+            Button("Clear All Data", role: .destructive) {
+                clearLocalData()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently delete all your local data including activities, growth records, milestones, and words. This cannot be undone.")
         }
         .sheet(isPresented: $showingExportSheet) {
             ActivityViewController(activityItems: [generateCSVFile()])
@@ -610,6 +620,18 @@ struct SettingsView: View {
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 16)
+                
+                // Clear local data option for local storage users
+                SettingsRow(
+                    icon: "trash.fill",
+                    title: isClearingData ? "Clearing Data..." : "Clear Local Data",
+                    titleColor: .red,
+                    action: {
+                        if !isClearingData {
+                            showingClearDataConfirmation = true
+                        }
+                    }
+                )
             } else {
                 // For CloudKit users, show delete and sign out options
                 SettingsRow(
@@ -722,6 +744,61 @@ struct SettingsView: View {
         case .failure(let error):
             cloudKitSetupMessage = "❌ Sign in cancelled or failed: \(error.localizedDescription)"
             isSettingUpCloudKit = false
+        }
+    }
+    
+    private func clearLocalData() {
+        isClearingData = true
+        
+        Task {
+            // Clear all local data
+            await MainActor.run {
+                // Clear activities
+                dataManager.recentActivities.removeAll()
+                
+                // Clear growth data
+                dataManager.growthData.removeAll()
+                
+                // Clear milestones
+                dataManager.milestones.removeAll()
+                
+                // Clear words
+                dataManager.words.removeAll()
+                
+                // Clear UserDefaults data
+                UserDefaults.standard.removeObject(forKey: "baby_name")
+                UserDefaults.standard.removeObject(forKey: "baby_birth_date")
+                UserDefaults.standard.removeObject(forKey: "primary_caregiver_name")
+                UserDefaults.standard.removeObject(forKey: "baby_profile_image")
+                
+                // Clear goals
+                UserDefaults.standard.removeObject(forKey: "feeding_goal")
+                UserDefaults.standard.removeObject(forKey: "sleep_goal")
+                UserDefaults.standard.removeObject(forKey: "diaper_goal")
+                UserDefaults.standard.removeObject(forKey: "feeding_interval")
+                UserDefaults.standard.removeObject(forKey: "pumping_interval")
+                UserDefaults.standard.removeObject(forKey: "diaper_interval")
+                
+                // Clear timer states
+                UserDefaults.standard.removeObject(forKey: "breastfeedingStartTime")
+                UserDefaults.standard.removeObject(forKey: "breastfeedingElapsed")
+                UserDefaults.standard.removeObject(forKey: "leftPumpingStartTime")
+                UserDefaults.standard.removeObject(forKey: "leftPumpingElapsed")
+                UserDefaults.standard.removeObject(forKey: "rightPumpingStartTime")
+                UserDefaults.standard.removeObject(forKey: "rightPumpingElapsed")
+                UserDefaults.standard.set(false, forKey: "breastfeedingIsRunning")
+                UserDefaults.standard.set(false, forKey: "leftPumpingIsRunning")
+                UserDefaults.standard.set(false, forKey: "rightPumpingIsRunning")
+                
+                // Clear widget and notification settings
+                UserDefaults.standard.removeObject(forKey: "live_activity_enabled")
+                
+                // Reset baby data
+                dataManager.babyName = ""
+                dataManager.babyBirthDate = Date()
+                
+                isClearingData = false
+            }
         }
     }
     
@@ -1530,6 +1607,9 @@ struct TrackingGoalsView: View {
         
         // Trigger countdown update
         dataManager.updateCountdowns()
+        
+        // Post notification to refresh home view with new goals
+        NotificationCenter.default.post(name: NSNotification.Name("GoalsUpdated"), object: nil)
     }
 }
 
@@ -1729,11 +1809,11 @@ struct PrivacyPolicyView: View {
                         
                         Text("We may collect anonymized usage statistics and crash reports to improve the App. This data cannot be used to identify you or your baby.")
                         
-                        Text("6. Children's Privacy")
+                        Text("6. Age Requirements")
                             .font(.headline)
                             .fontWeight(.semibold)
                         
-                        Text("While Tots is used to track babies and children, the App is designed for use by parents and caregivers who are 13 years or older. We do not knowingly collect personal information from children under 13.")
+                        Text("Grow with Tots is intended for use by individuals who are at least 16 years of age. The app is designed for parents, guardians, and caregivers to track their babies and children. We do not knowingly collect personal information from anyone under the age of 16. If you are under 16 years of age, please do not use this app.")
                         
                         Text("7. Your Rights")
                             .font(.headline)

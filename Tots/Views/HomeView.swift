@@ -50,6 +50,7 @@ struct HomeView: View {
     @State private var selectedFeedingType: AddActivityView.FeedingType?
     @State private var editingActivity: TotsActivity?
     @State private var selectedSummaryPeriod: SummaryPeriod = .today
+    @State private var goalsUpdateTrigger = false
     
     // MARK: - Computed Properties for Weekly Data
     private var weeklyFeedings: Int {
@@ -106,10 +107,41 @@ struct HomeView: View {
     }
     
     // Monthly goals (calculated based on daily goals * 30)
-    private var monthlyFeedingGoal: Int { 8 * 30 }
-    private var monthlySleepGoal: Double { 15.0 * 30 }
-    private var monthlyDiaperGoal: Int { 6 * 30 }
-    private var monthlyTummyTimeGoal: Int { 60 * 30 }
+    private var monthlyFeedingGoal: Int { 
+        let _ = goalsUpdateTrigger // Force dependency on trigger
+        let dailyGoal = UserDefaults.standard.double(forKey: "feeding_goal")
+        return Int(dailyGoal == 0 ? 8.0 : dailyGoal) * 30 
+    }
+    private var monthlySleepGoal: Double { 
+        let _ = goalsUpdateTrigger // Force dependency on trigger
+        let dailyGoal = UserDefaults.standard.double(forKey: "sleep_goal")
+        return (dailyGoal == 0 ? 15.0 : dailyGoal) * 30 
+    }
+    private var monthlyDiaperGoal: Int { 
+        let _ = goalsUpdateTrigger // Force dependency on trigger
+        let dailyGoal = UserDefaults.standard.double(forKey: "diaper_goal")
+        return Int(dailyGoal == 0 ? 6.0 : dailyGoal) * 30 
+    }
+    private var monthlyTummyTimeGoal: Int { 60 * 30 } // Keep tummy time as is for now
+    
+    // Daily goals from settings
+    private var dailyFeedingGoal: Int {
+        let _ = goalsUpdateTrigger // Force dependency on trigger
+        let goal = UserDefaults.standard.double(forKey: "feeding_goal")
+        return Int(goal == 0 ? 8.0 : goal)
+    }
+    
+    private var dailySleepGoal: Double {
+        let _ = goalsUpdateTrigger // Force dependency on trigger
+        let goal = UserDefaults.standard.double(forKey: "sleep_goal")
+        return goal == 0 ? 15.0 : goal
+    }
+    
+    private var dailyDiaperGoal: Int {
+        let _ = goalsUpdateTrigger // Force dependency on trigger
+        let goal = UserDefaults.standard.double(forKey: "diaper_goal")
+        return Int(goal == 0 ? 6.0 : goal)
+    }
     
     // MARK: - Daily Data for Weekly View
     private var dailyDataForWeek: [DayProgressData] {
@@ -249,6 +281,10 @@ struct HomeView: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("GoalsUpdated"))) { _ in
+            // Trigger view refresh when goals are updated
+            goalsUpdateTrigger.toggle()
+        }
         .sheet(isPresented: $showingDatePicker) {
             DatePickerHistoryView(selectedDate: $selectedHistoryDate)
         }
@@ -691,7 +727,7 @@ struct HomeView: View {
                 icon: "🍼",
                 title: "Feedings",
                 current: dataManager.todayFeedings,
-                goal: 8,
+                goal: dailyFeedingGoal,
                 color: .pink
             )
             
@@ -699,7 +735,7 @@ struct HomeView: View {
                 icon: "moon.zzz.fill",
                 title: "Sleep",
                 current: dataManager.todaySleepHours,
-                goal: 15.0,
+                goal: dailySleepGoal,
                 color: .purple,
                 unit: "h"
             )
@@ -708,7 +744,7 @@ struct HomeView: View {
                 icon: "DiaperIcon",
                 title: "Diapers",
                 current: dataManager.todayDiapers,
-                goal: 6,
+                goal: dailyDiaperGoal,
                 color: .white
             )
             
@@ -1389,28 +1425,6 @@ struct CountdownCard: View {
         return tummyActivities.compactMap { $0.duration }.reduce(0, +)
     }
     
-    // MARK: - Monthly Goals Computed Properties
-    
-    private var monthlyFeedingGoal: Int {
-        let calendar = Calendar.current
-        let now = Date()
-        let daysInMonth = calendar.range(of: .day, in: .month, for: now)?.count ?? 30
-        return daysInMonth * 8 // 8 feedings per day
-    }
-    
-    private var monthlyDiaperGoal: Int {
-        let calendar = Calendar.current
-        let now = Date()
-        let daysInMonth = calendar.range(of: .day, in: .month, for: now)?.count ?? 30
-        return daysInMonth * 6 // 6 diapers per day
-    }
-    
-    private var monthlySleepGoal: Double {
-        let calendar = Calendar.current
-        let now = Date()
-        let daysInMonth = calendar.range(of: .day, in: .month, for: now)?.count ?? 30
-        return Double(daysInMonth) * 15.0 // 15 hours per day
-    }
     
     private var monthlyTummyTimeGoal: Int {
         let calendar = Calendar.current
@@ -3798,6 +3812,7 @@ struct AddWordView: View {
                         .cornerRadius(16)
                         .disabled(!hasValidInput)
                         .opacity(hasValidInput ? 1.0 : 0.6)
+                        .contentShape(Rectangle()) // Make whole button clickable
                     }
                     .padding()
                     .onTapGesture {
