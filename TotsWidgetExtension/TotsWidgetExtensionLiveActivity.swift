@@ -578,7 +578,7 @@ struct CompactActivityCard: View {
                 
                 Text(activity.type.prefix.uppercased())
                     .font(.system(size: 8, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(.white.opacity(0.7))
                     .tracking(0.3)
             }
             
@@ -586,9 +586,9 @@ struct CompactActivityCard: View {
             Text(activity.label)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .foregroundColor(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        
             // Time
             if activity.isTimer || activity.time > Date() {
                 Text(activity.time, style: .timer)
@@ -762,7 +762,7 @@ struct GlassUpcomingSection: View {
                     .foregroundColor(color.opacity(0.7))
             }
         }
-        .padding(.horizontal, 12)
+                    .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(color.opacity(0.15))
         .cornerRadius(8)

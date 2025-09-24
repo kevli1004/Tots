@@ -217,11 +217,11 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
-                ZStack {
-                    // Liquid animated background
-                    LiquidBackground()
-                    
-                    ScrollView {
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                ScrollView {
                         VStack(spacing: 12) {
                         // Ad Banner
                         AdBannerContainerWide()
@@ -243,7 +243,7 @@ struct HomeView: View {
                     .padding(.bottom, 8)
                     .frame(width: geometry.size.width)
                 }
-            }
+                }
             }
                 .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -698,15 +698,12 @@ struct HomeView: View {
             TabView(selection: $selectedSummaryPeriod) {
                 todaySummaryContent
                     .tag(SummaryPeriod.today)
-                    .padding(.horizontal, 8) // Add padding to prevent cutoff
                 
                 weeklySummaryContent
                     .tag(SummaryPeriod.week)
-                    .padding(.horizontal, 8)
                 
                 monthlySummaryContent
                     .tag(SummaryPeriod.month)
-                    .padding(.horizontal, 8)
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
             .frame(height: 320) // Increased height significantly for better content display
@@ -1081,12 +1078,12 @@ struct CountdownCard: View {
                                 .foregroundColor(color)
                             
                             if !isFirstTime {
-                                Text("until next \(title.lowercased())")
+                            Text("until next \(title.lowercased())")
                                     .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .fontWeight(.medium)
-                            }
+                                .foregroundColor(.secondary)
+                                .fontWeight(.medium)
                         }
+                    }
                     }
                 }
             }
@@ -2103,13 +2100,13 @@ struct DatePickerHistoryView: View {
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
-                ZStack {
-                    // Liquid animated background
-                    LiquidBackground()
-                    
-                    VStack(spacing: 0) {
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                VStack(spacing: 0) {
                         // Ad Banner
-                        AdBannerContainer()
+                        AdBannerContainerWide()
                     
                     // Horizontal date selector
                     dateScrollerView
@@ -2145,7 +2142,7 @@ struct DatePickerHistoryView: View {
                     }
                 }
                 .frame(width: geometry.size.width)
-            }
+                }
             }
             }
             .navigationTitle("History")
@@ -2642,23 +2639,23 @@ struct MilestonesView: View {
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
-                ZStack {
+            ZStack {
                     // Liquid animated background with tap gesture for keyboard dismissal
-                    LiquidBackground()
+                LiquidBackground()
                         .onTapGesture {
                             // Dismiss keyboard when tapping background
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         }
-                    
+                
                     VStack(spacing: 16) {
                         // Ad Banner
-                        AdBannerContainerMedium()
+                        AdBannerContainer()
                         
-                        // Header with stats
-                        headerView
-                        
-                        // Age group selector
-                        ageGroupSelector
+                    // Header with stats
+                    headerView
+                    
+                    // Age group selector
+                    ageGroupSelector
                     
                     // Search bar
                     searchBar
@@ -2668,7 +2665,7 @@ struct MilestonesView: View {
                 }
                 .padding(.top, 16)
                 .frame(width: geometry.size.width)
-            }
+                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -3118,14 +3115,14 @@ struct ImprovedAddMilestoneView: View {
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
-                ZStack {
-                    // Background
-                    LiquidBackground()
-                    
-                    ScrollView {
+            ZStack {
+                // Background
+                LiquidBackground()
+                
+                ScrollView {
                     VStack(spacing: 24) {
                         // Ad Banner
-                        AdBannerContainer()
+                        AdBannerContainerWide()
                         
                         // Milestone Details
                         VStack(alignment: .leading, spacing: 16) {
@@ -3236,7 +3233,7 @@ struct ImprovedAddMilestoneView: View {
                     .padding()
                     .frame(width: geometry.size.width)
                 }
-            }
+                }
             }
             .navigationTitle("Add Custom Milestone")
             .navigationBarTitleDisplayMode(.large)
@@ -3285,23 +3282,23 @@ struct WordTrackerView: View {
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
-                ZStack {
+            ZStack {
                     // Liquid animated background with tap gesture for keyboard dismissal
-                    LiquidBackground()
+                LiquidBackground()
                         .onTapGesture {
                             // Dismiss keyboard when tapping background
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         }
-                    
+                
                     VStack(spacing: 16) {
                         // Ad Banner
-                        AdBannerContainerMedium()
+                        AdBannerContainer()
                         
-                        // Header with stats
-                        headerView
-                        
-                        // Category selector
-                        categorySelector
+                    // Header with stats
+                    headerView
+                    
+                    // Category selector
+                    categorySelector
                     
                     // Search bar
                     searchBar
@@ -3319,7 +3316,7 @@ struct WordTrackerView: View {
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         }
                 )
-            }
+                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -3631,14 +3628,14 @@ struct AddWordView: View {
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
-                ZStack {
-                    // Liquid animated background
-                    LiquidBackground()
-                    
-                    ScrollView {
-                        VStack(spacing: 24) {
+            ZStack {
+                // Liquid animated background
+                LiquidBackground()
+                
+                ScrollView {
+                    VStack(spacing: 24) {
                             // Ad Banner
-                            AdBannerContainer()
+                            AdBannerContainerWide()
                         
                         // Popular Words Section
                         if !hasValidInput {
@@ -3834,8 +3831,8 @@ struct AddWordView: View {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
                     .frame(width: geometry.size.width)
+                    }
                 }
-            }
             }
             .navigationTitle("Add Word")
             .navigationBarTitleDisplayMode(.large)

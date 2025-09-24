@@ -871,7 +871,6 @@ struct SettingsRow: View {
                     .foregroundColor(.secondary)
             }
             .padding(.vertical, 12)
-            .padding(.horizontal, 16)
             .background(Color.clear)
             .contentShape(Rectangle())
         }

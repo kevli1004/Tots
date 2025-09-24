@@ -60,7 +60,7 @@ struct AdBannerContainerWide: View {
     var body: some View {
         BannerAdView()
             .frame(height: height)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 0)
     }
 }
 
@@ -70,7 +70,7 @@ struct AdBannerContainerMedium: View {
     var body: some View {
         BannerAdView()
             .frame(height: height)
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 16)
     }
 }
 
