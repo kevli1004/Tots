@@ -512,9 +512,13 @@ struct AddActivityView: View {
                         )
                     }
                 }
-                .background(Color(.systemBackground))
-                .cornerRadius(8)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             }
             
             // Amount controls
@@ -544,9 +548,13 @@ struct AddActivityView: View {
                             .accentColor(.pink)
                     }
                     .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
                 }
             } else if feedingType == .solid {
                 VStack(alignment: .leading, spacing: 12) {
@@ -557,9 +565,13 @@ struct AddActivityView: View {
                     
                     TextField("What did they eat?", text: $feedingAmount)
                         .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(.white.opacity(0.2), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                        .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
                 }
             } else if feedingType == .breastfeeding {
                 VStack(alignment: .leading, spacing: 12) {
@@ -677,9 +689,13 @@ struct AddActivityView: View {
                     .padding(editingActivity != nil ? 24 : 16)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: editingActivity != nil ? 200 : nil)
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
                 }
             }
         }
@@ -716,187 +732,188 @@ struct AddActivityView: View {
                     )
                 }
             }
-            .background(Color(.systemBackground))
-            .cornerRadius(8)
-            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(.white.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+            .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
         }
     }
     
     private var sleepDetailsView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Timer Section (match pumping indentation)
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Sleep Timer")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 16)
-                
-                VStack(spacing: 16) {
-                    // Timer display - only show when not editing
-                    if editingActivity == nil {
-                        HStack {
-                            Spacer()
-                            Text(formatSleepTime(sleepElapsed))
-                                .font(.system(size: 36, weight: .bold, design: .monospaced))
-                                .foregroundColor(.primary)
-                            Spacer()
-                        }
-                    }
+        VStack(spacing: 20) {
+            // Timer display - only show when not editing
+            if editingActivity == nil {
+                HStack {
+                    Spacer()
+                    Text(formatSleepTime(sleepElapsed))
+                        .font(.system(size: 36, weight: .bold, design: .monospaced))
+                        .foregroundColor(.primary)
+                    Spacer()
+                }
+            }
+            
+            // Timer controls - only show when not editing
+            if editingActivity == nil {
+                HStack(spacing: 12) {
+                    Spacer()
                     
-                    // Timer controls - only show when not editing
-                    if editingActivity == nil {
-                        HStack(spacing: 12) {
-                            Spacer()
-                            
-                            // Start/Stop button
-                            Button(action: {
-                                if sleepIsRunning {
-                                    stopSleepTimer()
-                                } else {
-                                    startSleepTimer()
-                                }
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: sleepIsRunning ? "pause.fill" : "play.fill")
-                                        .font(.system(size: 16, weight: .semibold))
-                                    Text(sleepIsRunning ? "End Sleep" : "Start Sleep")
-                                        .fontWeight(.semibold)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 12)
-                                .background(sleepIsRunning ? Color.red : Color.green)
-                                .cornerRadius(25)
-                            }
-                            
-                            // Reset button
-                            Button(action: resetSleepTimer) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "arrow.clockwise")
-                                        .font(.system(size: 16, weight: .semibold))
-                                    Text("Reset")
-                                        .fontWeight(.semibold)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 12)
-                                .background(Color.orange)
-                                .cornerRadius(25)
-                            }
-                            
-                            Spacer()
-                        }
-                    }
-                    
-                    // Manual time entry
-                    VStack(spacing: 12) {
-                        if editingActivity != nil {
-                            Text("Sleep Duration")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
+                    // Start/Stop button
+                    Button(action: {
+                        if sleepIsRunning {
+                            stopSleepTimer()
                         } else {
-                            Text("Or enter time manually:")
-                                .font(.caption)
+                            startSleepTimer()
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: sleepIsRunning ? "pause.fill" : "play.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text(sleepIsRunning ? "End Sleep" : "Start Sleep")
+                                .fontWeight(.semibold)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(sleepIsRunning ? Color.red : Color.green)
+                        .cornerRadius(25)
+                    }
+                    
+                    // Reset button
+                    Button(action: resetSleepTimer) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Reset")
+                                .fontWeight(.semibold)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(Color.orange)
+                        .cornerRadius(25)
+                    }
+                    
+                    Spacer()
+                }
+            }
+            
+            // Manual time entry - expanded in edit mode
+            VStack(spacing: editingActivity != nil ? 24 : 8) {
+                Text(editingActivity != nil ? "Enter sleep duration:" : "Or enter time manually:")
+                    .font(editingActivity != nil ? .headline : .caption)
+                    .fontWeight(editingActivity != nil ? .semibold : .regular)
+                    .foregroundColor(editingActivity != nil ? .primary : .secondary)
+                
+                VStack(spacing: editingActivity != nil ? 20 : 12) {
+                    HStack(spacing: editingActivity != nil ? 24 : 12) {
+                        VStack(spacing: editingActivity != nil ? 8 : 4) {
+                            Text("Hours")
+                                .font(editingActivity != nil ? .subheadline : .caption2)
+                                .fontWeight(editingActivity != nil ? .semibold : .regular)
                                 .foregroundColor(.secondary)
+                            TextField("0", text: $sleepHours)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .keyboardType(.numberPad)
+                                .frame(width: editingActivity != nil ? 100 : 60)
+                                .disabled(sleepIsRunning)
                         }
                         
-                        HStack(spacing: editingActivity != nil ? 16 : 12) {
-                            VStack(spacing: 6) {
-                                Text(editingActivity != nil ? "H" : "Hours")
-                                    .font(editingActivity != nil ? .subheadline : .caption2)
-                                    .fontWeight(editingActivity != nil ? .semibold : .regular)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                                TextField("0", text: $sleepHours)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .keyboardType(.numberPad)
-                                    .frame(width: editingActivity != nil ? 90 : 60)
-                                    .disabled(sleepIsRunning)
-                            }
-                            .frame(maxWidth: .infinity)
-                            
+                        Text(":")
+                            .font(editingActivity != nil ? .largeTitle : .title2)
+                            .fontWeight(.bold)
+                        
+                        VStack(spacing: editingActivity != nil ? 8 : 4) {
+                            Text(editingActivity != nil ? "Minutes" : "Minutes")
+                                .font(editingActivity != nil ? .subheadline : .caption2)
+                                .fontWeight(editingActivity != nil ? .semibold : .regular)
+                                .foregroundColor(.secondary)
+                            TextField("0", text: $sleepMinutes)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .keyboardType(.numberPad)
+                                .frame(width: editingActivity != nil ? 100 : 60)
+                                .disabled(sleepIsRunning)
+                        }
+                        
+                        if editingActivity == nil {
                             Text(":")
-                                .font(editingActivity != nil ? .largeTitle : .title2)
+                                .font(.title2)
                                 .fontWeight(.bold)
                             
-                            VStack(spacing: 6) {
-                                Text(editingActivity != nil ? "M" : "Minutes")
-                                    .font(editingActivity != nil ? .subheadline : .caption2)
-                                    .fontWeight(editingActivity != nil ? .semibold : .regular)
+                            VStack(spacing: 4) {
+                                Text("Seconds")
+                                    .font(.caption2)
+                                    .fontWeight(.regular)
                                     .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                                TextField("0", text: $sleepMinutes)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .keyboardType(.numberPad)
-                                    .frame(width: editingActivity != nil ? 90 : 60)
-                                    .disabled(sleepIsRunning)
-                            }
-                            .frame(maxWidth: .infinity)
-                            
-                            Text(":")
-                                .font(editingActivity != nil ? .largeTitle : .title2)
-                                .fontWeight(.bold)
-                            
-                            VStack(spacing: 6) {
-                                Text(editingActivity != nil ? "S" : "Seconds")
-                                    .font(editingActivity != nil ? .subheadline : .caption2)
-                                    .fontWeight(editingActivity != nil ? .semibold : .regular)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
                                 TextField("0", text: $sleepSeconds)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .keyboardType(.numberPad)
-                                    .frame(width: editingActivity != nil ? 90 : 60)
+                                    .frame(width: 60)
                                     .disabled(sleepIsRunning)
                             }
-                            .frame(maxWidth: .infinity)
                         }
                     }
+                    
+                    // Add some helpful text in edit mode
+                    if editingActivity != nil {
+                        Text("Enter the total duration of the sleep session")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 8)
+                    }
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
-                .padding(.leading, 16)
             }
             
-            // Quick Duration Buttons (match pumping indentation)
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Quick Duration")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 16)
+            // Quick Duration Buttons - only show when not editing
+            if editingActivity == nil {
+                VStack(spacing: 12) {
+                    Text("Quick Duration")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
-                    ForEach([0.5, 1.0, 1.5, 2.0, 3.0, 4.0], id: \.self) { duration in
-                        Button(action: {
-                            sleepDuration = duration
-                            sleepElapsed = duration * 3600 // Convert hours to seconds
-                            sleepHours = String(Int(duration))
-                            sleepMinutes = String(Int((duration - Double(Int(duration))) * 60))
-                            sleepSeconds = "0"
-                        }) {
-                            Text("\(duration == floor(duration) ? String(format: "%.0f", duration) : String(format: "%.1f", duration))h")
-                                .font(.system(.body, design: .rounded))
-                                .fontWeight(.medium)
-                                .foregroundColor(.purple)
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 16)
-                                .background(Color.purple.opacity(0.1))
-                                .cornerRadius(20)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
+                        ForEach([0.5, 1.0, 1.5, 2.0, 3.0, 4.0], id: \.self) { duration in
+                            Button(action: {
+                                sleepDuration = duration
+                                sleepElapsed = duration * 3600 // Convert hours to seconds
+                                sleepHours = String(Int(duration))
+                                sleepMinutes = String(Int((duration - Double(Int(duration))) * 60))
+                                sleepSeconds = "0"
+                            }) {
+                                Text("\(duration == floor(duration) ? String(format: "%.0f", duration) : String(format: "%.1f", duration))h")
+                                    .font(.system(.body, design: .rounded))
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.purple)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 20)
+                                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 24)
+                                            .stroke(.purple.opacity(0.3), lineWidth: 1)
+                                    )
+                                    .shadow(color: .purple.opacity(0.2), radius: 8, x: 0, y: 4)
+                            }
+                            .disabled(sleepIsRunning)
                         }
-                        .disabled(sleepIsRunning)
                     }
                 }
-                .padding(.leading, 16)
             }
-            
         }
+        .padding(editingActivity != nil ? 24 : 16)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: editingActivity != nil ? 200 : nil)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(.white.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+        .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
     }
     
     private var milestoneDetailsView: some View {
@@ -909,9 +926,13 @@ struct AddActivityView: View {
                 
                 TextField("e.g., First smile", text: $milestoneTitle)
                     .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             }
             
             VStack(alignment: .leading, spacing: 12) {
@@ -922,9 +943,13 @@ struct AddActivityView: View {
                 
                 TextField("Additional details (optional)", text: $milestoneDescription, axis: .vertical)
                     .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
                     .lineLimit(3...6)
             }
         }
@@ -990,9 +1015,13 @@ struct AddActivityView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             }
             
             // Weight slider
@@ -1554,9 +1583,13 @@ struct AddActivityView: View {
                     .disabled(activityIsRunning)
                 }
                 .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             }
         }
         .padding()
@@ -1731,8 +1764,13 @@ struct AddActivityView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
                 
                 // Right breast timer
                 VStack(spacing: 16) {
@@ -1847,8 +1885,13 @@ struct AddActivityView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             }
             
             // Total session time
@@ -1863,8 +1906,13 @@ struct AddActivityView: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color(.systemGray5))
-            .cornerRadius(12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(.white.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+            .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
         }
         .padding()
         .liquidGlassCard()
