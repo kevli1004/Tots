@@ -325,11 +325,13 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
         public var isBreastfeedingActive: Bool
         public var isPumpingLeftActive: Bool
         public var isPumpingRightActive: Bool
+        public var isSleepActive: Bool
         public var breastfeedingElapsed: TimeInterval
         public var pumpingLeftElapsed: TimeInterval
         public var pumpingRightElapsed: TimeInterval
+        public var sleepElapsed: TimeInterval
         
-        public init(todayFeedings: Int, todayPumping: Int, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextPumpingTime: Date? = nil, nextTummyTime: Date? = nil, isBreastfeedingActive: Bool = false, isPumpingLeftActive: Bool = false, isPumpingRightActive: Bool = false, breastfeedingElapsed: TimeInterval = 0, pumpingLeftElapsed: TimeInterval = 0, pumpingRightElapsed: TimeInterval = 0) {
+        public init(todayFeedings: Int, todayPumping: Int, todayDiapers: Int, todayTummyTime: Int, lastUpdateTime: Date, nextFeedingTime: Date? = nil, nextDiaperTime: Date? = nil, nextPumpingTime: Date? = nil, nextTummyTime: Date? = nil, isBreastfeedingActive: Bool = false, isPumpingLeftActive: Bool = false, isPumpingRightActive: Bool = false, isSleepActive: Bool = false, breastfeedingElapsed: TimeInterval = 0, pumpingLeftElapsed: TimeInterval = 0, pumpingRightElapsed: TimeInterval = 0, sleepElapsed: TimeInterval = 0) {
             self.todayFeedings = todayFeedings
             self.todayPumping = todayPumping
             self.todayDiapers = todayDiapers
@@ -342,9 +344,11 @@ public struct TotsLiveActivityAttributes: ActivityAttributes {
             self.isBreastfeedingActive = isBreastfeedingActive
             self.isPumpingLeftActive = isPumpingLeftActive
             self.isPumpingRightActive = isPumpingRightActive
+            self.isSleepActive = isSleepActive
             self.breastfeedingElapsed = breastfeedingElapsed
             self.pumpingLeftElapsed = pumpingLeftElapsed
             self.pumpingRightElapsed = pumpingRightElapsed
+            self.sleepElapsed = sleepElapsed
         }
     }
 
@@ -482,6 +486,16 @@ struct DynamicActivityGrid: View {
                 label: "Right Pump",
                 time: Date().addingTimeInterval(-context.state.pumpingRightElapsed),
                 color: .cyan,
+                isTimer: true
+            ))
+        }
+        
+        if context.state.isSleepActive {
+            items.append(ActivityItem(
+                type: .active,
+                label: "Sleep",
+                time: Date().addingTimeInterval(-context.state.sleepElapsed),
+                color: .indigo,
                 isTimer: true
             ))
         }
@@ -1162,9 +1176,11 @@ extension TotsLiveActivityAttributes.ContentState {
             isBreastfeedingActive: false,
             isPumpingLeftActive: false,
             isPumpingRightActive: false,
+            isSleepActive: false,
             breastfeedingElapsed: 0,
             pumpingLeftElapsed: 0,
-            pumpingRightElapsed: 0
+            pumpingRightElapsed: 0,
+            sleepElapsed: 0
         )
     }
     
@@ -1182,9 +1198,11 @@ extension TotsLiveActivityAttributes.ContentState {
             isBreastfeedingActive: true,
             isPumpingLeftActive: false,
             isPumpingRightActive: true,
+            isSleepActive: true,
             breastfeedingElapsed: 1245, // 20 minutes 45 seconds
             pumpingLeftElapsed: 0,
-            pumpingRightElapsed: 892 // 14 minutes 52 seconds
+            pumpingRightElapsed: 892, // 14 minutes 52 seconds
+            sleepElapsed: 2400 // 40 minutes
         )
     }
 }

@@ -434,8 +434,8 @@ struct HomeView: View {
                 .fontWeight(.semibold)
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
-                // Show feed card only if breastfeeding is not active
-                if !isBreastfeedingActive {
+                // Show feed card only if no feeding-related activities are active
+                if !isBreastfeedingActive && !isPumpingActive {
                 CountdownCard(
                     icon: "🍼",
                     title: "Feed",
@@ -478,6 +478,7 @@ struct HomeView: View {
                         showingAddActivity = true
                     }
                 }
+                
             }
         }
     }
@@ -527,6 +528,18 @@ struct HomeView: View {
                                 showingAddActivity = true
                             }
                         }
+                        
+                        if isSleepActive {
+                            OngoingSessionCard(
+                                title: "Sleep",
+                                icon: "moon.zzz.fill",
+                                startTime: sleepStartTime,
+                                color: .indigo
+                            ) {
+                                selectedActivityType = .sleep
+                                showingAddActivity = true
+                            }
+                        }
                     }
                 }
             }
@@ -535,7 +548,7 @@ struct HomeView: View {
     
     // MARK: - Ongoing Session State
     private var hasOngoingSessions: Bool {
-        isBreastfeedingActive || isLeftPumpingActive || isRightPumpingActive
+        isBreastfeedingActive || isLeftPumpingActive || isRightPumpingActive || isSleepActive
     }
     
     private var isBreastfeedingActive: Bool {
@@ -554,6 +567,10 @@ struct HomeView: View {
         isLeftPumpingActive || isRightPumpingActive
     }
     
+    private var isSleepActive: Bool {
+        UserDefaults.standard.bool(forKey: "sleepIsRunning")
+    }
+    
     private var breastfeedingStartTime: Date? {
         UserDefaults.standard.object(forKey: "breastfeedingStartTime") as? Date
     }
@@ -564,6 +581,10 @@ struct HomeView: View {
     
     private var rightPumpingStartTime: Date? {
         UserDefaults.standard.object(forKey: "rightPumpingStartTime") as? Date
+    }
+    
+    private var sleepStartTime: Date? {
+        UserDefaults.standard.object(forKey: "sleepStartTime") as? Date
     }
     
     // MARK: - Pumping Countdown Logic
@@ -592,6 +613,23 @@ struct HomeView: View {
             time: breastfeedingStartTime ?? Date(),
             details: details,
             mood: .content,
+            duration: minutes,
+            notes: nil
+        )
+    }
+    
+    private func createSleepActivityFromTimer() -> TotsActivity {
+        let elapsed = sleepStartTime.map { Date().timeIntervalSince($0) } ?? 0
+        let minutes = Int(elapsed / 60)
+        let seconds = Int(elapsed) % 60
+        let hours = Double(minutes) / 60.0
+        let details = "Sleep - \(minutes)m \(seconds)s (\(String(format: "%.1f", hours)) hours)"
+        
+        return TotsActivity(
+            type: .sleep,
+            time: sleepStartTime ?? Date(),
+            details: details,
+            mood: .sleepy,
             duration: minutes,
             notes: nil
         )
@@ -735,7 +773,7 @@ struct HomeView: View {
             
             SummaryGoalCard(
                 icon: "🧸",
-                title: "Tummy Time",
+                title: "Activities",
                 current: dataManager.todayTummyTime,
                 goal: 60,
                 color: .green,
@@ -2060,12 +2098,12 @@ struct DatePickerHistoryView: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var scrollToDate: Date?
     
-    // Generate last 30 days for scrollable history
+    // Generate last 365 days (1 year) for scrollable history
     private var historyDates: [Date] {
         let calendar = Calendar.current
         var dates: [Date] = []
         
-        for i in 0..<30 {
+        for i in 0..<365 {
             if let date = calendar.date(byAdding: .day, value: -i, to: Date()),
                let normalizedDate = calendar.dateInterval(of: .day, for: date)?.start {
                 dates.append(normalizedDate)
@@ -2228,6 +2266,8 @@ struct DateScrollItem: View {
 struct DayHistoryCard: View {
     let date: Date
     @EnvironmentObject var dataManager: TotsDataManager
+    @State private var editingActivity: TotsActivity?
+    @State private var showingAddActivity = false
     
     private var activities: [TotsActivity] {
         dataManager.getActivities(for: date)
@@ -2279,7 +2319,10 @@ struct DayHistoryCard: View {
             } else {
                 LazyVStack(spacing: 8) {
                     ForEach(activities.sorted(by: { $0.time > $1.time })) { activity in
-                        TimelineActivityRow(activity: activity)
+                        TimelineActivityRow(activity: activity) {
+                            editingActivity = activity
+                            showingAddActivity = true
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -2287,6 +2330,10 @@ struct DayHistoryCard: View {
             }
         }
         .background(Color(.systemBackground))
+        .sheet(isPresented: $showingAddActivity) {
+            AddActivityView(editingActivity: editingActivity)
+                .environmentObject(dataManager)
+        }
     }
 }
 
@@ -2331,6 +2378,7 @@ struct StatPill: View {
 
 struct TimelineActivityRow: View {
     let activity: TotsActivity
+    let onTap: () -> Void
     
     private var timeString: String {
         let formatter = DateFormatter()
@@ -2397,6 +2445,10 @@ struct TimelineActivityRow: View {
         .background(.regularMaterial)
         .cornerRadius(8)
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 
@@ -3949,7 +4001,7 @@ struct SimpleBarChart: View {
                 
                 DailyActivityRow(
                     icon: "🧸",
-                    title: "Tummy Time",
+                    title: "Activities",
                     color: .green,
                     dailyData: dailyData,
                     maxValue: 60,
@@ -4003,7 +4055,7 @@ struct SimpleBarChart: View {
                 
                 WeeklyActivityRow(
                     icon: "🧸",
-                    title: "Tummy Time",
+                    title: "Activities",
                     color: .green,
                     weeklyData: weeklyData,
                     maxValue: 420,
@@ -4191,6 +4243,10 @@ struct OngoingSessionCard: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 24, height: 24)
+                        .foregroundColor(color)
+                } else if icon == "moon.zzz.fill" {
+                    Image(systemName: icon)
+                        .font(.title2)
                         .foregroundColor(color)
                 } else {
                     Text(icon)

@@ -76,12 +76,23 @@ struct AddActivityView: View {
     @State private var selectedHeadCircumferenceCm: Double = 35.0
     @State private var selectedHeadCircumferenceIn: Double = 13.8
     
-    // Activity stopwatch states
+    // Activity counter state (for non-timed activities)
+    @State private var activityCount: Int = 1
+    
+    // Activity timer states (for tummy time and screen time)
     @State private var activityIsRunning = false
     @State private var activityStartTime: Date?
     @State private var activityElapsed: TimeInterval = 0
     @State private var activityTimer: Timer?
     @State private var selectedActivitySubType: ActivitySubType = .tummyTime
+    
+    // Sleep timer states
+    @State private var sleepIsRunning = false
+    @State private var sleepStartTime: Date?
+    @State private var sleepElapsed: TimeInterval = 0
+    @State private var sleepTimer: Timer?
+    @State private var sleepHours = ""
+    @State private var sleepMinutes = ""
     
     // Pumping timer states
     @State private var leftPumpingIsRunning = false
@@ -117,7 +128,7 @@ struct AddActivityView: View {
     
     // MARK: - Computed Properties
     private var hasActiveTimers: Bool {
-        breastfeedingIsRunning || leftPumpingIsRunning || rightPumpingIsRunning || activityIsRunning
+        breastfeedingIsRunning || leftPumpingIsRunning || rightPumpingIsRunning || activityIsRunning || sleepIsRunning
     }
     
     enum FeedingType: String, CaseIterable {
@@ -242,6 +253,11 @@ struct AddActivityView: View {
                     stopActivity()
                     dismiss()
                 }
+            } else if selectedActivityType == .sleep && sleepIsRunning {
+                Button("Stop Sleep Timer") {
+                    stopSleepTimer()
+                    dismiss()
+                }
             } else {
                 // Fallback: show all active timers if context is unclear
                 if breastfeedingIsRunning {
@@ -265,17 +281,35 @@ struct AddActivityView: View {
                         checkAndDismissIfNoTimers()
                     }
                 }
+                
+                if sleepIsRunning {
+                    Button("Stop Sleep Timer") {
+                        stopSleepTimer()
+                        checkAndDismissIfNoTimers()
+                    }
+                }
             }
             
             Button("Exit but Keep Timers", role: .cancel) {
                 dismiss()
             }
         } message: {
-            Text("You have active timers running. Do you want to stop them or exit while keeping them running?")
+            if sleepIsRunning && selectedActivityType == .sleep {
+                Text("You have a sleep timer running. Do you want to stop it or exit while keeping it running?")
+            } else if breastfeedingIsRunning && selectedActivityType == .feeding {
+                Text("You have a breastfeeding timer running. Do you want to stop it or exit while keeping it running?")
+            } else if (leftPumpingIsRunning || rightPumpingIsRunning) && selectedActivityType == .pumping {
+                Text("You have pumping timers running. Do you want to stop them or exit while keeping them running?")
+            } else if activityIsRunning && selectedActivityType == .activity {
+                Text("You have an activity timer running. Do you want to stop it or exit while keeping it running?")
+            } else {
+                Text("You have active timers running. Do you want to stop them or exit while keeping them running?")
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             restoreBreastfeedingTimer()
             restorePumpingTimers()
+            restoreSleepTimer()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             // Timers continue running in background via UserDefaults tracking
@@ -292,6 +326,7 @@ struct AddActivityView: View {
                     // For active sessions, also restore timers
                     restoreBreastfeedingTimer()
                     restorePumpingTimers()
+                    restoreSleepTimer()
                     
                     // Only override with current timer values if text fields are still empty
                     if editingActivity.type == .feeding && editingActivity.details.contains("Breastfeeding") {
@@ -314,6 +349,13 @@ struct AddActivityView: View {
                         }
                         if rightPumpingSeconds.isEmpty {
                             rightPumpingSeconds = String(Int(rightPumpingElapsed) % 60)
+                        }
+                    } else if editingActivity.type == .sleep {
+                        if sleepHours.isEmpty && sleepElapsed > 0 {
+                            sleepHours = String(Int(sleepElapsed / 3600))
+                        }
+                        if sleepMinutes.isEmpty && sleepElapsed > 0 {
+                            sleepMinutes = String(Int(sleepElapsed) % 3600 / 60)
                         }
                     }
                 }
@@ -342,6 +384,7 @@ struct AddActivityView: View {
                 // Only restore timers when not editing
                 restoreBreastfeedingTimer()
                 restorePumpingTimers()
+                restoreSleepTimer()
                 if let preselectedType = preselectedType {
                 selectedActivityType = preselectedType
                     if let preselectedFeedingType = preselectedFeedingType {
@@ -383,29 +426,9 @@ struct AddActivityView: View {
             HStack {
                 Spacer()
                 VStack(spacing: 8) {
-                    // Use same icons as recent activities
-                    if selectedActivityType == .sleep {
-                        Image(systemName: "moon.zzz.fill")
-                            .font(.title2)
-                            .foregroundColor(selectedActivityType.color)
-                    } else if selectedActivityType == .milestone {
-                        Image(systemName: "figure.child")
-                            .font(.title2)
-                            .foregroundColor(selectedActivityType.color)
-                    } else if selectedActivityType.rawValue == "DiaperIcon" {
-                        Image(selectedActivityType.rawValue)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 24, height: 24)
-                            .foregroundColor(selectedActivityType.color)
-                    } else {
-                        Text(selectedActivityType.rawValue)
-                            .font(.title2)
-                    }
-                    
                     Text(selectedActivityType.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .font(.headline)
+                        .fontWeight(.semibold)
                         .foregroundColor(.primary)
                 }
                 .frame(width: 120, height: 80)
@@ -535,102 +558,27 @@ struct AddActivityView: View {
                 }
             } else if feedingType == .breastfeeding {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Duration")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.secondary)
-                        
-                        Spacer()
-                        
-                        // Manual mode toggle - only show when not editing
-                        if editingActivity == nil {
-                            HStack(spacing: 4) {
-                                Text(breastfeedingManualMode ? "Manual" : "Automatic")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Toggle("", isOn: $breastfeedingManualMode)
-                                    .toggleStyle(SwitchToggleStyle(tint: .pink))
-                                    .scaleEffect(0.8)
-                                    .onChange(of: breastfeedingManualMode) { isManual in
-                                        if isManual {
-                                            // When switching to manual, populate text fields with current values
-                                            if breastfeedingElapsed > 0 {
-                                                breastfeedingMinutes = String(Int(breastfeedingElapsed / 60))
-                                                breastfeedingSeconds = String(Int(breastfeedingElapsed) % 60)
-                                            }
-                                            if breastfeedingIsRunning {
-                                                stopBreastfeedingTimer()
-                                            }
-                                        } else if !isManual && !breastfeedingMinutes.isEmpty {
-                                            // Update elapsed time from manual input when switching back to automatic
-                                            let minutes = Int(breastfeedingMinutes) ?? 0
-                                            let seconds = Int(breastfeedingSeconds) ?? 0
-                                            breastfeedingElapsed = TimeInterval(minutes * 60 + seconds)
-                                        }
-                                    }
-                            }
-                        }
-                    }
+                    Text("Breastfeeding Timer")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
                     
-                    Group {
-                        if breastfeedingManualMode || editingActivity != nil {
-                            // Manual input fields when editing or when timer is stopped with elapsed time
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Minutes")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    TextField("0", text: Binding(
-                                        get: {
-                                            if !breastfeedingMinutes.isEmpty {
-                                                return breastfeedingMinutes
-                                            } else if breastfeedingElapsed > 0 {
-                                                return String(Int(breastfeedingElapsed / 60))
-                                            } else {
-                                                return "0"
-                                            }
-                                        },
-                                        set: { breastfeedingMinutes = $0 }
-                                    ))
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .keyboardType(.numberPad)
-                                }
+                    VStack(spacing: 16) {
+                        // Timer display
+                        HStack {
+                            Spacer()
+                            Text(formatTime(breastfeedingElapsed))
+                                .font(.system(size: 36, weight: .bold, design: .monospaced))
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
+                        
+                        // Timer controls - only show when not editing
+                        if editingActivity == nil {
+                            HStack(spacing: 16) {
+                                Spacer()
                                 
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Seconds")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    TextField("0", text: Binding(
-                                        get: {
-                                            if !breastfeedingSeconds.isEmpty {
-                                                return breastfeedingSeconds
-                                            } else if breastfeedingElapsed > 0 {
-                                                return String(Int(breastfeedingElapsed) % 60)
-                                            } else {
-                                                return "0"
-                                            }
-                                        },
-                                        set: { breastfeedingSeconds = $0 }
-                                    ))
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .keyboardType(.numberPad)
-                                }
-                            }
-                        } else {
-                            VStack(spacing: 16) {
-                                // Timer display
-                                VStack(spacing: 8) {
-                                    Text(formatTime(breastfeedingElapsed))
-                                        .font(.system(size: 48, weight: .bold, design: .monospaced))
-                                        .foregroundColor(.pink)
-                                    
-                                    Text("Duration")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                // Start/Pause button
+                                // Start/Stop button
                                 Button(action: {
                                     if breastfeedingIsRunning {
                                         stopBreastfeedingTimer()
@@ -638,32 +586,54 @@ struct AddActivityView: View {
                                         startBreastfeedingTimer()
                                     }
                                 }) {
-                                    HStack {
+                                    HStack(spacing: 8) {
                                         Image(systemName: breastfeedingIsRunning ? "pause.fill" : "play.fill")
-                                        Text(breastfeedingIsRunning ? "Pause" : (breastfeedingElapsed > 0 ? "Resume" : "Start"))
+                                            .font(.system(size: 16, weight: .semibold))
+                                        Text(breastfeedingIsRunning ? "End Feed" : "Start Feed")
+                                            .fontWeight(.semibold)
                                     }
-                                    .font(.headline)
                                     .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(breastfeedingIsRunning ? Color.red : Color.green)
-                                    .cornerRadius(12)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                                    .background(breastfeedingIsRunning ? Color.red : Color.pink)
+                                    .cornerRadius(25)
                                 }
                                 
-                                // Reset button
-                                if breastfeedingElapsed > 0 {
-                                    Button(action: resetBreastfeedingTimer) {
-                                        HStack {
-                                            Image(systemName: "arrow.counterclockwise")
-                                            Text("Reset")
-                                        }
-                                        .font(.subheadline)
+                                Spacer()
+                            }
+                        }
+                        
+                        // Manual time entry
+                        VStack(spacing: 8) {
+                            Text("Or enter time manually:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            HStack(spacing: 12) {
+                                VStack(spacing: 4) {
+                                    Text("Minutes")
+                                        .font(.caption2)
                                         .foregroundColor(.secondary)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
-                                        .background(Color(.systemGray6))
-                                        .cornerRadius(8)
-                                    }
+                                    TextField("0", text: $breastfeedingMinutes)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .keyboardType(.numberPad)
+                                        .frame(width: 60)
+                                        .disabled(breastfeedingIsRunning)
+                                }
+                                
+                                Text(":")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                VStack(spacing: 4) {
+                                    Text("Seconds")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    TextField("0", text: $breastfeedingSeconds)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .keyboardType(.numberPad)
+                                        .frame(width: 60)
+                                        .disabled(breastfeedingIsRunning)
                                 }
                             }
                         }
@@ -715,34 +685,124 @@ struct AddActivityView: View {
     }
     
     private var sleepDetailsView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Duration")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-            
-            VStack(spacing: 12) {
-                HStack {
-                    Text("30 min")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(String(format: "%.1f hours", sleepDuration))
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                    Spacer()
-                    Text("12 hrs")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            // Timer Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Sleep Timer")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
                 
-                Slider(value: $sleepDuration, in: 0.5...12.0, step: 0.5)
-                    .accentColor(.purple)
+                VStack(spacing: 16) {
+                    // Timer display
+                    HStack {
+                        Spacer()
+                        Text(formatTime(sleepElapsed))
+                            .font(.system(size: 36, weight: .bold, design: .monospaced))
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    
+                    // Timer controls - only show when not editing
+                    if editingActivity == nil {
+                        HStack(spacing: 16) {
+                            Spacer()
+                            
+                            // Start/Stop button
+                            Button(action: {
+                                if sleepIsRunning {
+                                    stopSleepTimer()
+                                } else {
+                                    startSleepTimer()
+                                }
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: sleepIsRunning ? "pause.fill" : "play.fill")
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text(sleepIsRunning ? "End Sleep" : "Start Sleep")
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(sleepIsRunning ? Color.red : Color.purple)
+                                .cornerRadius(25)
+                            }
+                            
+                            Spacer()
+                        }
+                    }
+                    
+                    // Manual time entry
+                    VStack(spacing: 8) {
+                        Text("Or enter time manually:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 12) {
+                            VStack(spacing: 4) {
+                                Text("Hours")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                TextField("0", text: $sleepHours)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .keyboardType(.numberPad)
+                                    .frame(width: 60)
+                                    .disabled(sleepIsRunning)
+                            }
+                            
+                            Text(":")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            VStack(spacing: 4) {
+                                Text("Minutes")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                TextField("0", text: $sleepMinutes)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .keyboardType(.numberPad)
+                                    .frame(width: 60)
+                                    .disabled(sleepIsRunning)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+            
+            // Quick Duration Buttons
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Quick Duration")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
+                    ForEach([0.5, 1.0, 1.5, 2.0, 3.0, 4.0], id: \.self) { duration in
+                        Button(action: {
+                            sleepDuration = duration
+                            sleepElapsed = duration * 3600 // Convert hours to seconds
+                            sleepHours = String(Int(duration))
+                            sleepMinutes = String(Int((duration - Double(Int(duration))) * 60))
+                        }) {
+                            Text("\(duration == floor(duration) ? String(format: "%.0f", duration) : String(format: "%.1f", duration))h")
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.medium)
+                                .foregroundColor(.purple)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                .background(Color.purple.opacity(0.1))
+                                .cornerRadius(20)
+                        }
+                        .disabled(sleepIsRunning)
+                    }
+                }
+            }
+            
         }
     }
     
@@ -1137,18 +1197,41 @@ struct AddActivityView: View {
         case .diaper:
             details = "\(diaperType.rawValue) diaper"
         case .sleep:
-            details = String(format: "Slept for %.1f hours", sleepDuration)
+            // Use timer data if available, otherwise fall back to slider
+            if sleepElapsed > 0 || !sleepHours.isEmpty || !sleepMinutes.isEmpty {
+                let hours: Int
+                let minutes: Int
+                
+                // Prioritize manual input when editing or when we have manual values
+                if !sleepHours.isEmpty || !sleepMinutes.isEmpty {
+                    hours = Int(sleepHours) ?? 0
+                    minutes = Int(sleepMinutes) ?? 0
+                } else {
+                    hours = Int(sleepElapsed / 3600)
+                    minutes = Int(sleepElapsed) % 3600 / 60
+                }
+                
+                let totalMinutes = hours * 60 + minutes
+                let hoursDecimal = Double(totalMinutes) / 60.0
+                details = String(format: "Sleep - %dh %dm (%.1f hours)", hours, minutes, hoursDecimal)
+            } else {
+                details = String(format: "Slept for %.1f hours", sleepDuration)
+            }
         case .milestone:
             details = milestoneDescription.isEmpty ? milestoneTitle : "\(milestoneTitle) - \(milestoneDescription)"
         case .activity:
             if selectedActivitySubType == .tummyTime || selectedActivitySubType == .screenTime {
-                // Timed activities include duration
+                // Timer-based activities include duration
                 let minutes = Int(activityElapsed / 60)
                 let seconds = Int(activityElapsed) % 60
                 details = "\(selectedActivitySubType.name) - \(minutes)m \(seconds)s"
             } else {
-                // Quick log activities just include the activity name
-                details = selectedActivitySubType.name
+                // Count-based activities include the count
+                if activityCount > 1 {
+                    details = "\(selectedActivitySubType.name) - Count: \(activityCount)"
+                } else {
+                    details = selectedActivitySubType.name
+                }
             }
         case .pumping:
             // Use text field values if editing or if timer is stopped with elapsed time
@@ -1262,6 +1345,10 @@ struct AddActivityView: View {
             resetRightPumping()
             // Update live activity immediately
             dataManager.updateLiveActivity()
+        } else if selectedActivityType == .sleep {
+            resetSleepTimer()
+            // Update live activity immediately
+            dataManager.updateLiveActivity()
         }
         
         dismiss()
@@ -1299,8 +1386,6 @@ struct AddActivityView: View {
                             selectedActivitySubType = subType
                         }) {
                             HStack {
-                                Text(subType.rawValue)
-                                    .font(.title2)
                                 Text(subType.name)
                                     .font(.subheadline)
                                     .fontWeight(.medium)
@@ -1317,7 +1402,7 @@ struct AddActivityView: View {
                 }
             }
             
-            // Only show timer for activities that need duration tracking
+            // Show timer for tummy time and screen time, count for others
             if selectedActivitySubType == .tummyTime || selectedActivitySubType == .screenTime {
                 VStack(spacing: 20) {
                     // Stopwatch display
@@ -1371,27 +1456,65 @@ struct AddActivityView: View {
                     }
                     .disabled(activityIsRunning)
                 }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             } else {
-                // For other activities, just show a note that it's a quick log
-                VStack(spacing: 12) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Quick Log Activity")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                    }
-                    
-                    Text("This activity will be logged with the current time. No timer needed.")
-                        .font(.caption)
+                // Activity count section for other activities
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Count")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
                         .foregroundColor(.secondary)
-                        .multilineTextAlignment(.leading)
+                    
+                    VStack(spacing: 16) {
+                        // Count display
+                        HStack {
+                            Spacer()
+                            Text("\(activityCount)")
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
+                        
+                        // Count controls
+                        HStack(spacing: 16) {
+                            // Decrease button
+                            Button(action: {
+                                if activityCount > 1 {
+                                    activityCount -= 1
+                                }
+                            }) {
+                                Image(systemName: "minus")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 50)
+                                    .background(Color.red.opacity(activityCount > 1 ? 1.0 : 0.5))
+                                    .clipShape(Circle())
+                            }
+                            .disabled(activityCount <= 1)
+                            
+                            Spacer()
+                            
+                            // Increase button
+                            Button(action: {
+                                activityCount += 1
+                            }) {
+                                Image(systemName: "plus")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 50)
+                                    .background(Color.green)
+                                    .clipShape(Circle())
+                            }
+                        }
+                    }
                 }
                 .padding()
-                .background(Color(.systemGray6).opacity(0.5))
-                .cornerRadius(8)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             }
         }
         .padding()
@@ -1547,14 +1670,6 @@ struct AddActivityView: View {
                             }
                         }
                         
-                        Button(action: resetLeftPumping) {
-                            HStack {
-                                Image(systemName: "arrow.counterclockwise")
-                                Text("Reset")
-                            }
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                            }
                         }
                     }
                 }
@@ -1657,14 +1772,6 @@ struct AddActivityView: View {
                             }
                         }
                         
-                        Button(action: resetRightPumping) {
-                            HStack {
-                                Image(systemName: "arrow.counterclockwise")
-                                Text("Reset")
-                            }
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                            }
                         }
                     }
                 }
@@ -1692,6 +1799,7 @@ struct AddActivityView: View {
         .padding()
         .liquidGlassCard()
     }
+    
     
     private func formatElapsedTime(_ timeInterval: TimeInterval) -> String {
         let minutes = Int(timeInterval) / 60
@@ -1905,25 +2013,61 @@ struct AddActivityView: View {
             }
             
         case .sleep:
-            // Parse sleep duration from details like "Slept for 1.5 hours"
-            let hourPattern = #"(\d+(?:\.\d+)?)\s*hours?"#
-            if let regex = try? NSRegularExpression(pattern: hourPattern),
-               let match = regex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
-               let range = Range(match.range(at: 1), in: details) {
-                sleepDuration = Double(String(details[range])) ?? 1.5
+            // Parse sleep data - check for timer format first, then fallback to hours
+            let originalDetails = activity.details // Use original case-sensitive details
+            if originalDetails.contains("Sleep - ") {
+                // New timer format: "Sleep - 120m 30s (2.0 hours)"
+                let timerPattern = #"Sleep - (\d+)m (\d+)s"#
+                if let regex = try? NSRegularExpression(pattern: timerPattern),
+                   let match = regex.firstMatch(in: originalDetails, range: NSRange(originalDetails.startIndex..., in: originalDetails)) {
+                    
+                    if let minutesRange = Range(match.range(at: 1), in: originalDetails),
+                       let secondsRange = Range(match.range(at: 2), in: originalDetails) {
+                        let minutes = String(originalDetails[minutesRange])
+                        let seconds = String(originalDetails[secondsRange])
+                        sleepHours = String(Int(minutes) ?? 0 / 60)
+                        sleepMinutes = String((Int(minutes) ?? 0) % 60)
+                        sleepElapsed = TimeInterval((Int(minutes) ?? 0) * 60 + (Int(seconds) ?? 0))
+                    }
+                }
+            } else {
+                // Parse sleep duration from details like "Slept for 1.5 hours"
+                let hourPattern = #"(\d+(?:\.\d+)?)\s*hours?"#
+                if let regex = try? NSRegularExpression(pattern: hourPattern, options: .caseInsensitive),
+                   let match = regex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let range = Range(match.range(at: 1), in: details) {
+                    sleepDuration = Double(String(details[range])) ?? 1.5
+                }
             }
             
         case .activity:
-            // Parse activity duration and type from details like "Tummy Time - 15m 30s"
-            if let duration = activity.duration {
-                activityElapsed = TimeInterval(duration * 60) // Convert minutes to seconds
-            }
-            
-            // Parse activity subtype
+            // Parse activity subtype first
             for subType in ActivitySubType.allCases {
                 if details.contains(subType.name.lowercased()) {
                     selectedActivitySubType = subType
                     break
+                }
+            }
+            
+            // Parse timer data for tummy time/screen time or count for others
+            if selectedActivitySubType == .tummyTime || selectedActivitySubType == .screenTime {
+                // Parse timer data from details like "Tummy Time - 15m 30s"
+                let timePattern = #"(\d+)m\s*(\d+)s"#
+                if let regex = try? NSRegularExpression(pattern: timePattern),
+                   let match = regex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let minutesRange = Range(match.range(at: 1), in: details),
+                   let secondsRange = Range(match.range(at: 2), in: details) {
+                    let minutes = Int(String(details[minutesRange])) ?? 0
+                    let seconds = Int(String(details[secondsRange])) ?? 0
+                    activityElapsed = TimeInterval(minutes * 60 + seconds)
+                }
+            } else {
+                // Parse activity count from details like "Other Activity - Count: 3"
+                let countPattern = #"Count:\s*(\d+)"#
+                if let regex = try? NSRegularExpression(pattern: countPattern),
+                   let match = regex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
+                   let range = Range(match.range(at: 1), in: details) {
+                    activityCount = Int(String(details[range])) ?? 1
                 }
             }
             
@@ -2042,7 +2186,23 @@ struct AddActivityView: View {
     private func getDuration() -> Int? {
         switch selectedActivityType {
         case .sleep:
-            return Int(sleepDuration * 60) // Convert hours to minutes
+            // Use timer data if available, otherwise fall back to slider
+            if sleepElapsed > 0 || !sleepHours.isEmpty || !sleepMinutes.isEmpty {
+                let hours: Int
+                let minutes: Int
+                
+                if (editingActivity != nil || (!sleepIsRunning && sleepElapsed > 0)) && (!sleepHours.isEmpty || !sleepMinutes.isEmpty) {
+                    hours = Int(sleepHours) ?? 0
+                    minutes = Int(sleepMinutes) ?? 0
+                } else {
+                    hours = Int(sleepElapsed / 3600)
+                    minutes = Int(sleepElapsed) % 3600 / 60
+                }
+                
+                return hours * 60 + minutes // Convert to total minutes
+            } else {
+                return Int(sleepDuration * 60) // Convert hours to minutes
+            }
         case .feeding:
             if feedingType == .breastfeeding {
                 // Use text field values if editing or if timer is stopped with elapsed time
@@ -2181,6 +2341,98 @@ struct AddActivityView: View {
         let minutes = Int(timeInterval) / 60
         let seconds = Int(timeInterval) % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    // MARK: - Sleep Timer Functions
+    
+    private func startSleepTimer() {
+        // If we have edited values in text fields, use them as the starting point
+        if !sleepHours.isEmpty || !sleepMinutes.isEmpty {
+            let hours = Int(sleepHours) ?? 0
+            let minutes = Int(sleepMinutes) ?? 0
+            sleepElapsed = TimeInterval(hours * 3600 + minutes * 60)
+        }
+        
+        // Always calculate start time based on current elapsed time (for resume functionality)
+        sleepStartTime = Date().addingTimeInterval(-sleepElapsed)
+        
+        sleepIsRunning = true
+        
+        sleepTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            updateSleepElapsed()
+        }
+        
+        // Store start time for background tracking
+        UserDefaults.standard.set(sleepStartTime, forKey: "sleepStartTime")
+        UserDefaults.standard.set(sleepElapsed, forKey: "sleepElapsed")
+        UserDefaults.standard.set(true, forKey: "sleepIsRunning")
+        
+        // Update live activity immediately
+        dataManager.updateLiveActivity()
+    }
+    
+    private func stopSleepTimer() {
+        sleepTimer?.invalidate()
+        sleepTimer = nil
+        sleepIsRunning = false
+        
+        // Clear background tracking - ensure proper cleanup
+        UserDefaults.standard.removeObject(forKey: "sleepStartTime")
+        UserDefaults.standard.removeObject(forKey: "sleepElapsed")
+        UserDefaults.standard.set(false, forKey: "sleepIsRunning")
+        
+        // Force synchronization to ensure UserDefaults are written immediately
+        UserDefaults.standard.synchronize()
+        
+        // Update live activity immediately
+        dataManager.updateLiveActivity()
+    }
+    
+    private func resetSleepTimer() {
+        stopSleepTimer()
+        sleepElapsed = 0
+        sleepStartTime = nil
+        sleepHours = ""
+        sleepMinutes = ""
+    }
+    
+    private func updateSleepElapsed() {
+        guard let startTime = sleepStartTime else { return }
+        sleepElapsed = Date().timeIntervalSince(startTime)
+        
+        // Update stored elapsed time for background tracking
+        UserDefaults.standard.set(sleepElapsed, forKey: "sleepElapsed")
+    }
+    
+    private func restoreSleepTimer() {
+        // Double-check UserDefaults to avoid race conditions
+        UserDefaults.standard.synchronize()
+        let isRunning = UserDefaults.standard.bool(forKey: "sleepIsRunning")
+        
+        // Only restore if we're not already running a timer
+        guard !sleepIsRunning else { return }
+        
+        if isRunning {
+            if let startTime = UserDefaults.standard.object(forKey: "sleepStartTime") as? Date {
+                sleepStartTime = startTime
+                sleepElapsed = Date().timeIntervalSince(startTime)
+                sleepIsRunning = true
+                
+                sleepTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                    updateSleepElapsed()
+                }
+            }
+        } else {
+            // Restore any saved elapsed time even if not running
+            sleepElapsed = UserDefaults.standard.double(forKey: "sleepElapsed")
+            
+            if sleepElapsed > 0 {
+                let hours = Int(sleepElapsed) / 3600
+                let minutes = Int(sleepElapsed) % 3600 / 60
+                sleepHours = String(hours)
+                sleepMinutes = String(minutes)
+            }
+        }
     }
     
     private func restoreBreastfeedingTimer() {
