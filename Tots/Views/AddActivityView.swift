@@ -179,66 +179,26 @@ struct AddActivityView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Full viewport edit mode for sleep only
-                        if selectedActivityType == .sleep && editingActivity != nil {
-                            // Compact time selector
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("When?")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.primary)
-                                
-                                DatePicker("Activity Time", selection: $activityTime, displayedComponents: [.date, .hourAndMinute])
-                                    .datePickerStyle(CompactDatePickerStyle())
-                                    .padding(.vertical, 12)
-                                    .padding(.horizontal, 16)
-                                    .liquidGlassCard()
-                            }
-                            
-                            // Full sleep details view - takes most of the space
-                            sleepDetailsView
-                                .frame(minHeight: geometry.size.height * 0.4)
-                            
-                            Spacer(minLength: 20)
-                            
-                            // Compact notes
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Notes (Optional)")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.primary)
-                                
-                                TextField("Add any notes...", text: $notes, axis: .vertical)
-                                    .lineLimit(2...3)
-                                    .padding()
-                                    .liquidGlassCard()
-                            }
-                            
-                            // Save button
-                            saveButtonView
-                                .padding(.top, 10)
-                        } else {
-                            // Standard layout for non-sleep edit mode
-                            // Ad Banner
-                            AdBannerContainerWide()
-                            
-                            // Unit toggle for growth activities
-                            if selectedActivityType == .growth {
-                                unitToggleRow
-                            }
-                            
-                            // Time selector
-                            timeSelectorView
-                            
-                            // Activity details
-                            activityDetailsView
-                            
-                            // Notes
-                            notesView
-                            
-                            // Save button
-                            saveButtonView
+                        // Standard layout for all activities
+                        // Ad Banner
+                        AdBannerContainerWide()
+                        
+                        // Unit toggle for growth activities
+                        if selectedActivityType == .growth {
+                            unitToggleRow
                         }
+                        
+                        // Time selector
+                        timeSelectorView
+                        
+                        // Activity details
+                        activityDetailsView
+                        
+                        // Notes
+                        notesView
+                        
+                        // Save button
+                        saveButtonView
                     }
                     .padding()
                     .frame(width: geometry.size.width)
@@ -764,12 +724,13 @@ struct AddActivityView: View {
     
     private var sleepDetailsView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Timer Section
+            // Timer Section (match pumping indentation)
             VStack(alignment: .leading, spacing: 12) {
                 Text("Sleep Timer")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
+                    .padding(.leading, 16)
                 
                 VStack(spacing: 16) {
                     // Timer display - only show when not editing
@@ -801,9 +762,10 @@ struct AddActivityView: View {
                                         .font(.system(size: 16, weight: .semibold))
                                     Text(sleepIsRunning ? "End Sleep" : "Start Sleep")
                                         .fontWeight(.semibold)
+                                        .fixedSize(horizontal: true, vertical: false)
                                 }
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, 24)
                                 .padding(.vertical, 12)
                                 .background(sleepIsRunning ? Color.red : Color.green)
                                 .cornerRadius(25)
@@ -816,9 +778,10 @@ struct AddActivityView: View {
                                         .font(.system(size: 16, weight: .semibold))
                                     Text("Reset")
                                         .fontWeight(.semibold)
+                                        .fixedSize(horizontal: true, vertical: false)
                                 }
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, 24)
                                 .padding(.vertical, 12)
                                 .background(Color.orange)
                                 .cornerRadius(25)
@@ -895,17 +858,20 @@ struct AddActivityView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color(.systemBackground))
                 .cornerRadius(12)
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                .padding(.leading, 16)
             }
             
-            // Quick Duration Buttons
+            // Quick Duration Buttons (match pumping indentation)
             VStack(alignment: .leading, spacing: 12) {
                 Text("Quick Duration")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
-                
+                    .padding(.leading, 16)
+
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
                     ForEach([0.5, 1.0, 1.5, 2.0, 3.0, 4.0], id: \.self) { duration in
                         Button(action: {
@@ -927,10 +893,10 @@ struct AddActivityView: View {
                         .disabled(sleepIsRunning)
                     }
                 }
+                .padding(.leading, 16)
             }
             
         }
-        .padding(.horizontal, 16)
     }
     
     private var milestoneDetailsView: some View {
