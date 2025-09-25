@@ -93,6 +93,7 @@ struct AddActivityView: View {
     @State private var sleepTimer: Timer?
     @State private var sleepHours = ""
     @State private var sleepMinutes = ""
+    @State private var sleepSeconds = ""
     
     // Pumping timer states
     @State private var leftPumpingIsRunning = false
@@ -178,25 +179,71 @@ struct AddActivityView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Ad Banner
-                        AdBannerContainerWide()
-                        
-                        // Unit toggle for growth activities
-                        if selectedActivityType == .growth {
-                            unitToggleRow
+                        // Full viewport edit mode for sleep only
+                        if selectedActivityType == .sleep && editingActivity != nil {
+                            VStack(spacing: 24) {
+                                // Compact time selector
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("When?")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.primary)
+                                    
+                                    DatePicker("Activity Time", selection: $activityTime, displayedComponents: [.date, .hourAndMinute])
+                                        .datePickerStyle(CompactDatePickerStyle())
+                                        .padding(.vertical, 12)
+                                        .padding(.horizontal, 16)
+                                        .liquidGlassCard()
+                                }
+                                
+                                // Full sleep details view - takes most of the space
+                                sleepDetailsView
+                                    .frame(minHeight: geometry.size.height * 0.4)
+                                
+                                Spacer(minLength: 20)
+                                
+                                // Compact notes
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Notes (Optional)")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.primary)
+                                    
+                                    TextField("Add any notes...", text: $notes, axis: .vertical)
+                                        .lineLimit(2...3)
+                                        .padding()
+                                        .liquidGlassCard()
+                                }
+                                
+                                // Save button
+                                saveButtonView
+                                    .padding(.top, 10)
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            // Standard layout for non-sleep edit mode
+                            // Ad Banner
+                            AdBannerContainerWide()
+                            
+                            // Unit toggle for growth activities
+                            if selectedActivityType == .growth {
+                                unitToggleRow
+                            }
+                            
+                            // Time selector
+                            timeSelectorView
+                            
+                            // Activity details
+                            activityDetailsView
+                            
+                            // Notes
+                            notesView
+                            
+                            // Save button
+                            saveButtonView
                         }
-                        
-                        // Time selector
-                        timeSelectorView
-                        
-                        // Activity details
-                        activityDetailsView
-                        
-                        // Notes
-                        notesView
-                        
-                        // Save button
-                        saveButtonView
                     }
                     .padding()
                     .frame(width: geometry.size.width)
@@ -356,6 +403,9 @@ struct AddActivityView: View {
                         }
                         if sleepMinutes.isEmpty && sleepElapsed > 0 {
                             sleepMinutes = String(Int(sleepElapsed) % 3600 / 60)
+                        }
+                        if sleepSeconds.isEmpty && sleepElapsed > 0 {
+                            sleepSeconds = String(Int(sleepElapsed) % 60)
                         }
                     }
                 }
@@ -564,18 +614,20 @@ struct AddActivityView: View {
                         .foregroundColor(.secondary)
                     
                     VStack(spacing: 16) {
-                        // Timer display
-                        HStack {
-                            Spacer()
-                            Text(formatTime(breastfeedingElapsed))
-                                .font(.system(size: 36, weight: .bold, design: .monospaced))
-                                .foregroundColor(.primary)
-                            Spacer()
+                        // Timer display - only show when not editing
+                        if editingActivity == nil {
+                            HStack {
+                                Spacer()
+                                Text(formatTime(breastfeedingElapsed))
+                                    .font(.system(size: 36, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
                         }
                         
                         // Timer controls - only show when not editing
                         if editingActivity == nil {
-                            HStack(spacing: 16) {
+                            HStack(spacing: 12) {
                                 Spacer()
                                 
                                 // Start/Stop button
@@ -595,7 +647,22 @@ struct AddActivityView: View {
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 12)
-                                    .background(breastfeedingIsRunning ? Color.red : Color.pink)
+                                    .background(breastfeedingIsRunning ? Color.red : Color.green)
+                                    .cornerRadius(25)
+                                }
+                                
+                                // Reset button
+                                Button(action: resetBreastfeedingTimer) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 16, weight: .semibold))
+                                        Text("Reset")
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                                    .background(Color.orange)
                                     .cornerRadius(25)
                                 }
                                 
@@ -694,18 +761,20 @@ struct AddActivityView: View {
                     .foregroundColor(.secondary)
                 
                 VStack(spacing: 16) {
-                    // Timer display
-                    HStack {
-                        Spacer()
-                        Text(formatTime(sleepElapsed))
-                            .font(.system(size: 36, weight: .bold, design: .monospaced))
-                            .foregroundColor(.primary)
-                        Spacer()
+                    // Timer display - only show when not editing
+                    if editingActivity == nil {
+                        HStack {
+                            Spacer()
+                            Text(formatSleepTime(sleepElapsed))
+                                .font(.system(size: 36, weight: .bold, design: .monospaced))
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
                     }
                     
                     // Timer controls - only show when not editing
                     if editingActivity == nil {
-                        HStack(spacing: 16) {
+                        HStack(spacing: 12) {
                             Spacer()
                             
                             // Start/Stop button
@@ -725,7 +794,22 @@ struct AddActivityView: View {
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 12)
-                                .background(sleepIsRunning ? Color.red : Color.purple)
+                                .background(sleepIsRunning ? Color.red : Color.green)
+                                .cornerRadius(25)
+                            }
+                            
+                            // Reset button
+                            Button(action: resetSleepTimer) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text("Reset")
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(Color.orange)
                                 .cornerRadius(25)
                             }
                             
@@ -734,37 +818,68 @@ struct AddActivityView: View {
                     }
                     
                     // Manual time entry
-                    VStack(spacing: 8) {
-                        Text("Or enter time manually:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    VStack(spacing: 12) {
+                        if editingActivity != nil {
+                            Text("Sleep Duration")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                        } else {
+                            Text("Or enter time manually:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                         
-                        HStack(spacing: 12) {
-                            VStack(spacing: 4) {
-                                Text("Hours")
-                                    .font(.caption2)
+                        HStack(spacing: editingActivity != nil ? 16 : 12) {
+                            VStack(spacing: 6) {
+                                Text(editingActivity != nil ? "H" : "Hours")
+                                    .font(editingActivity != nil ? .subheadline : .caption2)
+                                    .fontWeight(editingActivity != nil ? .semibold : .regular)
                                     .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                                 TextField("0", text: $sleepHours)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .keyboardType(.numberPad)
-                                    .frame(width: 60)
+                                    .frame(width: editingActivity != nil ? 90 : 60)
                                     .disabled(sleepIsRunning)
                             }
+                            .frame(maxWidth: .infinity)
                             
                             Text(":")
-                                .font(.title2)
+                                .font(editingActivity != nil ? .largeTitle : .title2)
                                 .fontWeight(.bold)
                             
-                            VStack(spacing: 4) {
-                                Text("Minutes")
-                                    .font(.caption2)
+                            VStack(spacing: 6) {
+                                Text(editingActivity != nil ? "M" : "Minutes")
+                                    .font(editingActivity != nil ? .subheadline : .caption2)
+                                    .fontWeight(editingActivity != nil ? .semibold : .regular)
                                     .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                                 TextField("0", text: $sleepMinutes)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .keyboardType(.numberPad)
-                                    .frame(width: 60)
+                                    .frame(width: editingActivity != nil ? 90 : 60)
                                     .disabled(sleepIsRunning)
                             }
+                            .frame(maxWidth: .infinity)
+                            
+                            Text(":")
+                                .font(editingActivity != nil ? .largeTitle : .title2)
+                                .fontWeight(.bold)
+                            
+                            VStack(spacing: 6) {
+                                Text(editingActivity != nil ? "S" : "Seconds")
+                                    .font(editingActivity != nil ? .subheadline : .caption2)
+                                    .fontWeight(editingActivity != nil ? .semibold : .regular)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                TextField("0", text: $sleepSeconds)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .keyboardType(.numberPad)
+                                    .frame(width: editingActivity != nil ? 90 : 60)
+                                    .disabled(sleepIsRunning)
+                            }
+                            .frame(maxWidth: .infinity)
                         }
                     }
                 }
@@ -788,6 +903,7 @@ struct AddActivityView: View {
                             sleepElapsed = duration * 3600 // Convert hours to seconds
                             sleepHours = String(Int(duration))
                             sleepMinutes = String(Int((duration - Double(Int(duration))) * 60))
+                            sleepSeconds = "0"
                         }) {
                             Text("\(duration == floor(duration) ? String(format: "%.0f", duration) : String(format: "%.1f", duration))h")
                                 .font(.system(.body, design: .rounded))
@@ -884,14 +1000,19 @@ struct AddActivityView: View {
             
             // Prepopulation message
             if growthValuesPrepopulated && editingActivity == nil && editingGrowthEntry == nil {
-                HStack {
+                HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "info.circle.fill")
                         .foregroundColor(.blue)
+                        .font(.system(size: 16))
                     Text("Values pre-filled with your last recorded measurements. Adjust as needed.")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding()
+                .frame(maxWidth: .infinity)
                 .background(Color(.systemBackground))
                 .cornerRadius(12)
                 .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
@@ -1198,22 +1319,25 @@ struct AddActivityView: View {
             details = "\(diaperType.rawValue) diaper"
         case .sleep:
             // Use timer data if available, otherwise fall back to slider
-            if sleepElapsed > 0 || !sleepHours.isEmpty || !sleepMinutes.isEmpty {
+            if sleepElapsed > 0 || !sleepHours.isEmpty || !sleepMinutes.isEmpty || !sleepSeconds.isEmpty {
                 let hours: Int
                 let minutes: Int
+                let seconds: Int
                 
                 // Prioritize manual input when editing or when we have manual values
-                if !sleepHours.isEmpty || !sleepMinutes.isEmpty {
+                if !sleepHours.isEmpty || !sleepMinutes.isEmpty || !sleepSeconds.isEmpty {
                     hours = Int(sleepHours) ?? 0
                     minutes = Int(sleepMinutes) ?? 0
+                    seconds = Int(sleepSeconds) ?? 0
                 } else {
                     hours = Int(sleepElapsed / 3600)
                     minutes = Int(sleepElapsed) % 3600 / 60
+                    seconds = Int(sleepElapsed) % 60
                 }
                 
-                let totalMinutes = hours * 60 + minutes
-                let hoursDecimal = Double(totalMinutes) / 60.0
-                details = String(format: "Sleep - %dh %dm (%.1f hours)", hours, minutes, hoursDecimal)
+                let totalSeconds = hours * 3600 + minutes * 60 + seconds
+                let hoursDecimal = Double(totalSeconds) / 3600.0
+                details = String(format: "Sleep - %dh %dm %ds (%.1f hours)", hours, minutes, seconds, hoursDecimal)
             } else {
                 details = String(format: "Slept for %.1f hours", sleepDuration)
             }
@@ -1226,12 +1350,8 @@ struct AddActivityView: View {
                 let seconds = Int(activityElapsed) % 60
                 details = "\(selectedActivitySubType.name) - \(minutes)m \(seconds)s"
             } else {
-                // Count-based activities include the count
-                if activityCount > 1 {
-                    details = "\(selectedActivitySubType.name) - Count: \(activityCount)"
-                } else {
-                    details = selectedActivitySubType.name
-                }
+                // Non-timer activities just use the activity name
+                details = selectedActivitySubType.name
             }
         case .pumping:
             // Use text field values if editing or if timer is stopped with elapsed time
@@ -1460,61 +1580,6 @@ struct AddActivityView: View {
                 .background(Color(.systemBackground))
                 .cornerRadius(12)
                 .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
-            } else {
-                // Activity count section for other activities
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Count")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                    
-                    VStack(spacing: 16) {
-                        // Count display
-                        HStack {
-                            Spacer()
-                            Text("\(activityCount)")
-                                .font(.system(size: 48, weight: .bold, design: .rounded))
-                                .foregroundColor(.primary)
-                            Spacer()
-                        }
-                        
-                        // Count controls
-                        HStack(spacing: 16) {
-                            // Decrease button
-                            Button(action: {
-                                if activityCount > 1 {
-                                    activityCount -= 1
-                                }
-                            }) {
-                                Image(systemName: "minus")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 50)
-                                    .background(Color.red.opacity(activityCount > 1 ? 1.0 : 0.5))
-                                    .clipShape(Circle())
-                            }
-                            .disabled(activityCount <= 1)
-                            
-                            Spacer()
-                            
-                            // Increase button
-                            Button(action: {
-                                activityCount += 1
-                            }) {
-                                Image(systemName: "plus")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                                    .frame(width: 50, height: 50)
-                                    .background(Color.green)
-                                    .clipShape(Circle())
-                            }
-                        }
-                    }
-                }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             }
         }
         .padding()
@@ -1670,6 +1735,20 @@ struct AddActivityView: View {
                             }
                         }
                         
+                        // Reset button
+                        Button(action: resetLeftPumping) {
+                            HStack {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Reset")
+                            }
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.orange)
+                            .cornerRadius(8)
+                        }
+                        
                         }
                     }
                 }
@@ -1770,6 +1849,20 @@ struct AddActivityView: View {
                                     .background(Color.green)
                                 .cornerRadius(8)
                             }
+                        }
+                        
+                        // Reset button
+                        Button(action: resetRightPumping) {
+                            HStack {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Reset")
+                            }
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.orange)
+                            .cornerRadius(8)
                         }
                         
                         }
@@ -1960,6 +2053,11 @@ struct AddActivityView: View {
         if activityIsRunning {
             stopActivity()
         }
+        
+        // Stop sleep timer
+        if sleepIsRunning {
+            stopSleepTimer()
+        }
     }
     
     private func checkAndDismissIfNoTimers() {
@@ -2016,18 +2114,55 @@ struct AddActivityView: View {
             // Parse sleep data - check for timer format first, then fallback to hours
             let originalDetails = activity.details // Use original case-sensitive details
             if originalDetails.contains("Sleep - ") {
-                // New timer format: "Sleep - 120m 30s (2.0 hours)"
-                let timerPattern = #"Sleep - (\d+)m (\d+)s"#
+                // New timer format: "Sleep - 2h 30m 45s (2.5 hours)"
+                let timerPattern = #"Sleep - (\d+)h (\d+)m (\d+)s"#
                 if let regex = try? NSRegularExpression(pattern: timerPattern),
                    let match = regex.firstMatch(in: originalDetails, range: NSRange(originalDetails.startIndex..., in: originalDetails)) {
                     
-                    if let minutesRange = Range(match.range(at: 1), in: originalDetails),
-                       let secondsRange = Range(match.range(at: 2), in: originalDetails) {
+                    if let hoursRange = Range(match.range(at: 1), in: originalDetails),
+                       let minutesRange = Range(match.range(at: 2), in: originalDetails),
+                       let secondsRange = Range(match.range(at: 3), in: originalDetails) {
+                        let hours = String(originalDetails[hoursRange])
                         let minutes = String(originalDetails[minutesRange])
                         let seconds = String(originalDetails[secondsRange])
-                        sleepHours = String(Int(minutes) ?? 0 / 60)
-                        sleepMinutes = String((Int(minutes) ?? 0) % 60)
-                        sleepElapsed = TimeInterval((Int(minutes) ?? 0) * 60 + (Int(seconds) ?? 0))
+                        sleepHours = hours
+                        sleepMinutes = minutes
+                        sleepSeconds = seconds
+                        let totalSeconds = (Int(hours) ?? 0) * 3600 + (Int(minutes) ?? 0) * 60 + (Int(seconds) ?? 0)
+                        sleepElapsed = TimeInterval(totalSeconds)
+                    }
+                } else {
+                    // Fallback: try format without seconds "Sleep - 2h 30m (2.5 hours)"
+                    let timerPatternNoSeconds = #"Sleep - (\d+)h (\d+)m"#
+                    if let regex = try? NSRegularExpression(pattern: timerPatternNoSeconds),
+                       let match = regex.firstMatch(in: originalDetails, range: NSRange(originalDetails.startIndex..., in: originalDetails)) {
+                        
+                        if let hoursRange = Range(match.range(at: 1), in: originalDetails),
+                           let minutesRange = Range(match.range(at: 2), in: originalDetails) {
+                            let hours = String(originalDetails[hoursRange])
+                            let minutes = String(originalDetails[minutesRange])
+                            sleepHours = hours
+                            sleepMinutes = minutes
+                            sleepSeconds = "0"
+                            let totalSeconds = (Int(hours) ?? 0) * 3600 + (Int(minutes) ?? 0) * 60
+                            sleepElapsed = TimeInterval(totalSeconds)
+                        }
+                    } else {
+                        // Fallback: try old format "Sleep - 120m 30s" for backwards compatibility
+                        let oldTimerPattern = #"Sleep - (\d+)m (\d+)s"#
+                        if let regex = try? NSRegularExpression(pattern: oldTimerPattern),
+                           let match = regex.firstMatch(in: originalDetails, range: NSRange(originalDetails.startIndex..., in: originalDetails)) {
+                            
+                            if let minutesRange = Range(match.range(at: 1), in: originalDetails),
+                               let secondsRange = Range(match.range(at: 2), in: originalDetails) {
+                                let totalMinutes = Int(String(originalDetails[minutesRange])) ?? 0
+                                let seconds = Int(String(originalDetails[secondsRange])) ?? 0
+                                sleepHours = String(totalMinutes / 60)
+                                sleepMinutes = String(totalMinutes % 60)
+                                sleepSeconds = String(seconds)
+                                sleepElapsed = TimeInterval(totalMinutes * 60 + seconds)
+                            }
+                        }
                     }
                 }
             } else {
@@ -2062,13 +2197,8 @@ struct AddActivityView: View {
                     activityElapsed = TimeInterval(minutes * 60 + seconds)
                 }
             } else {
-                // Parse activity count from details like "Other Activity - Count: 3"
-                let countPattern = #"Count:\s*(\d+)"#
-                if let regex = try? NSRegularExpression(pattern: countPattern),
-                   let match = regex.firstMatch(in: details, range: NSRange(details.startIndex..., in: details)),
-                   let range = Range(match.range(at: 1), in: details) {
-                    activityCount = Int(String(details[range])) ?? 1
-                }
+                // Non-timer activities don't need special parsing
+                // Activity subtype is already set from the main loop above
             }
             
         case .pumping:
@@ -2187,19 +2317,23 @@ struct AddActivityView: View {
         switch selectedActivityType {
         case .sleep:
             // Use timer data if available, otherwise fall back to slider
-            if sleepElapsed > 0 || !sleepHours.isEmpty || !sleepMinutes.isEmpty {
+            if sleepElapsed > 0 || !sleepHours.isEmpty || !sleepMinutes.isEmpty || !sleepSeconds.isEmpty {
                 let hours: Int
                 let minutes: Int
+                let seconds: Int
                 
-                if (editingActivity != nil || (!sleepIsRunning && sleepElapsed > 0)) && (!sleepHours.isEmpty || !sleepMinutes.isEmpty) {
+                if (editingActivity != nil || (!sleepIsRunning && sleepElapsed > 0)) && (!sleepHours.isEmpty || !sleepMinutes.isEmpty || !sleepSeconds.isEmpty) {
                     hours = Int(sleepHours) ?? 0
                     minutes = Int(sleepMinutes) ?? 0
+                    seconds = Int(sleepSeconds) ?? 0
                 } else {
                     hours = Int(sleepElapsed / 3600)
                     minutes = Int(sleepElapsed) % 3600 / 60
+                    seconds = Int(sleepElapsed) % 60
                 }
                 
-                return hours * 60 + minutes // Convert to total minutes
+                let totalMinutes = hours * 60 + minutes + (seconds > 0 ? 1 : 0) // Round up if there are seconds
+                return totalMinutes
             } else {
                 return Int(sleepDuration * 60) // Convert hours to minutes
             }
@@ -2343,14 +2477,22 @@ struct AddActivityView: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
     
+    private func formatSleepTime(_ timeInterval: TimeInterval) -> String {
+        let hours = Int(timeInterval) / 3600
+        let minutes = Int(timeInterval) % 3600 / 60
+        let seconds = Int(timeInterval) % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+    
     // MARK: - Sleep Timer Functions
     
     private func startSleepTimer() {
         // If we have edited values in text fields, use them as the starting point
-        if !sleepHours.isEmpty || !sleepMinutes.isEmpty {
+        if !sleepHours.isEmpty || !sleepMinutes.isEmpty || !sleepSeconds.isEmpty {
             let hours = Int(sleepHours) ?? 0
             let minutes = Int(sleepMinutes) ?? 0
-            sleepElapsed = TimeInterval(hours * 3600 + minutes * 60)
+            let seconds = Int(sleepSeconds) ?? 0
+            sleepElapsed = TimeInterval(hours * 3600 + minutes * 60 + seconds)
         }
         
         // Always calculate start time based on current elapsed time (for resume functionality)
@@ -2394,6 +2536,7 @@ struct AddActivityView: View {
         sleepStartTime = nil
         sleepHours = ""
         sleepMinutes = ""
+        sleepSeconds = ""
     }
     
     private func updateSleepElapsed() {
@@ -2429,8 +2572,10 @@ struct AddActivityView: View {
             if sleepElapsed > 0 {
                 let hours = Int(sleepElapsed) / 3600
                 let minutes = Int(sleepElapsed) % 3600 / 60
+                let seconds = Int(sleepElapsed) % 60
                 sleepHours = String(hours)
                 sleepMinutes = String(minutes)
+                sleepSeconds = String(seconds)
             }
         }
     }

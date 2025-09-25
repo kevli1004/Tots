@@ -521,6 +521,16 @@ struct DynamicActivityGrid: View {
             ))
         }
         
+        if let nextPumpingTime = context.state.nextPumpingTime {
+            items.append(ActivityItem(
+                type: .upcoming,
+                label: "Pumping",
+                time: nextPumpingTime,
+                color: .cyan,
+                isTimer: false
+            ))
+        }
+        
         return items
     }
     
@@ -553,7 +563,7 @@ struct DynamicActivityGrid: View {
                 CompactActivityCard(activity: activities[1])
                 CompactActivityCard(activity: activities[2])
             }
-        } else {
+        } else if itemCount == 4 {
             // Four items - 2x2 grid
             VStack(spacing: 6) {
                 HStack(spacing: 12) {
@@ -563,6 +573,39 @@ struct DynamicActivityGrid: View {
                 HStack(spacing: 12) {
                     CompactActivityCard(activity: activities[2])
                     CompactActivityCard(activity: activities[3])
+                }
+            }
+        } else if itemCount == 5 {
+            // Five items - 3 on top, 2 on bottom
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    CompactActivityCard(activity: activities[0])
+                    CompactActivityCard(activity: activities[1])
+                    CompactActivityCard(activity: activities[2])
+                }
+                HStack(spacing: 12) {
+                    Spacer()
+                    CompactActivityCard(activity: activities[3])
+                    CompactActivityCard(activity: activities[4])
+                    Spacer()
+                }
+            }
+        } else {
+            // Six or more items - 3x2 grid (show first 6)
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    CompactActivityCard(activity: activities[0])
+                    CompactActivityCard(activity: activities[1])
+                    CompactActivityCard(activity: activities[2])
+                }
+                HStack(spacing: 8) {
+                    CompactActivityCard(activity: activities[3])
+                    CompactActivityCard(activity: activities[4])
+                    if activities.count > 5 {
+                        CompactActivityCard(activity: activities[5])
+                    } else {
+                        Spacer()
+                    }
                 }
             }
         }

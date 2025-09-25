@@ -434,8 +434,8 @@ struct HomeView: View {
                 .fontWeight(.semibold)
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
-                // Show feed card only if no feeding-related activities are active
-                if !isBreastfeedingActive && !isPumpingActive {
+                // Show feed card only if breastfeeding is not active (pumping doesn't conflict with feeding)
+                if !isBreastfeedingActive {
                 CountdownCard(
                     icon: "🍼",
                     title: "Feed",
@@ -774,10 +774,9 @@ struct HomeView: View {
             SummaryGoalCard(
                 icon: "🧸",
                 title: "Activities",
-                current: dataManager.todayTummyTime,
-                goal: 60,
+                current: dataManager.todayActivityCount,
+                goal: 5,
                 color: .green,
-                unit: "m",
                 onSettingsTap: { showingTrackingGoals = true }
             )
         }

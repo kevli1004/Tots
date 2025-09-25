@@ -96,6 +96,7 @@ class TotsDataManager: ObservableObject {
     @Published var todaySleepHours: Double = 14.2
     @Published var todayMilestones: Int = 1
     @Published var todayTummyTime: Int = 45 // minutes
+    @Published var todayActivityCount: Int = 0 // count of activities
     @Published var todayPlayTime: Int = 120 // minutes
     @Published var todayPumping: Int = 0
     
@@ -562,6 +563,9 @@ class TotsDataManager: ObservableObject {
         let tummyActivities = todayActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
         todayTummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
         
+        let allActivityEntries = todayActivities.filter { $0.type == .activity }
+        todayActivityCount = allActivityEntries.count
+        
         let playActivities = todayActivities.filter { $0.type == .activity && !$0.details.lowercased().contains("tummy") }
         todayPlayTime = playActivities.compactMap { $0.duration }.reduce(0, +)
         
@@ -592,6 +596,9 @@ class TotsDataManager: ObservableObject {
             let playActivities = dayActivities.filter { $0.type == .activity && !$0.details.lowercased().contains("tummy") }
             let playTime = playActivities.compactMap { $0.duration }.reduce(0, +)
             
+            let allActivities = dayActivities.filter { $0.type == .activity }
+            let activityCount = allActivities.count
+            
             let formatter = DateFormatter()
             formatter.dateFormat = "E"
             let dayString = formatter.string(from: date)
@@ -603,7 +610,8 @@ class TotsDataManager: ObservableObject {
                 diapers: diapers,
                 sleepHours: sleepHours,
                 tummyTime: tummyTime,
-                playTime: playTime
+                playTime: playTime,
+                activityCount: activityCount
             )
         }.reversed()
     }
@@ -765,6 +773,8 @@ class TotsDataManager: ObservableObject {
         case .milestone:
             todayMilestones += 1
         case .activity:
+            todayActivityCount += 1
+            // For tummy time, still track duration for the specific tummy time goal
             if activity.details.lowercased().contains("tummy") {
                 todayTummyTime += activity.duration ?? 15
             } else {
@@ -1693,8 +1703,8 @@ class TotsDataManager: ObservableObject {
             nextPumpingTime = nextPumping
             nextPumpingCountdown = max(0, nextPumping.timeIntervalSince(now))
         } else {
-            // No previous pumping - don't show pumping in live activity
-            nextPumpingTime = nil
+            // No previous pumping - show as due (same as feeding and diaper)
+            nextPumpingTime = now
             nextPumpingCountdown = 0
         }
         
@@ -1948,6 +1958,7 @@ struct DayData: Identifiable {
     let sleepHours: Double
     let tummyTime: Int // minutes
     let playTime: Int // minutes
+    let activityCount: Int // count of all activities
 }
 
 struct Milestone: Identifiable, Codable {
@@ -2270,11 +2281,38 @@ extension TotsDataManager {
         let isRightPumpingActive = UserDefaults.standard.bool(forKey: "rightPumpingIsRunning")
         let isSleepActive = UserDefaults.standard.bool(forKey: "sleepIsRunning")
         
-        // Use simple elapsed times - just get basic info for display
-        let breastfeedingElapsed: TimeInterval = UserDefaults.standard.double(forKey: "breastfeedingElapsed")
-        let pumpingLeftElapsed: TimeInterval = UserDefaults.standard.double(forKey: "leftPumpingElapsed")
-        let pumpingRightElapsed: TimeInterval = UserDefaults.standard.double(forKey: "rightPumpingElapsed")
-        let sleepElapsed: TimeInterval = UserDefaults.standard.double(forKey: "sleepElapsed")
+        // Calculate current elapsed times for active timers, use stored values for inactive ones
+        let breastfeedingElapsed: TimeInterval = {
+            if isBreastfeedingActive, let startTime = UserDefaults.standard.object(forKey: "breastfeedingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            } else {
+                return UserDefaults.standard.double(forKey: "breastfeedingElapsed")
+            }
+        }()
+        
+        let pumpingLeftElapsed: TimeInterval = {
+            if isLeftPumpingActive, let startTime = UserDefaults.standard.object(forKey: "leftPumpingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            } else {
+                return UserDefaults.standard.double(forKey: "leftPumpingElapsed")
+            }
+        }()
+        
+        let pumpingRightElapsed: TimeInterval = {
+            if isRightPumpingActive, let startTime = UserDefaults.standard.object(forKey: "rightPumpingStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            } else {
+                return UserDefaults.standard.double(forKey: "rightPumpingElapsed")
+            }
+        }()
+        
+        let sleepElapsed: TimeInterval = {
+            if isSleepActive, let startTime = UserDefaults.standard.object(forKey: "sleepStartTime") as? Date {
+                return Date().timeIntervalSince(startTime)
+            } else {
+                return UserDefaults.standard.double(forKey: "sleepElapsed")
+            }
+        }()
         
         let updatedState = TotsLiveActivityAttributes.ContentState(
             todayFeedings: todayFeedings,
