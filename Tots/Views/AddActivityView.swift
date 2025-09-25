@@ -496,11 +496,11 @@ struct AddActivityView: View {
                         }) {
                             Text(type.rawValue)
                                 .font(.subheadline)
-                                .fontWeight(.medium)
+                                .fontWeight(feedingType == type ? .semibold : .medium)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
-                                .foregroundColor(feedingType == type ? .white : .primary)
-                                .background(feedingType == type ? Color.blue.opacity(0.8) : Color(.systemBackground))
+                                .foregroundColor(feedingType == type ? .blue : .primary)
+                                .background(feedingType == type ? Color.blue.opacity(0.1) : Color.clear)
                         }
                         .buttonStyle(PlainButtonStyle())
                         .overlay(
@@ -615,8 +615,9 @@ struct AddActivityView: View {
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 12)
                                     .background(breastfeedingIsRunning ? Color.red : Color.green)
-                                    .cornerRadius(25)
+                                    .cornerRadius(12)
                                 }
+                                .buttonStyle(PlainButtonStyle())
                                 
                                 // Reset button
                                 Button(action: resetBreastfeedingTimer) {
@@ -630,8 +631,9 @@ struct AddActivityView: View {
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 12)
                                     .background(Color.orange)
-                                    .cornerRadius(25)
+                                    .cornerRadius(12)
                                 }
+                                .buttonStyle(PlainButtonStyle())
                                 
                                 Spacer()
                             }
@@ -716,11 +718,11 @@ struct AddActivityView: View {
                     }) {
                         Text(type.rawValue)
                             .font(.subheadline)
-                            .fontWeight(.medium)
+                            .fontWeight(diaperType == type ? .semibold : .medium)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .foregroundColor(diaperType == type ? .white : .primary)
-                            .background(diaperType == type ? Color.orange.opacity(0.8) : Color(.systemBackground))
+                            .foregroundColor(diaperType == type ? .orange : .primary)
+                            .background(diaperType == type ? Color.orange.opacity(0.1) : Color.clear)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .overlay(
@@ -779,8 +781,9 @@ struct AddActivityView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(sleepIsRunning ? Color.red : Color.green)
-                        .cornerRadius(25)
+                        .cornerRadius(12)
                     }
+                    .buttonStyle(PlainButtonStyle())
                     
                     // Reset button
                     Button(action: resetSleepTimer) {
@@ -795,8 +798,9 @@ struct AddActivityView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(Color.orange)
-                        .cornerRadius(25)
+                        .cornerRadius(12)
                     }
+                    .buttonStyle(PlainButtonStyle())
                     
                     Spacer()
                 }
@@ -1730,6 +1734,7 @@ struct AddActivityView: View {
                                 .background(Color.red)
                                 .cornerRadius(8)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         } else {
                             Button(action: startLeftPumping) {
                                 HStack {
@@ -1743,6 +1748,7 @@ struct AddActivityView: View {
                                     .background(Color.green)
                                 .cornerRadius(8)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
                         
                         // Reset button
@@ -1758,6 +1764,7 @@ struct AddActivityView: View {
                             .background(Color.orange)
                             .cornerRadius(8)
                         }
+                        .buttonStyle(PlainButtonStyle())
                         
                         }
                     }
@@ -1851,6 +1858,7 @@ struct AddActivityView: View {
                                 .background(Color.red)
                                 .cornerRadius(8)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         } else {
                             Button(action: startRightPumping) {
                                 HStack {
@@ -1864,6 +1872,7 @@ struct AddActivityView: View {
                                     .background(Color.green)
                                 .cornerRadius(8)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
                         
                         // Reset button
@@ -1879,6 +1888,7 @@ struct AddActivityView: View {
                             .background(Color.orange)
                             .cornerRadius(8)
                         }
+                        .buttonStyle(PlainButtonStyle())
                         
                         }
                     }
