@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import ActivityKit
 import CloudKit
+import StoreKit
 
 class TotsDataManager: ObservableObject {
     // MARK: - Storage Keys
@@ -99,6 +100,9 @@ class TotsDataManager: ObservableObject {
     @Published var todayActivityCount: Int = 0 // count of activities
     @Published var todayPlayTime: Int = 120 // minutes
     @Published var todayPumping: Int = 0
+    
+    // Feedback prompt properties
+    @Published var shouldShowFeedbackPrompt: Bool = false
     
     // Weekly goals
     @Published var weeklyFeedingGoal: Int = 56 // 8 per day
@@ -639,6 +643,9 @@ class TotsDataManager: ObservableObject {
         if activity.type == .growth {
             addGrowthEntry(from: activity)
         }
+        
+        // Track total activities for rating prompt
+        incrementActivityCount()
         
         // Update Live Activity if running
         updateLiveActivity()
@@ -2762,6 +2769,74 @@ extension TotsDataManager {
             }
         }
     }
+    
+    // MARK: - Rating Prompt Functions
+    
+    private func incrementActivityCount() {
+        let currentCount = UserDefaults.standard.integer(forKey: "total_activities_logged")
+        let newCount = currentCount + 1
+        UserDefaults.standard.set(newCount, forKey: "total_activities_logged")
+        
+        print("📊 Activity count: \(currentCount) → \(newCount)")
+        
+        // Check if we should show feedback prompt
+        checkForFeedbackPrompt(activityCount: newCount)
+    }
+    
+    private func checkForFeedbackPrompt(activityCount: Int) {
+        let hasShownFeedback = UserDefaults.standard.bool(forKey: "has_shown_feedback_prompt")
+        let lastPromptDate = UserDefaults.standard.object(forKey: "last_feedback_prompt_date") as? Date
+        
+        print("💭 Checking feedback prompt: count=\(activityCount), hasShown=\(hasShownFeedback)")
+        
+        // Don't show more than once every 30 days
+        if let lastDate = lastPromptDate,
+           Date().timeIntervalSince(lastDate) < 30 * 24 * 60 * 60 { 
+            print("⏰ Feedback prompt blocked - shown recently (\(lastDate))")
+            return 
+        }
+        
+        // Show feedback prompt at milestones: 10, 25, 50 activities
+        // But only if user hasn't already rated or given feedback
+        let shouldShow = !hasShownFeedback && (
+            (activityCount == 10) ||
+            (activityCount == 25) ||
+            (activityCount == 50)
+        )
+        
+        print("🎯 Should show feedback prompt: \(shouldShow)")
+        
+        if shouldShow {
+            UserDefaults.standard.set(Date(), forKey: "last_feedback_prompt_date")
+            print("✅ Triggering feedback prompt!")
+            
+            DispatchQueue.main.async {
+                self.shouldShowFeedbackPrompt = true
+            }
+        }
+    }
+    
+    func handleFeedbackPromptResponse(action: FeedbackPromptAction) {
+        shouldShowFeedbackPrompt = false
+        
+        switch action {
+        case .rated:
+            // User rated - don't ask again
+            UserDefaults.standard.set(true, forKey: "has_shown_feedback_prompt")
+        case .feedback:
+            // User gave feedback - don't ask again for a while
+            UserDefaults.standard.set(true, forKey: "has_shown_feedback_prompt")
+        case .later:
+            // Will show again at next milestone or after 30 days
+            break
+        }
+    }
+}
+
+enum FeedbackPromptAction {
+    case rated
+    case feedback
+    case later
 }
 
 

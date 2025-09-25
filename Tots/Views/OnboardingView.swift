@@ -36,17 +36,29 @@ struct OnboardingView: View {
                     // Progress indicator
                     progressIndicator
                     
-                    // Content with scrollable navigation
-                    TabView(selection: $currentStep) {
-                        appleSignInStep.tag(0)
-                        if showingSteps {
-                            babyDetailsStepWithNav.tag(1)
-                            goalsStepWithNav.tag(2)
-                            permissionsStepWithNav.tag(3)
+                    // Content without sliding animation
+                    Group {
+                        switch currentStep {
+                        case 0:
+                            appleSignInStep
+                        case 1:
+                            if showingSteps {
+                                babyDetailsStepWithNav
+                            }
+                        case 2:
+                            if showingSteps {
+                                goalsStepWithNav
+                            }
+                        case 3:
+                            if showingSteps {
+                                permissionsStepWithNav
+                            }
+                        default:
+                            appleSignInStep
                         }
                     }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .animation(.easeInOut, value: currentStep)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.3), value: currentStep)
                 }
             }
         }

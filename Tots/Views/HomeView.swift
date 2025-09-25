@@ -240,6 +240,12 @@ struct HomeView: View {
                     .padding(.bottom, 8)
                     .frame(width: geometry.size.width)
                 }
+                
+                // Feedback prompt overlay
+                if dataManager.shouldShowFeedbackPrompt {
+                    FeedbackPromptView()
+                        .zIndex(1000)
+                }
                 }
             }
                 .navigationTitle("")

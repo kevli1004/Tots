@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1EB68B4A2E8501F3001D94A3 /* FeedbackPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB68B492E8501F3001D94A3 /* FeedbackPromptView.swift */; };
 		1EF69D252E7B00A6002E715A /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EF69D242E7B00A6002E715A /* WidgetKit.framework */; platformFilters = (ios, macos, ); };
 		1EF69D272E7B00A6002E715A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EF69D262E7B00A6002E715A /* SwiftUI.framework */; };
 		1EF69D362E7B00A9002E715A /* TotsWidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1EF69D222E7B00A6002E715A /* TotsWidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -54,6 +55,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1EB68B492E8501F3001D94A3 /* FeedbackPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackPromptView.swift; sourceTree = "<group>"; };
 		1EF69D222E7B00A6002E715A /* TotsWidgetExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TotsWidgetExtensionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1EF69D242E7B00A6002E715A /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		1EF69D262E7B00A6002E715A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -170,6 +172,7 @@
 		A1000029000000001 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				1EB68B492E8501F3001D94A3 /* FeedbackPromptView.swift */,
 				1EF69D532E7B3A76002E715A /* OnboardingView.swift */,
 				A1000016000000001 /* HomeView.swift */,
 				A1000018000000001 /* ProgressView.swift */,
@@ -316,6 +319,7 @@
 				A1000017000000001 /* ProgressView.swift in Sources */,
 				1EF69D682E7C2C9B002E715A /* CloudKitManager.swift in Sources */,
 				1EF69D692E7C2C9B002E715A /* CloudKitSchemaSetup.swift in Sources */,
+				1EB68B4A2E8501F3001D94A3 /* FeedbackPromptView.swift in Sources */,
 				A1000019000000001 /* SettingsView.swift in Sources */,
 				A1000021000000001 /* AddActivityView.swift in Sources */,
 				A1000009000000001 /* TotsDataManager.swift in Sources */,

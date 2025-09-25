@@ -1,6 +1,7 @@
 import SwiftUI
 import CloudKit
 import AuthenticationServices
+import StoreKit
 
 enum AppearanceMode: String, CaseIterable {
     case light = "light"
@@ -14,6 +15,7 @@ struct SettingsView: View {
     @State private var showingPersonalDetails = false
     @State private var isSettingUpCloudKit = false
     @State private var cloudKitSetupMessage = ""
+    @State private var isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
     @State private var showingCloudKitShare = false
     @State private var showingFamilyManager = false
     @State private var showingDeleteConfirmation = false
@@ -131,6 +133,8 @@ struct SettingsView: View {
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
             loadAppearanceMode()
+            // Sync storage state with UserDefaults
+            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
         }
     }
     
@@ -682,6 +686,16 @@ struct SettingsView: View {
                 }
             )
             
+            SettingsRow(
+                icon: "star.fill",
+                title: "Rate Tots",
+                action: { 
+                    if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                        SKStoreReviewController.requestReview(in: scene)
+                    }
+                }
+            )
+            
             // Hidden for now
             /*
             SettingsRow(
@@ -697,9 +711,19 @@ struct SettingsView: View {
                 .padding(.vertical, 8)
             
             // Conditional account management based on storage type
-            let isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
-            
             if isLocalStorageOnly {
+                // Clear local data option for local storage users - moved to top
+                SettingsRow(
+                    icon: "trash.fill",
+                    title: isClearingData ? "Clearing Data..." : "Clear Local Data",
+                    titleColor: .red,
+                    action: {
+                        if !isClearingData {
+                            showingClearDataConfirmation = true
+                        }
+                    }
+                )
+                
                 // For local storage users, show sign in with Apple option
                 VStack(spacing: 12) {
                     SignInWithAppleButton(
@@ -720,18 +744,6 @@ struct SettingsView: View {
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 16)
-                
-                // Clear local data option for local storage users
-                SettingsRow(
-                    icon: "trash.fill",
-                    title: isClearingData ? "Clearing Data..." : "Clear Local Data",
-                    titleColor: .red,
-                    action: {
-                        if !isClearingData {
-                            showingClearDataConfirmation = true
-                        }
-                    }
-                )
             } else {
                 // For CloudKit users, show delete and sign out options
                 SettingsRow(
@@ -809,6 +821,7 @@ struct SettingsView: View {
                 await MainActor.run {
                     cloudKitSetupMessage = "✅ Successfully signed in! Your data is now syncing."
                     isSettingUpCloudKit = false
+                    isLocalStorageOnly = false  // Update the state immediately
                 }
                 
                 // Clear message after delay
