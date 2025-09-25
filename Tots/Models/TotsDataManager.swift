@@ -1697,8 +1697,14 @@ class TotsDataManager: ObservableObject {
             nextFeedingCountdown = 0
         }
         
-        // Calculate next pumping time
-        if let lastPumping = recentActivities.first(where: { $0.type == .pumping }) {
+        // Calculate next pumping time - but not if already pumping
+        let isPumpingActive = UserDefaults.standard.bool(forKey: "leftPumpingIsRunning") || UserDefaults.standard.bool(forKey: "rightPumpingIsRunning")
+        
+        if isPumpingActive {
+            // Don't show upcoming pumping if already pumping
+            nextPumpingTime = nil
+            nextPumpingCountdown = 0
+        } else if let lastPumping = recentActivities.first(where: { $0.type == .pumping }) {
             let nextPumping = lastPumping.time.addingTimeInterval(pumpingInterval)
             nextPumpingTime = nextPumping
             nextPumpingCountdown = max(0, nextPumping.timeIntervalSince(now))

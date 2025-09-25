@@ -48,6 +48,10 @@ struct HomeView: View {
         return dataManager.weeklyData.reduce(0) { $0 + $1.tummyTime }
     }
     
+    private var weeklyActivityCount: Int {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.activityCount }
+    }
+    
     // MARK: - Computed Properties for Monthly Data
     private var monthlyFeedings: Int {
         let calendar = Calendar.current
@@ -83,6 +87,15 @@ struct HomeView: View {
             $0.time >= thirtyDaysAgo && $0.type == .activity && $0.details.lowercased().contains("tummy")
         }
         return tummyActivities.compactMap { $0.duration }.reduce(0, +)
+    }
+    
+    private var monthlyActivityCount: Int {
+        let calendar = Calendar.current
+        let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let monthlyActivities = dataManager.recentActivities.filter { 
+            $0.time >= thirtyDaysAgo && $0.type == .activity 
+        }
+        return monthlyActivities.count
     }
     
     // Monthly goals (calculated based on daily goals * 30)
@@ -137,6 +150,8 @@ struct HomeView: View {
             let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
             let tummyActivities = dayActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
             let tummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
+            let allActivities = dayActivities.filter { $0.type == .activity }
+            let activityCount = allActivities.count
             
             let formatter = DateFormatter()
             formatter.dateFormat = "E"
@@ -148,7 +163,8 @@ struct HomeView: View {
                 feedings: feedings,
                 diapers: diapers,
                 sleepHours: sleepHours,
-                tummyTime: tummyTime
+                tummyTime: tummyTime,
+                activityCount: activityCount
             )
         }.reversed()
     }
@@ -176,6 +192,8 @@ struct HomeView: View {
             let sleepHours = Double(sleepActivities.compactMap { $0.duration }.reduce(0, +)) / 60.0
             let tummyActivities = weekActivities.filter { $0.type == .activity && $0.details.lowercased().contains("tummy") }
             let tummyTime = tummyActivities.compactMap { $0.duration }.reduce(0, +)
+            let allActivities = weekActivities.filter { $0.type == .activity }
+            let activityCount = allActivities.count
             
             let formatter = DateFormatter()
             formatter.dateFormat = "MMM d"
@@ -187,7 +205,8 @@ struct HomeView: View {
                 feedings: feedings,
                 diapers: diapers,
                 sleepHours: sleepHours,
-                tummyTime: tummyTime
+                tummyTime: tummyTime,
+                activityCount: activityCount
             )
         }.reversed()
     }
@@ -1400,6 +1419,10 @@ struct CountdownCard: View {
         return dataManager.weeklyData.reduce(0) { $0 + $1.tummyTime }
     }
     
+    private var weeklyActivityCount: Int {
+        return dataManager.weeklyData.reduce(0) { $0 + $1.activityCount }
+    }
+    
     // MARK: - Monthly Data Computed Properties
     
     private var monthlyFeedings: Int {
@@ -1448,6 +1471,15 @@ struct CountdownCard: View {
         return tummyActivities.compactMap { $0.duration }.reduce(0, +)
     }
     
+    private var monthlyActivityCount: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
+        
+        return dataManager.recentActivities.filter { activity in
+            activity.type == .activity && activity.time >= startOfMonth
+        }.count
+    }
     
     private var monthlyTummyTimeGoal: Int {
         let calendar = Calendar.current
@@ -3917,6 +3949,7 @@ struct DayProgressData: Identifiable {
     let diapers: Int
     let sleepHours: Double
     let tummyTime: Int
+    let activityCount: Int
 }
 
 struct WeekProgressData: Identifiable {
@@ -3927,6 +3960,7 @@ struct WeekProgressData: Identifiable {
     let diapers: Int
     let sleepHours: Double
     let tummyTime: Int
+    let activityCount: Int
 }
 
 // MARK: - Simple Bar Chart
@@ -4003,8 +4037,8 @@ struct SimpleBarChart: View {
                     title: "Activities",
                     color: .green,
                     dailyData: dailyData,
-                    maxValue: 60,
-                    getValue: { $0.tummyTime }
+                    maxValue: 35, // Reasonable max for activity count per day
+                    getValue: { $0.activityCount }
                 )
             }
             
@@ -4057,8 +4091,8 @@ struct SimpleBarChart: View {
                     title: "Activities",
                     color: .green,
                     weeklyData: weeklyData,
-                    maxValue: 420,
-                    getValue: { $0.tummyTime }
+                    maxValue: 245, // 35 activities per day * 7 days
+                    getValue: { $0.activityCount }
                 )
             }
             

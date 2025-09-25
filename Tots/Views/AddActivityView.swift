@@ -181,47 +181,42 @@ struct AddActivityView: View {
                     VStack(spacing: 24) {
                         // Full viewport edit mode for sleep only
                         if selectedActivityType == .sleep && editingActivity != nil {
-                            VStack(spacing: 24) {
-                                // Compact time selector
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("When?")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.primary)
-                                    
-                                    DatePicker("Activity Time", selection: $activityTime, displayedComponents: [.date, .hourAndMinute])
-                                        .datePickerStyle(CompactDatePickerStyle())
-                                        .padding(.vertical, 12)
-                                        .padding(.horizontal, 16)
-                                        .liquidGlassCard()
-                                }
+                            // Compact time selector
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("When?")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.primary)
                                 
-                                // Full sleep details view - takes most of the space
-                                sleepDetailsView
-                                    .frame(minHeight: geometry.size.height * 0.4)
-                                
-                                Spacer(minLength: 20)
-                                
-                                // Compact notes
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("Notes (Optional)")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.primary)
-                                    
-                                    TextField("Add any notes...", text: $notes, axis: .vertical)
-                                        .lineLimit(2...3)
-                                        .padding()
-                                        .liquidGlassCard()
-                                }
-                                
-                                // Save button
-                                saveButtonView
-                                    .padding(.top, 10)
+                                DatePicker("Activity Time", selection: $activityTime, displayedComponents: [.date, .hourAndMinute])
+                                    .datePickerStyle(CompactDatePickerStyle())
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 16)
+                                    .liquidGlassCard()
                             }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 16)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            
+                            // Full sleep details view - takes most of the space
+                            sleepDetailsView
+                                .frame(minHeight: geometry.size.height * 0.4)
+                            
+                            Spacer(minLength: 20)
+                            
+                            // Compact notes
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Notes (Optional)")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.primary)
+                                
+                                TextField("Add any notes...", text: $notes, axis: .vertical)
+                                    .lineLimit(2...3)
+                                    .padding()
+                                    .liquidGlassCard()
+                            }
+                            
+                            // Save button
+                            saveButtonView
+                                .padding(.top, 10)
                         } else {
                             // Standard layout for non-sleep edit mode
                             // Ad Banner
@@ -670,42 +665,58 @@ struct AddActivityView: View {
                             }
                         }
                         
-                        // Manual time entry
-                        VStack(spacing: 8) {
-                            Text("Or enter time manually:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        // Manual time entry - expanded in edit mode
+                        VStack(spacing: editingActivity != nil ? 24 : 8) {
+                            Text(editingActivity != nil ? "Enter feeding duration:" : "Or enter time manually:")
+                                .font(editingActivity != nil ? .headline : .caption)
+                                .fontWeight(editingActivity != nil ? .semibold : .regular)
+                                .foregroundColor(editingActivity != nil ? .primary : .secondary)
                             
-                            HStack(spacing: 12) {
-                                VStack(spacing: 4) {
-                                    Text("Minutes")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    TextField("0", text: $breastfeedingMinutes)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .keyboardType(.numberPad)
-                                        .frame(width: 60)
-                                        .disabled(breastfeedingIsRunning)
+                            VStack(spacing: editingActivity != nil ? 20 : 12) {
+                                HStack(spacing: editingActivity != nil ? 24 : 12) {
+                                    VStack(spacing: editingActivity != nil ? 8 : 4) {
+                                        Text("Minutes")
+                                            .font(editingActivity != nil ? .subheadline : .caption2)
+                                            .fontWeight(editingActivity != nil ? .semibold : .regular)
+                                            .foregroundColor(.secondary)
+                                        TextField("0", text: $breastfeedingMinutes)
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                            .keyboardType(.numberPad)
+                                            .frame(width: editingActivity != nil ? 100 : 60)
+                                            .disabled(breastfeedingIsRunning)
+                                    }
+                                    
+                                    Text(":")
+                                        .font(editingActivity != nil ? .largeTitle : .title2)
+                                        .fontWeight(.bold)
+                                    
+                                    VStack(spacing: editingActivity != nil ? 8 : 4) {
+                                        Text("Seconds")
+                                            .font(editingActivity != nil ? .subheadline : .caption2)
+                                            .fontWeight(editingActivity != nil ? .semibold : .regular)
+                                            .foregroundColor(.secondary)
+                                        TextField("0", text: $breastfeedingSeconds)
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                            .keyboardType(.numberPad)
+                                            .frame(width: editingActivity != nil ? 100 : 60)
+                                            .disabled(breastfeedingIsRunning)
+                                    }
                                 }
                                 
-                                Text(":")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                
-                                VStack(spacing: 4) {
-                                    Text("Seconds")
-                                        .font(.caption2)
+                                // Add some helpful text in edit mode
+                                if editingActivity != nil {
+                                    Text("Enter the total duration of the breastfeeding session")
+                                        .font(.caption)
                                         .foregroundColor(.secondary)
-                                    TextField("0", text: $breastfeedingSeconds)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .keyboardType(.numberPad)
-                                        .frame(width: 60)
-                                        .disabled(breastfeedingIsRunning)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.top, 8)
                                 }
                             }
                         }
                     }
-                    .padding()
+                    .padding(editingActivity != nil ? 24 : 16)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: editingActivity != nil ? 200 : nil)
                     .background(Color(.systemBackground))
                     .cornerRadius(12)
                     .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
@@ -884,9 +895,8 @@ struct AddActivityView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemBackground))
+                .background(Color(.systemGray6))
                 .cornerRadius(12)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             }
             
             // Quick Duration Buttons
@@ -920,6 +930,7 @@ struct AddActivityView: View {
             }
             
         }
+        .padding(.horizontal, 16)
     }
     
     private var milestoneDetailsView: some View {
@@ -2537,6 +2548,12 @@ struct AddActivityView: View {
         sleepHours = ""
         sleepMinutes = ""
         sleepSeconds = ""
+        
+        // Ensure all UserDefaults are properly cleared
+        UserDefaults.standard.removeObject(forKey: "sleepStartTime")
+        UserDefaults.standard.removeObject(forKey: "sleepElapsed")
+        UserDefaults.standard.set(false, forKey: "sleepIsRunning")
+        UserDefaults.standard.synchronize()
     }
     
     private func updateSleepElapsed() {
