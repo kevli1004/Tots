@@ -7,7 +7,8 @@ class AdMobManager: NSObject, ObservableObject {
     
     override init() {
         super.init()
-        MobileAds.shared.start { _ in }
+        // Temporarily disabled AdMob API calls
+        // MobileAds.shared.start { _ in }
     }
     
     // Production Ad Unit IDs
@@ -63,13 +64,15 @@ struct BannerAdView: UIViewRepresentable {
             bannerView.rootViewController = rootViewController
         }
         
-        bannerView.load(Request())
+        // Temporarily disabled ad loading
+        // bannerView.load(Request())
         return bannerView
     }
     
     func updateUIView(_ uiView: BannerView, context: Context) {
+        // Temporarily disabled ad loading
         // Force reload when orientation changes back to portrait
-        uiView.load(Request())
+        // uiView.load(Request())
     }
 }
 
@@ -79,10 +82,8 @@ struct AdBannerContainer: View {
     @StateObject private var orientationMonitor = OrientationMonitor()
     
     var body: some View {
-        BannerAdView()
-            .frame(height: height)
-            .padding(.horizontal, 16)
-            .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+        // Temporarily hiding ads
+        EmptyView()
     }
 }
 
@@ -91,10 +92,8 @@ struct AdBannerContainerWide: View {
     @StateObject private var orientationMonitor = OrientationMonitor()
     
     var body: some View {
-        BannerAdView()
-            .frame(height: height)
-            .padding(.horizontal, 0)
-            .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+        // Temporarily hiding ads
+        EmptyView()
     }
 }
 
@@ -103,10 +102,8 @@ struct AdBannerContainerMedium: View {
     @StateObject private var orientationMonitor = OrientationMonitor()
     
     var body: some View {
-        BannerAdView()
-            .frame(height: height)
-            .padding(.horizontal, 16)
-            .id(orientationMonitor.refreshTrigger) // Force recreation when orientation changes
+        // Temporarily hiding ads
+        EmptyView()
     }
 }
 

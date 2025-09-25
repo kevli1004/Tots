@@ -680,6 +680,7 @@ struct GrowthCard: View {
                 }
             }
             .padding()
+            .frame(height: 120) // Fixed height for consistency
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(.regularMaterial)

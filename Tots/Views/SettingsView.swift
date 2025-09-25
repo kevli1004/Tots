@@ -945,21 +945,28 @@ struct SettingsRow: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .frame(width: 24)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+            HStack(spacing: 16) {
+                // Glass icon container
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 36, height: 36)
+                        .shadow(color: .primary.opacity(0.08), radius: 4, x: 0, y: 2)
+                    
+                    Image(systemName: icon)
                         .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.primary)
+                }
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundColor(titleColor)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     
                     if let subtitle = subtitle {
                         Text(subtitle)
-                            .font(.system(size: 12))
+                            .font(.system(size: 13, design: .rounded))
                             .foregroundColor(.secondary)
                     }
                 }
@@ -970,9 +977,9 @@ struct SettingsRow: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.secondary)
             }
-            .padding(.vertical, 12)
-            .background(Color.clear)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .liquidGlassCard(cornerRadius: 16, shadowRadius: 4)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -1492,9 +1499,8 @@ struct FamilyMemberRow: View {
                 }
             }
         }
-        .padding()
-        .background(.regularMaterial)
-        .cornerRadius(12)
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 16, shadowRadius: 4)
     }
 }
 
@@ -1782,10 +1788,8 @@ struct GoalSliderRow: View {
                     .accentColor(.blue)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .padding(20)
+        .liquidGlassCard(cornerRadius: 20, shadowRadius: 6)
     }
 }
 

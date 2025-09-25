@@ -8,20 +8,28 @@ struct TrackingCard: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 32, weight: .medium))
-                    .foregroundColor(color)
+            VStack(spacing: 16) {
+                // Icon with glass background
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 56, height: 56)
+                        .shadow(color: color.opacity(0.3), radius: 8, x: 0, y: 4)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(color)
+                }
                 
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .frame(height: 120)
-            .background(.regularMaterial)
-            .cornerRadius(16)
+            .frame(height: 130)
+            .liquidGlassCard(cornerRadius: 20, shadowRadius: 8)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -90,26 +98,36 @@ struct StatCard: View {
     let color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(title)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundColor(.secondary)
                 
                 Spacer()
+                
+                // Color indicator
+                Circle()
+                    .fill(color.opacity(0.8))
+                    .frame(width: 8, height: 8)
             }
             
             Text(value)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
             
             Text(subtitle)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(color)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background {
+                    Capsule()
+                        .fill(color.opacity(0.15))
+                }
         }
-        .padding(16)
-        .background(.regularMaterial)
-        .cornerRadius(12)
+        .padding(18)
+        .liquidGlassCard(cornerRadius: 16, shadowRadius: 6)
     }
 }
 
