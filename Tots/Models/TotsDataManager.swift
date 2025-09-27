@@ -3,6 +3,15 @@ import SwiftUI
 import ActivityKit
 import CloudKit
 import StoreKit
+import Network
+
+enum SyncStatus {
+    case synced
+    case syncing
+    case pendingSync(count: Int)
+    case error(String)
+    case offline
+}
 
 class TotsDataManager: ObservableObject {
     // MARK: - Storage Keys
@@ -48,6 +57,16 @@ class TotsDataManager: ObservableObject {
     @Published var familySharingEnabled: Bool = false
     @Published var babyProfileRecord: CKRecord?
     let cloudKitManager = CloudKitManager.shared
+    
+    // MARK: - Offline Sync System
+    @Published var syncStatus: SyncStatus = .synced
+    @Published var isConnected: Bool = true
+    private var pendingSyncActivities: [TotsActivity] = []
+    private var pendingSyncGrowthEntries: [GrowthEntry] = []
+    private let networkMonitor = NWPathMonitor()
+    private let syncQueue = DispatchQueue(label: "cloudkit.sync", qos: .background)
+    private let pendingSyncKey = "pending_sync_activities"
+    private let pendingGrowthSyncKey = "pending_sync_growth"
     private let schemaSetup = CloudKitSchemaSetup.shared
     
     // App State Management
@@ -439,11 +458,16 @@ class TotsDataManager: ObservableObject {
         updateCountdowns()
         startCountdownTimer()
         setupAppLifecycleNotifications()
+        setupNetworkMonitoring()
+        loadPendingSyncData()
         
         // Initialize CloudKit and check for family sharing
         Task {
             await initializeCloudKit()
         }
+        
+        // Start periodic sync for multi-user collaboration
+        startPeriodicSync()
     }
     
     private func initializeCloudKit() async {
@@ -702,26 +726,9 @@ class TotsDataManager: ObservableObject {
         
         // Debug logging
         
-        // Always sync to CloudKit (create baby profile if needed)
+        // Offline-first CloudKit sync
         Task {
-            do {
-                // Ensure we have a baby profile record
-                if babyProfileRecord == nil {
-                    await createDefaultBabyProfile()
-                }
-                
-                guard let profileRecord = babyProfileRecord else {
-                    print("⚠️ No baby profile record available for CloudKit sync")
-                    return
-                }
-                
-                print("💾 Syncing activity to CloudKit - Always using shared database for family compatibility")
-                try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
-                print("✅ Activity synced successfully")
-            } catch {
-                print("❌ CloudKit sync error: \(error)")
-                // Ignore CloudKit errors during save
-            }
+            await syncActivityToCloudKit(activity)
         }
     }
     
@@ -1873,6 +1880,9 @@ class TotsDataManager: ObservableObject {
         // Live activity timer will be suspended by iOS in background
         // The live activity itself will continue to update via system scheduling
         print("🌙 App entered background - live activity timer suspended")
+        
+        // Save any pending sync data
+        savePendingSyncData()
     }
     
     private func handleAppWillEnterForeground() {
@@ -1884,6 +1894,11 @@ class TotsDataManager: ObservableObject {
         
         // Also update immediately to refresh with latest data
         updateLiveActivity()
+        
+        // Process any pending sync when app becomes active
+        Task {
+            await processPendingSync()
+        }
     }
     
     deinit {
@@ -1894,7 +1909,7 @@ class TotsDataManager: ObservableObject {
 }
 
 struct TotsActivity: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     let type: ActivityType
     let time: Date
     let details: String
@@ -1904,8 +1919,13 @@ struct TotsActivity: Identifiable, Codable {
     let weight: Double? // in pounds
     let height: Double? // in inches
     let headCircumference: Double? // in cm
+    let createdAt: Date // When the activity was first created
+    let modifiedAt: Date // When the activity was last modified
+    let createdBy: String? // User ID who created this activity
+    let modifiedBy: String? // User ID who last modified this activity
     
-    init(type: ActivityType, time: Date, details: String, mood: BabyMood = .neutral, duration: Int? = nil, notes: String? = nil, weight: Double? = nil, height: Double? = nil, headCircumference: Double? = nil) {
+    init(type: ActivityType, time: Date, details: String, mood: BabyMood = .neutral, duration: Int? = nil, notes: String? = nil, weight: Double? = nil, height: Double? = nil, headCircumference: Double? = nil, createdBy: String? = nil) {
+        self.id = UUID()
         self.type = type
         self.time = time
         self.details = details
@@ -1915,6 +1935,46 @@ struct TotsActivity: Identifiable, Codable {
         self.weight = weight
         self.height = height
         self.headCircumference = headCircumference
+        self.createdAt = Date()
+        self.modifiedAt = Date()
+        self.createdBy = createdBy
+        self.modifiedBy = createdBy
+    }
+    
+    // Create a modified copy of the activity (this would need a custom initializer)
+    // For now, we'll handle modifications in the conflict resolution logic
+    
+    // Internal initializer for CloudKit reconstruction
+    internal init(
+        id: UUID,
+        type: ActivityType,
+        time: Date,
+        details: String,
+        mood: BabyMood,
+        duration: Int?,
+        notes: String?,
+        weight: Double?,
+        height: Double?,
+        headCircumference: Double?,
+        createdAt: Date,
+        modifiedAt: Date,
+        createdBy: String?,
+        modifiedBy: String?
+    ) {
+        self.id = id
+        self.type = type
+        self.time = time
+        self.details = details
+        self.mood = mood
+        self.duration = duration
+        self.notes = notes
+        self.weight = weight
+        self.height = height
+        self.headCircumference = headCircumference
+        self.createdAt = createdAt
+        self.modifiedAt = modifiedAt
+        self.createdBy = createdBy
+        self.modifiedBy = modifiedBy
     }
 }
 
@@ -2483,6 +2543,369 @@ extension TotsDataManager {
         print("🏁 Live Activity stopped")
     }
     
+    
+    // MARK: - Network Monitoring & Sync Queue
+    
+    private func setupNetworkMonitoring() {
+        networkMonitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                let wasConnected = self?.isConnected ?? false
+                self?.isConnected = path.status == .satisfied
+                
+                if !wasConnected && self?.isConnected == true {
+                    // Connection restored - process pending sync
+                    print("🌐 Network connection restored, processing pending sync...")
+                    Task {
+                        await self?.processPendingSync()
+                    }
+                }
+                
+                // Update sync status based on connection
+                if self?.isConnected == false {
+                    self?.syncStatus = .offline
+                } else if let pendingCount = self?.pendingSyncActivities.count, pendingCount > 0 {
+                    self?.syncStatus = .pendingSync(count: pendingCount)
+                } else {
+                    self?.syncStatus = .synced
+                }
+            }
+        }
+        
+        let queue = DispatchQueue(label: "NetworkMonitor")
+        networkMonitor.start(queue: queue)
+    }
+    
+    private func loadPendingSyncData() {
+        // Load pending activities from UserDefaults
+        if let data = UserDefaults.standard.data(forKey: pendingSyncKey),
+           let activities = try? JSONDecoder().decode([TotsActivity].self, from: data) {
+            pendingSyncActivities = activities
+            print("📱 Loaded \(activities.count) pending activities from local storage")
+        }
+        
+        // Load pending growth entries
+        if let data = UserDefaults.standard.data(forKey: pendingGrowthSyncKey),
+           let entries = try? JSONDecoder().decode([GrowthEntry].self, from: data) {
+            pendingSyncGrowthEntries = entries
+            print("📱 Loaded \(entries.count) pending growth entries from local storage")
+        }
+        
+        // Update sync status
+        updateSyncStatus()
+    }
+    
+    private func savePendingSyncData() {
+        // Save pending activities
+        if let data = try? JSONEncoder().encode(pendingSyncActivities) {
+            UserDefaults.standard.set(data, forKey: pendingSyncKey)
+        }
+        
+        // Save pending growth entries
+        if let data = try? JSONEncoder().encode(pendingSyncGrowthEntries) {
+            UserDefaults.standard.set(data, forKey: pendingGrowthSyncKey)
+        }
+    }
+    
+    private func updateSyncStatus() {
+        let totalPending = pendingSyncActivities.count + pendingSyncGrowthEntries.count
+        
+        if !isConnected {
+            syncStatus = .offline
+        } else if totalPending > 0 {
+            syncStatus = .pendingSync(count: totalPending)
+        } else {
+            syncStatus = .synced
+        }
+    }
+    
+    private func processPendingSync() async {
+        guard isConnected && babyProfileRecord != nil else { return }
+        
+        await MainActor.run {
+            syncStatus = .syncing
+        }
+        
+        // Sync pending activities
+        var syncedActivities: [TotsActivity] = []
+        for activity in pendingSyncActivities {
+            do {
+                try await cloudKitManager.saveActivity(activity, to: babyProfileRecord!.recordID)
+                syncedActivities.append(activity)
+                print("✅ Synced pending activity: \(activity.type.name)")
+            } catch {
+                print("❌ Failed to sync activity: \(error)")
+            }
+        }
+        
+        // Remove successfully synced activities
+        pendingSyncActivities.removeAll { activity in
+            syncedActivities.contains { $0.id == activity.id }
+        }
+        
+        // Sync pending growth entries
+        var syncedGrowthEntries: [GrowthEntry] = []
+        for entry in pendingSyncGrowthEntries {
+            // Convert GrowthEntry to TotsActivity for CloudKit sync
+            let activity = TotsActivity(
+                type: .growth,
+                time: entry.date,
+                details: "Growth tracking",
+                mood: .neutral,
+                duration: 0,
+                notes: "",
+                weight: entry.weight,
+                height: entry.height
+            )
+            
+            do {
+                try await cloudKitManager.saveActivity(activity, to: babyProfileRecord!.recordID)
+                syncedGrowthEntries.append(entry)
+                print("✅ Synced pending growth entry")
+            } catch {
+                print("❌ Failed to sync growth entry: \(error)")
+            }
+        }
+        
+        // Remove successfully synced growth entries
+        pendingSyncGrowthEntries.removeAll { entry in
+            syncedGrowthEntries.contains { $0.id == entry.id }
+        }
+        
+        // Save updated pending data
+        savePendingSyncData()
+        
+        // Update sync status
+        await MainActor.run {
+            updateSyncStatus()
+        }
+        
+        print("🔄 Sync completed. Remaining pending: \(pendingSyncActivities.count) activities, \(pendingSyncGrowthEntries.count) growth entries")
+    }
+    
+    private func syncActivityToCloudKit(_ activity: TotsActivity) async {
+        do {
+            // Ensure we have a baby profile record
+            if babyProfileRecord == nil {
+                await createDefaultBabyProfile()
+            }
+            
+            guard let profileRecord = babyProfileRecord else {
+                print("⚠️ No baby profile record available, queuing activity for later sync")
+                await queueActivityForSync(activity)
+                return
+            }
+            
+            // Attempt immediate sync if connected
+            if isConnected {
+                print("💾 Syncing activity to CloudKit with conflict resolution")
+                try await syncActivityWithConflictResolution(activity, to: profileRecord.recordID)
+                print("✅ Activity synced successfully")
+                
+                // Update sync status
+                await MainActor.run {
+                    updateSyncStatus()
+                }
+            } else {
+                print("📱 Offline - queuing activity for later sync")
+                await queueActivityForSync(activity)
+            }
+        } catch {
+            print("❌ CloudKit sync error: \(error), queuing for retry")
+            await queueActivityForSync(activity)
+        }
+    }
+    
+    private func syncActivityWithConflictResolution(_ activity: TotsActivity, to profileID: CKRecord.ID) async throws {
+        // First, fetch the latest data from CloudKit to check for conflicts
+        let latestActivities = try await cloudKitManager.fetchActivities(for: profileID)
+        
+        // Check if this activity already exists (by ID) and has been modified by another user
+        if let existingActivity = latestActivities.first(where: { $0.id == activity.id }) {
+            // Activity exists - check for conflicts
+            if hasConflict(local: activity, remote: existingActivity) {
+                print("⚠️ Conflict detected for activity \(activity.id)")
+                let resolvedActivity = await resolveActivityConflict(local: activity, remote: existingActivity)
+                try await cloudKitManager.saveActivity(resolvedActivity, to: profileID)
+            } else {
+                // No conflict, safe to save
+                try await cloudKitManager.saveActivity(activity, to: profileID)
+            }
+        } else {
+            // New activity, safe to save
+            try await cloudKitManager.saveActivity(activity, to: profileID)
+        }
+        
+        // After sync, merge any new remote activities into local data
+        await mergeRemoteActivities(latestActivities)
+    }
+    
+    private func hasConflict(local: TotsActivity, remote: TotsActivity) -> Bool {
+        // Check if both versions have been modified and have different content
+        let contentDiffers = local.details != remote.details ||
+                           local.mood != remote.mood ||
+                           !areOptionalIntsEqual(local.duration, remote.duration) ||
+                           !areOptionalStringsEqual(local.notes, remote.notes) ||
+                           !areOptionalDoublesEqual(local.weight, remote.weight) ||
+                           !areOptionalDoublesEqual(local.height, remote.height)
+        
+        // Check if remote was modified after local
+        let remoteIsNewer = remote.modifiedAt > local.modifiedAt
+        
+        // Check if different users modified the same activity
+        let differentModifiers = local.modifiedBy != remote.modifiedBy
+        
+        return contentDiffers && (remoteIsNewer || differentModifiers)
+    }
+    
+    private func areOptionalStringsEqual(_ a: String?, _ b: String?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case (let a?, let b?): return a == b
+        default: return false
+        }
+    }
+    
+    private func areOptionalIntsEqual(_ a: Int?, _ b: Int?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case (let a?, let b?): return a == b
+        default: return false
+        }
+    }
+    
+    private func areOptionalDoublesEqual(_ a: Double?, _ b: Double?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case (let a?, let b?): return a == b
+        default: return false
+        }
+    }
+    
+    private func resolveActivityConflict(local: TotsActivity, remote: TotsActivity) async -> TotsActivity {
+        // Conflict resolution strategies:
+        
+        // 1. For activities, we generally want to preserve the most recent data
+        // 2. For certain fields, we might want to merge (e.g., notes)
+        // 3. For critical data like measurements, we might want user intervention
+        
+        print("🔀 Resolving conflict between local and remote activity")
+        
+        // Strategy 1: Merge notes if both exist
+        var mergedNotes: String? = nil
+        let localNotes = local.notes ?? ""
+        let remoteNotes = remote.notes ?? ""
+        
+        if !localNotes.isEmpty && !remoteNotes.isEmpty && localNotes != remoteNotes {
+            mergedNotes = "Local: \(localNotes)\nRemote: \(remoteNotes)"
+        } else if !localNotes.isEmpty {
+            mergedNotes = localNotes
+        } else if !remoteNotes.isEmpty {
+            mergedNotes = remoteNotes
+        }
+        
+        // Strategy 2: Use local measurements if they exist, otherwise remote
+        let resolvedWeight = local.weight ?? remote.weight
+        let resolvedHeight = local.height ?? remote.height
+        let resolvedHeadCircumference = local.headCircumference ?? remote.headCircumference
+        
+        // Strategy 3: Use most recent timestamp for other fields
+        let useLocal = local.modifiedAt > remote.modifiedAt
+        
+        // Strategy 4: For duration, use the longer one if both exist
+        var resolvedDuration: Int? = nil
+        if let localDuration = local.duration, let remoteDuration = remote.duration {
+            resolvedDuration = max(localDuration, remoteDuration)
+        } else {
+            resolvedDuration = local.duration ?? remote.duration
+        }
+        
+        return TotsActivity(
+            type: local.type, // Type shouldn't change
+            time: local.time, // Keep local time (when user entered it)
+            details: useLocal ? local.details : remote.details,
+            mood: useLocal ? local.mood : remote.mood,
+            duration: resolvedDuration,
+            notes: mergedNotes,
+            weight: resolvedWeight,
+            height: resolvedHeight,
+            headCircumference: resolvedHeadCircumference,
+            createdBy: local.createdBy ?? remote.createdBy
+        )
+    }
+    
+    private func mergeRemoteActivities(_ remoteActivities: [TotsActivity]) async {
+        await MainActor.run {
+            // Find activities that exist remotely but not locally
+            let localActivityIDs = Set(recentActivities.map { $0.id })
+            let newRemoteActivities = remoteActivities.filter { !localActivityIDs.contains($0.id) }
+            
+            if !newRemoteActivities.isEmpty {
+                print("📥 Merging \(newRemoteActivities.count) new remote activities")
+                
+                // Add new remote activities to local data
+                for remoteActivity in newRemoteActivities {
+                    recentActivities.append(remoteActivity)
+                }
+                
+                // Sort by time (most recent first)
+                recentActivities.sort { $0.time > $1.time }
+                
+                // Keep only the most recent activities to prevent memory issues
+                if recentActivities.count > 1000 {
+                    recentActivities = Array(recentActivities.prefix(1000))
+                }
+                
+                // Update UI
+                updateCountdowns()
+                updateLiveActivity()
+            }
+        }
+    }
+    
+    private func queueActivityForSync(_ activity: TotsActivity) async {
+        await MainActor.run {
+            // Add to pending queue if not already there
+            if !pendingSyncActivities.contains(where: { $0.id == activity.id }) {
+                pendingSyncActivities.append(activity)
+                savePendingSyncData()
+                updateSyncStatus()
+                print("📋 Activity queued for sync. Total pending: \(pendingSyncActivities.count)")
+            }
+        }
+    }
+    
+    // Public method to manually trigger sync (for UI)
+    func forceSyncNow() async {
+        print("🔄 Manual sync triggered")
+        await processPendingSync()
+        await fetchLatestDataFromCloudKit()
+    }
+    
+    // Fetch latest data from CloudKit to get updates from other family members
+    private func fetchLatestDataFromCloudKit() async {
+        guard isConnected, let profileRecord = babyProfileRecord else { return }
+        
+        do {
+            print("📥 Fetching latest data from CloudKit...")
+            let latestActivities = try await cloudKitManager.fetchActivities(for: profileRecord.recordID)
+            await mergeRemoteActivities(latestActivities)
+            print("✅ Successfully merged latest data from CloudKit")
+        } catch {
+            print("❌ Failed to fetch latest data: \(error)")
+        }
+    }
+    
+    // Periodic sync to stay up-to-date with family members
+    private func startPeriodicSync() {
+        // Sync every 30 seconds when app is active and connected
+        Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.isConnected else { return }
+            
+            Task {
+                await self.fetchLatestDataFromCloudKit()
+            }
+        }
+    }
     
     // MARK: - CloudKit Family Sharing
     

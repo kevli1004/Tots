@@ -215,8 +215,14 @@ class CloudKitManager: ObservableObject {
         record["notes"] = activity.notes
         record["weight"] = activity.weight
         record["height"] = activity.height
+        record["headCircumference"] = activity.headCircumference
+        record["createdAt"] = activity.createdAt
+        record["modifiedAt"] = activity.modifiedAt
+        record["createdBy"] = activity.createdBy
+        record["modifiedBy"] = activity.modifiedBy
+        record["activityID"] = activity.id.uuidString // Store the UUID for conflict resolution
         record["babyProfile"] = CKRecord.Reference(recordID: babyProfileID, action: .deleteSelf)
-        record["createdBy"] = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
+        record["userCreatedBy"] = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
         
         // Save to private database custom zone (shareable via CKShare to family members)
         print("💾 Saving activity to private database custom zone (shareable via CKShare for family access)")
@@ -274,7 +280,8 @@ class CloudKitManager: ObservableObject {
             return nil
         }
         
-        return TotsActivity(
+        // Create a new activity with proper initialization
+        var activity = TotsActivity(
             type: type,
             time: time,
             details: details,
@@ -282,8 +289,34 @@ class CloudKitManager: ObservableObject {
             duration: record["duration"] as? Int,
             notes: record["notes"] as? String,
             weight: record["weight"] as? Double,
-            height: record["height"] as? Double
+            height: record["height"] as? Double,
+            headCircumference: record["headCircumference"] as? Double,
+            createdBy: record["createdBy"] as? String
         )
+        
+        // Override timestamps and modification info if available from CloudKit
+        if let createdAt = record["createdAt"] as? Date {
+            // We need to create a new instance with the CloudKit data
+            // Since TotsActivity properties are immutable, we'll need to reconstruct it
+            return TotsActivity(
+                id: UUID(uuidString: record["activityID"] as? String ?? UUID().uuidString) ?? UUID(),
+                type: type,
+                time: time,
+                details: details,
+                mood: mood,
+                duration: record["duration"] as? Int,
+                notes: record["notes"] as? String,
+                weight: record["weight"] as? Double,
+                height: record["height"] as? Double,
+                headCircumference: record["headCircumference"] as? Double,
+                createdAt: createdAt,
+                modifiedAt: record["modifiedAt"] as? Date ?? createdAt,
+                createdBy: record["createdBy"] as? String,
+                modifiedBy: record["modifiedBy"] as? String
+            )
+        }
+        
+        return activity
     }
     
     // MARK: - Family Sharing

@@ -46,6 +46,9 @@ struct SettingsView: View {
                     babyProfileView
                         .id(profileImageUpdateTrigger)
                     
+                    // Sync status indicator
+                    syncStatusView
+                    
                     // App preferences (appearance & live activity)
                     appPreferencesView
                     
@@ -341,6 +344,91 @@ struct SettingsView: View {
         .buttonStyle(PlainButtonStyle())
     }
     
+    private var syncStatusView: some View {
+        HStack(spacing: 12) {
+            // Sync status icon
+            Group {
+                switch dataManager.syncStatus {
+                case .synced:
+                    Image(systemName: "checkmark.icloud")
+                        .foregroundColor(.green)
+                case .syncing:
+                    Image(systemName: "arrow.clockwise.icloud")
+                        .foregroundColor(.blue)
+                case .pendingSync(let count):
+                    Image(systemName: "exclamationmark.icloud")
+                        .foregroundColor(.orange)
+                case .error:
+                    Image(systemName: "xmark.icloud")
+                        .foregroundColor(.red)
+                case .offline:
+                    Image(systemName: "wifi.slash")
+                        .foregroundColor(.gray)
+                }
+            }
+            .font(.system(size: 16, weight: .medium))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(syncStatusTitle)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.primary)
+                
+                Text(syncStatusSubtitle)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            // Manual sync button for pending items
+            if case .pendingSync = dataManager.syncStatus, dataManager.isConnected {
+                Button("Sync Now") {
+                    Task {
+                        await dataManager.forceSyncNow()
+                    }
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.blue)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(6)
+            }
+        }
+        .padding(12)
+        .background(.regularMaterial)
+        .cornerRadius(12)
+    }
+    
+    private var syncStatusTitle: String {
+        switch dataManager.syncStatus {
+        case .synced:
+            return "All Data Synced"
+        case .syncing:
+            return "Syncing..."
+        case .pendingSync(let count):
+            return "\(count) Items Pending"
+        case .error:
+            return "Sync Error"
+        case .offline:
+            return "Offline"
+        }
+    }
+    
+    private var syncStatusSubtitle: String {
+        switch dataManager.syncStatus {
+        case .synced:
+            return "Your data is up to date across all devices"
+        case .syncing:
+            return "Uploading your latest activities to CloudKit"
+        case .pendingSync(let count):
+            return "\(count) activities will sync when connection improves"
+        case .error(let message):
+            return "Sync failed: \(message)"
+        case .offline:
+            return "Data will sync automatically when online"
+        }
+    }
     
     private var familySharingView: some View {
         VStack(spacing: 16) {
