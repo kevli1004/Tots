@@ -49,8 +49,8 @@ struct SettingsView: View {
                     // Storage status indicator
                     storageStatusView
                     
-                    // Family sharing - hidden for now
-                    // familySharingView
+                    // Family sharing
+                    familySharingView
                     
                     // Settings options
                     settingsOptionsView
@@ -410,81 +410,8 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
                 }
-            } else if !dataManager.familySharingEnabled {
-                // Show CloudKit setup for users who haven't enabled family sharing yet
-                Button(action: {
-                    self.setupCloudKitSharing()
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "icloud.fill")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.blue)
-                        
-                        VStack(alignment: .leading) {
-                            Text("Enable Family Sharing")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.primary)
-                            Text("Sync data with CloudKit")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        if isSettingUpCloudKit {
-                            SwiftUI.ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(16)
-                    .liquidGlassCard()
-                }
-                .disabled(isSettingUpCloudKit)
-                
-                if !cloudKitSetupMessage.isEmpty {
-                    Text(cloudKitSetupMessage)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                }
             } else {
-                // Family Management (when CloudKit is enabled)
-                Button(action: {
-                    showingFamilyManager = true
-                    Task {
-                        familyMembers = try await dataManager.fetchFamilyMembers()
-                    }
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "person.3.fill")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.green)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Manage Family Sharing")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.primary)
-                            
-                            Text("\(familyMembers.count) member\(familyMembers.count == 1 ? "" : "s")")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(16)
-                    .liquidGlassCard()
-                }
-                
-                // Single Share Button
+                // Single Family Sharing Button
                 Button(action: {
                     Task {
                         await manageFamilySharing()
@@ -495,11 +422,15 @@ struct SettingsView: View {
                             .font(.system(size: 20, weight: .medium))
                             .foregroundColor(.white)
                         
-                        Text(dataManager.familySharingEnabled ? "Manage Family Sharing" : "Enable Family Sharing")
+                        Text("Manage Family Sharing")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
                         
                         Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
                     }
                     .padding(16)
                     .background(Color.blue)
@@ -507,6 +438,14 @@ struct SettingsView: View {
                 }
             }
             
+            // Show any error messages
+            if !cloudKitSetupMessage.isEmpty {
+                Text(cloudKitSetupMessage)
+                    .font(.caption)
+                    .foregroundColor(cloudKitSetupMessage.contains("❌") ? .red : .secondary)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+            }
         }
     }
     
@@ -690,8 +629,9 @@ struct SettingsView: View {
                 icon: "star.fill",
                 title: "Rate Tots",
                 action: { 
-                    if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-                        SKStoreReviewController.requestReview(in: scene)
+                    // Open App Store page directly for rating
+                    if let url = URL(string: "https://apps.apple.com/app/id6738046463?action=write-review") {
+                        UIApplication.shared.open(url)
                     }
                 }
             )
@@ -769,15 +709,25 @@ struct SettingsView: View {
     // MARK: - CloudKit Setup Methods
     
     private func manageFamilySharing() async {
+        print("🔗 Managing family sharing button tapped")
+        
         do {
+            print("🔗 Attempting to create/get baby profile share...")
             if let share = try await dataManager.shareBabyProfile() {
+                print("✅ Got share, presenting CloudKit sharing controller")
                 await MainActor.run {
                     // Show the native CloudKit sharing controller
                     presentCloudKitSharingController(share: share)
                 }
+            } else {
+                print("❌ No share returned from shareBabyProfile")
             }
         } catch {
-            // Ignore sharing setup errors
+            print("❌ Error in manageFamilySharing: \(error)")
+            // Show error to user
+            await MainActor.run {
+                cloudKitSetupMessage = "❌ Failed to setup sharing: \(error.localizedDescription)"
+            }
         }
     }
     
@@ -1372,14 +1322,12 @@ struct FamilyManagerView: View {
                     
                     VStack(spacing: 12) {
                         Button(action: {
-                            // Enable family sharing locally
-                            dataManager.familySharingEnabled = true
-                            UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+                            // Start sharing process
                             hasActiveShare = true
                         }) {
                             HStack {
                                 Image(systemName: "person.3.fill")
-                                Text("Enable Family Sharing")
+                                Text("Start Sharing")
                             }
                             .font(.headline)
                             .foregroundColor(.white)
@@ -1469,6 +1417,8 @@ struct FamilyManagerView: View {
 
 struct FamilyMemberRow: View {
     let member: FamilyMember
+    @EnvironmentObject var dataManager: TotsDataManager
+    @State private var showingRevokeConfirmation = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -1494,6 +1444,15 @@ struct FamilyMemberRow: View {
                     
                     Spacer()
                     
+                    // Status badge
+                    Text(statusText)
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(statusColor.opacity(0.2))
+                        .foregroundColor(statusColor)
+                        .cornerRadius(8)
+                    
                     Text(member.role == .owner ? "Owner" : "Member")
                         .font(.caption)
                         .padding(.horizontal, 8)
@@ -1510,10 +1469,74 @@ struct FamilyMemberRow: View {
                         .foregroundColor(.secondary)
                         .cornerRadius(8)
                 }
+                
+                // Revoke button for non-owners who have accepted
+                if member.role != .owner && member.acceptanceStatus == .accepted {
+                    HStack {
+                        Spacer()
+                        Button("Revoke Access") {
+                            showingRevokeConfirmation = true
+                        }
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(6)
+                    }
+                    .padding(.top, 4)
+                }
             }
         }
         .padding(16)
         .liquidGlassCard(cornerRadius: 16, shadowRadius: 4)
+        .confirmationDialog("Revoke Access", isPresented: $showingRevokeConfirmation, titleVisibility: .visible) {
+            Button("Revoke Access", role: .destructive) {
+                Task {
+                    await revokeMemberAccess()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to revoke \(member.name)'s access to baby tracking data?")
+        }
+    }
+    
+    private var statusColor: Color {
+        switch member.acceptanceStatus {
+        case .accepted:
+            return .green
+        case .pending:
+            return .orange
+        case .removed:
+            return .red
+        @unknown default:
+            return .gray
+        }
+    }
+    
+    private var statusText: String {
+        switch member.acceptanceStatus {
+        case .accepted:
+            return "Active"
+        case .pending:
+            return "Invited"
+        case .removed:
+            return "Removed"
+        @unknown default:
+            return "Unknown"
+        }
+    }
+    
+    private func revokeMemberAccess() async {
+        guard let activeShare = await dataManager.cloudKitManager.activeShare else { return }
+        
+        do {
+            try await dataManager.cloudKitManager.revokeFamilyMemberAccess(member, from: activeShare)
+            print("✅ Successfully revoked access for \(member.name)")
+        } catch {
+            print("❌ Failed to revoke access: \(error)")
+        }
     }
 }
 

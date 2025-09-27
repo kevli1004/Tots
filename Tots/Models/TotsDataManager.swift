@@ -27,6 +27,7 @@ class TotsDataManager: ObservableObject {
         guard let latestGrowth = growthData.sorted(by: { $0.date > $1.date }).first else { return 0.0 }
         let weightKg = convertWeightToKg(latestGrowth.weight)
         let heightM = convertHeightToCm(latestGrowth.height) / 100.0
+        guard heightM > 0 else { return 0.0 } // Prevent division by zero
         return weightKg / (heightM * heightM)
     }
     
@@ -438,6 +439,50 @@ class TotsDataManager: ObservableObject {
         updateCountdowns()
         startCountdownTimer()
         setupAppLifecycleNotifications()
+        
+        // Initialize CloudKit and check for family sharing
+        Task {
+            await initializeCloudKit()
+        }
+    }
+    
+    private func initializeCloudKit() async {
+        do {
+            let accountStatus = try await cloudKitManager.checkAccountStatus()
+            if accountStatus == .available {
+                await MainActor.run {
+                    cloudKitManager.isSignedIn = true
+                }
+                
+                // Check for existing shared records first
+                try await cloudKitManager.checkForSharedRecords()
+                
+                // Try to restore baby profile from UserDefaults
+                if let recordName = UserDefaults.standard.string(forKey: "baby_profile_record_id") {
+                    let recordID = CKRecord.ID(recordName: recordName)
+                    do {
+                        babyProfileRecord = try await cloudKitManager.fetchBabyProfile(recordID: recordID)
+                        familySharingEnabled = UserDefaults.standard.bool(forKey: "family_sharing_enabled")
+                        
+                        // Debug: Log database usage
+                        print("🔄 CloudKit setup complete - Always using shared database for family compatibility")
+                        
+                        // Check if we have an active share for UI purposes
+                        let hasActiveShare = await cloudKitManager.activeShare != nil
+                        if hasActiveShare && !familySharingEnabled {
+                            familySharingEnabled = true
+                            UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+                            print("🔄 Updated familySharingEnabled to match activeShare state")
+                        }
+                    } catch {
+                        // Profile not found or error - will need to create new one
+                        print("Error fetching baby profile: \(error)")
+                    }
+                }
+            }
+        } catch {
+            print("Error checking CloudKit account status: \(error)")
+        }
     }
     
     // MARK: - Data Persistence
@@ -666,11 +711,15 @@ class TotsDataManager: ObservableObject {
                 }
                 
                 guard let profileRecord = babyProfileRecord else {
+                    print("⚠️ No baby profile record available for CloudKit sync")
                     return
                 }
                 
+                print("💾 Syncing activity to CloudKit - Always using shared database for family compatibility")
                 try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
+                print("✅ Activity synced successfully")
             } catch {
+                print("❌ CloudKit sync error: \(error)")
                 // Ignore CloudKit errors during save
             }
         }
@@ -679,6 +728,7 @@ class TotsDataManager: ObservableObject {
     private func addGrowthEntry(from activity: TotsActivity) {
         // Only create growth entry if at least one measurement is provided
         guard activity.weight != nil || activity.height != nil || activity.headCircumference != nil else {
+            print("⚠️ No growth measurements provided, skipping growth entry creation")
             return
         }
         
@@ -687,17 +737,25 @@ class TotsDataManager: ObservableObject {
         let height = activity.height ?? (currentHeight > 0 ? currentHeight : nil)
         let headCircumference = activity.headCircumference ?? (currentHeadCircumference > 0 ? currentHeadCircumference : nil)
         
-        // Only create entry if we have at least one valid measurement
-        if let weight = weight, let height = height, let headCircumference = headCircumference {
-            let growthEntry = GrowthEntry(
-                date: activity.time,
-                weight: weight,
-                height: height,
-                headCircumference: headCircumference
-            )
-            
-            growthData.append(growthEntry)
+        // Validate measurements are reasonable
+        guard let finalWeight = weight, finalWeight > 0,
+              let finalHeight = height, finalHeight > 0,
+              let finalHeadCirc = headCircumference, finalHeadCirc > 0 else {
+            print("⚠️ Invalid growth measurements (weight: \(weight ?? -1), height: \(height ?? -1), head: \(headCircumference ?? -1)), skipping entry")
+            return
         }
+        
+        // Only create entry if we have all valid measurements
+        let growthEntry = GrowthEntry(
+            date: activity.time,
+            weight: finalWeight,
+            height: finalHeight,
+            headCircumference: finalHeadCirc
+        )
+        
+        growthData.append(growthEntry)
+        saveGrowthData()
+        print("✅ Created growth entry: weight=\(finalWeight), height=\(finalHeight), head=\(finalHeadCirc)")
     }
     
     func deleteActivity(_ activity: TotsActivity) {
@@ -754,8 +812,11 @@ class TotsDataManager: ObservableObject {
         if let index = growthData.firstIndex(where: { entry in
             Calendar.current.isDate(entry.date, equalTo: oldActivity.time, toGranularity: .minute)
         }) {
-            // Update the growth entry with new values
-            if let weight = newActivity.weight, let height = newActivity.height, let headCircumference = newActivity.headCircumference {
+            // Update the growth entry with new values - ensure all values are valid
+            if let weight = newActivity.weight, weight > 0,
+               let height = newActivity.height, height > 0,
+               let headCircumference = newActivity.headCircumference, headCircumference > 0 {
+                
                 let updatedEntry = GrowthEntry(
                     date: newActivity.time,
                     weight: weight,
@@ -763,7 +824,15 @@ class TotsDataManager: ObservableObject {
                     headCircumference: headCircumference
                 )
                 growthData[index] = updatedEntry
+                saveGrowthData()
+                print("✅ Updated growth entry at index \(index): weight=\(weight), height=\(height), head=\(headCircumference)")
+            } else {
+                print("⚠️ Invalid growth data for update, removing entry instead")
+                growthData.remove(at: index)
+                saveGrowthData()
             }
+        } else {
+            print("⚠️ No matching growth entry found for update")
         }
     }
     
@@ -1088,6 +1157,7 @@ class TotsDataManager: ObservableObject {
         let ageInMonths = Calendar.current.dateComponents([.month], from: babyBirthDate, to: entry.date).month ?? 0
         let weightKg = convertWeightToKg(entry.weight)
         let heightM = convertHeightToCm(entry.height) / 100.0
+        guard heightM > 0 else { return 50 } // Return default percentile if height is invalid
         let bmi = weightKg / (heightM * heightM)
         
         // WHO BMI-for-age standards with age-appropriate standard deviation
@@ -2435,10 +2505,36 @@ extension TotsDataManager {
     }
     
     func shareBabyProfile() async throws -> CKShare? {
-        guard let profileRecord = babyProfileRecord else { 
-            return nil 
+        print("🔗 shareBabyProfile() called")
+        
+        // Check if we have an existing baby profile record
+        if let existingRecord = babyProfileRecord {
+            print("🔗 Found existing baby profile: \(existingRecord.recordID)")
+            
+            // Check if it's in the default zone (not shareable)
+            if existingRecord.recordID.zoneID.zoneName == "_defaultZone" {
+                print("🔗 Existing profile is in default zone, need to create new one in custom zone")
+                // Clear the existing record and create a new one in custom zone
+                babyProfileRecord = nil
+                UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
+            }
         }
         
+        // Ensure we have a baby profile record in custom zone
+        if babyProfileRecord == nil {
+            print("🔗 No shareable baby profile record, creating in custom zone...")
+            await createDefaultBabyProfile()
+            
+            // Wait a moment for the creation to complete
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        }
+        
+        guard let profileRecord = babyProfileRecord else { 
+            print("❌ Still no baby profile record available for sharing after creation attempt")
+            throw CloudKitError.userNotFound
+        }
+        
+        print("🔗 Starting to share baby profile: \(profileRecord.recordID)")
         
         do {
             let share = try await cloudKitManager.shareBabyProfile(profileRecord)
@@ -2451,8 +2547,10 @@ extension TotsDataManager {
                 UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
             }
             
+            print("✅ Successfully created share for baby profile")
             return share
         } catch {
+            print("❌ Failed to share baby profile: \(error)")
             throw error
         }
     }
@@ -2731,7 +2829,16 @@ extension TotsDataManager {
     }
     
     private func createDefaultBabyProfile() async {
+        print("🍼 Creating default baby profile in custom zone for sharing...")
+        
         do {
+            // Check if user is signed in to CloudKit
+            let accountStatus = try await cloudKitManager.checkAccountStatus()
+            guard accountStatus == .available else {
+                print("❌ CloudKit account not available: \(accountStatus)")
+                return
+            }
+            
             // Use default values if not set
             let name = babyName.isEmpty ? "Baby" : babyName
             let birthDate = babyBirthDate
@@ -2741,18 +2848,24 @@ extension TotsDataManager {
                 diaper: weeklyDiaperGoal / 7
             )
             
+            print("🍼 Creating baby profile in custom zone with name: \(name), birthDate: \(birthDate)")
+            
             let record = try await cloudKitManager.createBabyProfile(
                 name: name,
                 birthDate: birthDate,
                 goals: goals
             )
             
+            print("✅ Successfully created baby profile record in custom zone: \(record.recordID)")
+            
             await MainActor.run {
                 self.babyProfileRecord = record
                 UserDefaults.standard.set(record.recordID.recordName, forKey: "baby_profile_record_id")
             }
+            
+            print("✅ Baby profile record saved locally")
         } catch {
-            // Ignore CloudKit errors
+            print("❌ Failed to create default baby profile: \(error)")
         }
     }
     

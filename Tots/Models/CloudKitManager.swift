@@ -10,6 +10,9 @@ class CloudKitManager: ObservableObject {
     let privateDatabase: CKDatabase
     private let sharedDatabase: CKDatabase
     
+    // Custom zone for shared records
+    private let customZoneID = CKRecordZone.ID(zoneName: "TotsSharedZone", ownerName: CKCurrentUserDefaultName)
+    
     @Published var isSignedIn = false
     @Published var familyMembers: [FamilyMember] = []
     @Published var activeShare: CKShare?
@@ -91,13 +94,33 @@ class CloudKitManager: ObservableObject {
         }
     }
     
+    // MARK: - Custom Zone Management
+    
+    private func createCustomZoneIfNeeded() async throws {
+        do {
+            // Try to fetch the zone first from private database
+            _ = try await privateDatabase.recordZone(for: customZoneID)
+            print("✅ Custom zone already exists in private database")
+        } catch {
+            // Zone doesn't exist, create it in private database
+            let customZone = CKRecordZone(zoneID: customZoneID)
+            _ = try await privateDatabase.save(customZone)
+            print("✅ Created custom zone in private database: \(customZoneID.zoneName)")
+        }
+    }
+    
     // MARK: - Baby Profile Management
     
     func createBabyProfile(name: String, birthDate: Date, goals: BabyGoals) async throws -> CKRecord {
         // First ensure user record exists
         let userRecord = try await getOrCreateUserRecord()
         
-        let record = CKRecord(recordType: "BabyProfile")
+        // Create custom zone if needed (required for sharing)
+        try await createCustomZoneIfNeeded()
+        
+        // Create record in custom zone (required for sharing)
+        let recordID = CKRecord.ID(recordName: UUID().uuidString, zoneID: customZoneID)
+        let record = CKRecord(recordType: "BabyProfile", recordID: recordID)
         record["name"] = name
         record["birthDate"] = birthDate
         record["feedingGoal"] = goals.feeding
@@ -105,6 +128,7 @@ class CloudKitManager: ObservableObject {
         record["diaperGoal"] = goals.diaper
         record["createdBy"] = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
         
+        // Save to private database custom zone (shareable via CKShare)
         return try await privateDatabase.save(record)
     }
     
@@ -116,6 +140,7 @@ class CloudKitManager: ObservableObject {
         record["sleepGoal"] = goals.sleep
         record["diaperGoal"] = goals.diaper
         
+        // Save to private database (records must be in private DB to be shareable)
         return try await privateDatabase.save(record)
     }
     
@@ -129,14 +154,45 @@ class CloudKitManager: ObservableObject {
         let query = CKQuery(recordType: "BabyProfile", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "birthDate", ascending: false)]
         
-        let result = try await privateDatabase.records(matching: query)
-        let profiles = result.matchResults.compactMap { try? $0.1.get() }
+        // Fetch from private database custom zone (where shareable records are created)
+        let operation = CKQueryOperation(query: query)
+        operation.zoneID = customZoneID
+        operation.resultsLimit = 100 // Limit results for performance
+        
+        var profiles: [CKRecord] = []
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.recordMatchedBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    profiles.append(record)
+                case .failure(let error):
+                    print("Error fetching profile record: \(error)")
+                }
+            }
+            
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            self.privateDatabase.add(operation)
+        }
         
         return profiles
     }
     
     func fetchBabyProfile(recordID: CKRecord.ID) async throws -> CKRecord {
-        return try await privateDatabase.record(for: recordID)
+        // Try shared database first (if record is shared), then private database
+        do {
+            return try await sharedDatabase.record(for: recordID)
+        } catch {
+            return try await privateDatabase.record(for: recordID)
+        }
     }
     
     // MARK: - Activity Management
@@ -145,7 +201,12 @@ class CloudKitManager: ObservableObject {
         // Ensure user record exists
         let userRecord = try await getOrCreateUserRecord()
         
-        let record = CKRecord(recordType: "Activity")
+        // Create custom zone if needed (required for sharing)
+        try await createCustomZoneIfNeeded()
+        
+        // Create activity record in custom zone (will be accessible via share)
+        let recordID = CKRecord.ID(recordName: UUID().uuidString, zoneID: customZoneID)
+        let record = CKRecord(recordType: "Activity", recordID: recordID)
         record["type"] = activity.type.rawValue
         record["time"] = activity.time
         record["details"] = activity.details
@@ -157,9 +218,9 @@ class CloudKitManager: ObservableObject {
         record["babyProfile"] = CKRecord.Reference(recordID: babyProfileID, action: .deleteSelf)
         record["createdBy"] = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
         
-        // Save to shared database if profile is shared, otherwise private
-        let database = activeShare != nil ? sharedDatabase : privateDatabase
-        _ = try await database.save(record)
+        // Save to private database custom zone (shareable via CKShare to family members)
+        print("💾 Saving activity to private database custom zone (shareable via CKShare for family access)")
+        _ = try await privateDatabase.save(record)
     }
     
     func fetchActivities(for babyProfileID: CKRecord.ID) async throws -> [TotsActivity] {
@@ -168,13 +229,39 @@ class CloudKitManager: ObservableObject {
         let query = CKQuery(recordType: "Activity", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "time", ascending: false)]
         
-        let database = activeShare != nil ? sharedDatabase : privateDatabase
-        let result = try await database.records(matching: query)
+        // Fetch from private database custom zone (where records are created and shared via CKShare)
+        print("📖 Fetching activities from private database custom zone (shareable via CKShare for family access)")
         
-        return result.matchResults.compactMap { matchResult in
-            guard let record = try? matchResult.1.get() else { return nil }
-            return convertToActivity(record)
+        let operation = CKQueryOperation(query: query)
+        operation.zoneID = customZoneID
+        operation.resultsLimit = 500 // Limit results for performance
+        var activities: [TotsActivity] = []
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.recordMatchedBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    if let activity = self.convertToActivity(record) {
+                        activities.append(activity)
+                    }
+                case .failure(let error):
+                    print("Error fetching activity record: \(error)")
+                }
+            }
+            
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            self.privateDatabase.add(operation)
         }
+        
+        return activities
     }
     
     private func convertToActivity(_ record: CKRecord) -> TotsActivity? {
@@ -202,38 +289,94 @@ class CloudKitManager: ObservableObject {
     // MARK: - Family Sharing
     
     func shareBabyProfile(_ profileRecord: CKRecord) async throws -> CKShare {
+        print("🔗 Starting to share baby profile: \(profileRecord.recordID)")
         
-        // Create a new record without any reference fields to avoid the reference error
-        let cleanRecord = CKRecord(recordType: "BabyProfile")
-        cleanRecord["name"] = profileRecord["name"]
-        cleanRecord["birthDate"] = profileRecord["birthDate"]
-        cleanRecord["feedingGoal"] = profileRecord["feedingGoal"]
-        cleanRecord["sleepGoal"] = profileRecord["sleepGoal"]
-        cleanRecord["diaperGoal"] = profileRecord["diaperGoal"]
-        // Explicitly NOT copying createdBy or other reference fields
-        
-        let savedRecord = try await privateDatabase.save(cleanRecord)
-        
-        // Create and return the share for UICloudSharingController to handle
-        let share = CKShare(rootRecord: savedRecord)
+        // Create the share for the record
+        let share = CKShare(rootRecord: profileRecord)
         share[CKShare.SystemFieldKey.title] = profileRecord["name"] as? String ?? "Baby Profile"
-        share.publicPermission = .none
+        share.publicPermission = .readWrite  // Allow read/write access for family members
         
-        // Let UICloudSharingController handle the actual share saving
+        // Save both records in the same operation (required by CloudKit)
+        let operation = CKModifyRecordsOperation(recordsToSave: [profileRecord, share], recordIDsToDelete: nil)
+        operation.savePolicy = .allKeys
+        operation.qualityOfService = .userInitiated
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.modifyRecordsCompletionBlock = { (savedRecords: [CKRecord]?, deletedRecordIDs: [CKRecord.ID]?, error: Error?) in
+                if let error = error {
+                    print("❌ Failed to save baby profile and share: \(error)")
+                    continuation.resume(throwing: error)
+                } else {
+                    print("✅ Successfully saved baby profile and share")
+                    continuation.resume()
+                }
+            }
+            
+            self.privateDatabase.add(operation)
+        }
+        
+        // Set the active share
+        await setActiveShare(share)
+        
+        print("🔗 Baby profile shared successfully")
         return share
     }
     
     func fetchSharedProfiles() async throws -> [CKRecord] {
+        // Query shared profiles that the user has access to
         let query = CKQuery(recordType: "BabyProfile", predicate: NSPredicate(value: true))
         query.sortDescriptors = [NSSortDescriptor(key: "birthDate", ascending: false)]
         
-        let result = try await sharedDatabase.records(matching: query)
-        return result.matchResults.compactMap { try? $0.1.get() }
+        let operation = CKQueryOperation(query: query)
+        operation.resultsLimit = 50 // Limit results for performance
+        
+        var profiles: [CKRecord] = []
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.recordMatchedBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    profiles.append(record)
+                case .failure(let error):
+                    print("Error fetching shared profile record: \(error)")
+                }
+            }
+            
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            self.sharedDatabase.add(operation)
+        }
+        
+        return profiles
     }
     
     func stopSharingProfile(_ profileRecord: CKRecord) async throws {
         // For now, just mark as not shared locally
         // CloudKit will handle the actual share removal
+    }
+    
+    func revokeFamilyMemberAccess(_ member: FamilyMember, from share: CKShare) async throws {
+        // Find the participant to remove
+        guard let participantToRemove = share.participants.first(where: { participant in
+            participant.userIdentity.userRecordID?.recordName == member.participantID
+        }) else {
+            throw CloudKitError.userNotFound
+        }
+        
+        // Remove the participant from the share
+        share.removeParticipant(participantToRemove)
+        
+        // Save the updated share
+        _ = try await privateDatabase.save(share)
+        
+        print("✅ Revoked access for family member: \(member.name)")
     }
     
     func fetchFamilyMembers(for share: CKShare) async throws -> [FamilyMember] {
@@ -245,7 +388,9 @@ class CloudKitManager: ObservableObject {
             name: ownerParticipant.userIdentity.nameComponents?.formatted() ?? "Owner",
             email: ownerParticipant.userIdentity.lookupInfo?.emailAddress ?? "",
             role: .owner,
-            permission: .readWrite
+            permission: .readWrite,
+            acceptanceStatus: .accepted,
+            participantID: ownerParticipant.userIdentity.userRecordID?.recordName ?? ""
         )
         members.append(member)
         
@@ -256,7 +401,9 @@ class CloudKitManager: ObservableObject {
                     name: participant.userIdentity.nameComponents?.formatted() ?? "Family Member",
                     email: participant.userIdentity.lookupInfo?.emailAddress ?? "",
                     role: participant.role,
-                    permission: participant.permission
+                    permission: participant.permission,
+                    acceptanceStatus: participant.acceptanceStatus,
+                    participantID: participant.userIdentity.userRecordID?.recordName ?? ""
                 )
                 members.append(member)
             }
@@ -286,14 +433,36 @@ class CloudKitManager: ObservableObject {
     }
     
     func checkForSharedRecords() async throws {
+        // Query for shares in the shared database
         let query = CKQuery(recordType: "cloudkit.share", predicate: NSPredicate(value: true))
-        let result = try await sharedDatabase.records(matching: query)
         
-        if let firstShare = result.matchResults.first?.1 {
-            let shareRecord = try firstShare.get()
-            if let share = shareRecord as? CKShare {
-                await setActiveShare(share)
+        let operation = CKQueryOperation(query: query)
+        operation.resultsLimit = 10 // Limit results for performance
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.recordMatchedBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    if let share = record as? CKShare {
+                        Task { @MainActor in
+                            await self.setActiveShare(share)
+                        }
+                    }
+                case .failure(let error):
+                    print("Error fetching share record: \(error)")
+                }
             }
+            
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            self.sharedDatabase.add(operation)
         }
     }
     
@@ -451,6 +620,8 @@ struct FamilyMember: Identifiable {
     let email: String
     let role: CKShare.ParticipantRole
     let permission: CKShare.ParticipantPermission
+    let acceptanceStatus: CKShare.ParticipantAcceptanceStatus
+    let participantID: String
 }
 
 enum CloudKitError: Error, LocalizedError {
