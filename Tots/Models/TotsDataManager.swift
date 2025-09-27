@@ -486,17 +486,30 @@ class TotsDataManager: ObservableObject {
                     let recordID = CKRecord.ID(recordName: recordName)
                     do {
                         babyProfileRecord = try await cloudKitManager.fetchBabyProfile(recordID: recordID)
-                        familySharingEnabled = UserDefaults.standard.bool(forKey: "family_sharing_enabled")
                         
-                        // Debug: Log database usage
-                        print("🔄 CloudKit setup complete - Always using shared database for family compatibility")
+                        await MainActor.run {
+                            // Set CloudKit as signed in
+                            cloudKitManager.isSignedIn = true
+                            
+                            familySharingEnabled = UserDefaults.standard.bool(forKey: "family_sharing_enabled")
+                            
+                            // User has existing CloudKit profile, so they're signed in
+                            UserDefaults.standard.set(false, forKey: "local_storage_only")
+                            
+                            // Post notification that user is signed in
+                            NotificationCenter.default.post(name: .init("user_signed_in"), object: nil)
+                            
+                            print("🔄 CloudKit setup complete - User recognized as signed in, isSignedIn = \(cloudKitManager.isSignedIn)")
+                        }
                         
                         // Check if we have an active share for UI purposes
                         let hasActiveShare = await cloudKitManager.activeShare != nil
                         if hasActiveShare && !familySharingEnabled {
-                            familySharingEnabled = true
-                            UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
-                            print("🔄 Updated familySharingEnabled to match activeShare state")
+                            await MainActor.run {
+                                familySharingEnabled = true
+                                UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+                                print("🔄 Updated familySharingEnabled to match activeShare state")
+                            }
                         }
                     } catch {
                         // Profile not found or error - will need to create new one
@@ -3268,6 +3281,12 @@ extension TotsDataManager {
                 print("📤 Uploaded \(newLocalWords.count) new local words to CloudKit")
             }
             
+            // Set CloudKit as signed in for existing profile path
+            await MainActor.run {
+                cloudKitManager.isSignedIn = true
+                print("✅ CloudKit sign-in complete (existing profile) - isSignedIn = \(cloudKitManager.isSignedIn)")
+            }
+            
         } else {
             // No existing CloudKit data - create new profile with current local data
             print("📝 No existing CloudKit data found, creating new profile with local data...")
@@ -3313,6 +3332,9 @@ extension TotsDataManager {
         }
             
             await MainActor.run {
+                // Set CloudKit as signed in
+                cloudKitManager.isSignedIn = true
+                
                 familySharingEnabled = true
                 UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
                 UserDefaults.standard.set(false, forKey: "local_storage_only")
@@ -3320,6 +3342,8 @@ extension TotsDataManager {
                 
                 // Post notification that user signed in
                 NotificationCenter.default.post(name: .init("user_signed_in"), object: nil)
+                
+                print("✅ CloudKit sign-in complete - isSignedIn = \(cloudKitManager.isSignedIn)")
         }
     }
     

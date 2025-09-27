@@ -770,6 +770,7 @@ class CloudKitManager: ObservableObject {
         // Clear local storage
         UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
         UserDefaults.standard.removeObject(forKey: "family_sharing_enabled")
+        UserDefaults.standard.set(true, forKey: "local_storage_only")
         UserDefaults.standard.set(false, forKey: "onboarding_completed")
         
         // Notify app to show onboarding

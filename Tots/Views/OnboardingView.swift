@@ -1188,6 +1188,26 @@ struct OnboardingView: View {
             dataManager.startLiveActivity()
         }
         
+        // Automatically sign in to CloudKit if available
+        Task {
+            do {
+                let accountStatus = try await dataManager.cloudKitManager.checkAccountStatus()
+                if accountStatus == .available {
+                    print("🔄 Auto-signing in to CloudKit after onboarding...")
+                    try await dataManager.signInToCloudKit()
+                    print("✅ Auto sign-in to CloudKit successful")
+                } else {
+                    print("ℹ️ CloudKit not available, user will remain in local storage mode")
+                    // Set local storage only if CloudKit is not available
+                    UserDefaults.standard.set(true, forKey: "local_storage_only")
+                }
+            } catch {
+                print("⚠️ Auto sign-in to CloudKit failed: \(error)")
+                // Set local storage only if sign-in fails
+                UserDefaults.standard.set(true, forKey: "local_storage_only")
+            }
+        }
+        
         // Notify the app that onboarding is complete
         NotificationCenter.default.post(name: .init("onboarding_completed"), object: nil)
         

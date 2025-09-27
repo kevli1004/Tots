@@ -15,7 +15,10 @@ struct SettingsView: View {
     @State private var showingPersonalDetails = false
     @State private var isSettingUpCloudKit = false
     @State private var cloudKitSetupMessage = ""
-    @State private var isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+    // Computed property based on CloudKit sign-in state
+    private var isLocalStorageOnly: Bool {
+        return !dataManager.cloudKitManager.isSignedIn
+    }
     @State private var showingCloudKitShare = false
     @State private var showingFamilyManager = false
     @State private var showingDeleteConfirmation = false
@@ -83,7 +86,7 @@ struct SettingsView: View {
                 .environmentObject(dataManager)
         }
         .confirmationDialog("Delete Account", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
-            if !UserDefaults.standard.bool(forKey: "local_storage_only") {
+            if dataManager.cloudKitManager.isSignedIn {
                 Button("Delete Account", role: .destructive) {
                     isDeletingAccount = true
                     Task {
@@ -104,7 +107,7 @@ struct SettingsView: View {
             Text("This will permanently delete all your data from CloudKit and cannot be undone.")
         }
         .confirmationDialog("Sign Out", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
-            if !UserDefaults.standard.bool(forKey: "local_storage_only") {
+            if dataManager.cloudKitManager.isSignedIn {
                 Button("Sign Out", role: .destructive) {
                     Task {
                         await dataManager.signOut()
@@ -157,16 +160,8 @@ struct SettingsView: View {
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
             loadAppearanceMode()
-            // Sync storage state with UserDefaults
-            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_in"))) { _ in
-            // Update when user signs in
-            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_out"))) { _ in
-            // Update when user signs out
-            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+            // Debug: Log current sign-in state
+            print("🔍 SettingsView onAppear: isSignedIn = \(dataManager.cloudKitManager.isSignedIn), isLocalStorageOnly = \(isLocalStorageOnly)")
         }
     }
     
@@ -870,18 +865,21 @@ struct SettingsView: View {
     }
     
     private func signInToCloudKit() {
+        print("🔄 SettingsView signInToCloudKit called")
         self.isSettingUpCloudKit = true
         cloudKitSetupMessage = "Signing in to CloudKit..."
         
         Task {
             do {
                 // Sign in to CloudKit and upload local data
+                print("🔄 Calling dataManager.signInToCloudKit()")
                 try await dataManager.signInToCloudKit()
                 
                 await MainActor.run {
+                    print("✅ CloudKit sign-in successful, isSignedIn = \(dataManager.cloudKitManager.isSignedIn)")
                     cloudKitSetupMessage = "✅ Successfully signed in! Your data is now syncing."
                     isSettingUpCloudKit = false
-                    isLocalStorageOnly = false  // Update the state immediately
+                    // isLocalStorageOnly is now computed from CloudKitManager.isSignedIn
                 }
                 
                 // Clear message after delay
@@ -889,6 +887,7 @@ struct SettingsView: View {
                     cloudKitSetupMessage = ""
                 }
             } catch {
+                print("❌ CloudKit sign-in failed: \(error)")
                 await MainActor.run {
                     let errorMessage = error.localizedDescription
                     if errorMessage.contains("No iCloud account found") {
@@ -911,10 +910,12 @@ struct SettingsView: View {
         case .success(let authorization):
             if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
                 // Successfully signed in with Apple ID
+                print("🍎 Apple ID sign-in successful, proceeding to CloudKit sign-in")
                 // Now try to sign in to CloudKit
                 self.signInToCloudKit()
             }
         case .failure(let error):
+            print("❌ Apple ID sign-in failed: \(error)")
             cloudKitSetupMessage = "❌ Sign in cancelled or failed: \(error.localizedDescription)"
             isSettingUpCloudKit = false
         }
