@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingLogoutConfirmation = false
     @State private var showingClearDataConfirmation = false
+    @State private var showingClearLocalDataConfirmation = false
     @State private var isDeletingAccount = false
     @State private var isClearingData = false
     @State private var familyMembers: [FamilyMember] = []
@@ -114,7 +115,25 @@ struct SettingsView: View {
         } message: {
             Text("This will sign you out and clear all local data. Your CloudKit data will remain safe.")
         }
-        .confirmationDialog("Clear Local Data", isPresented: $showingClearDataConfirmation, titleVisibility: .visible) {
+        .confirmationDialog("Clear Cloud Data", isPresented: $showingClearDataConfirmation, titleVisibility: .visible) {
+            Button("Clear All Data", role: .destructive) {
+                isClearingData = true
+                Task {
+                    do {
+                        try await dataManager.clearCloudData()
+                    } catch {
+                        print("❌ Error clearing cloud data: \(error)")
+                    }
+                    await MainActor.run {
+                        isClearingData = false
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently delete all your data from both CloudKit and this device, but you'll remain signed in. This cannot be undone.")
+        }
+        .confirmationDialog("Clear Local Data", isPresented: $showingClearLocalDataConfirmation, titleVisibility: .visible) {
             Button("Clear All Data", role: .destructive) {
                 clearLocalData()
             }
@@ -139,6 +158,14 @@ struct SettingsView: View {
         .onAppear {
             loadAppearanceMode()
             // Sync storage state with UserDefaults
+            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_in"))) { _ in
+            // Update when user signs in
+            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_out"))) { _ in
+            // Update when user signs out
             isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
         }
     }
@@ -711,7 +738,7 @@ struct SettingsView: View {
                     titleColor: .red,
                     action: {
                         if !isClearingData {
-                            showingClearDataConfirmation = true
+                            showingClearLocalDataConfirmation = true
                         }
                     }
                 )
@@ -737,7 +764,18 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 16)
             } else {
-                // For CloudKit users, show delete and sign out options
+                // For CloudKit users, show clear data, delete and sign out options
+                SettingsRow(
+                    icon: "trash.circle.fill",
+                    title: isClearingData ? "Clearing Data..." : "Clear Cloud Data",
+                    titleColor: .orange,
+                    action: { 
+                        if !isClearingData {
+                            showingClearDataConfirmation = true 
+                        }
+                    }
+                )
+                
                 SettingsRow(
                     icon: "trash.fill",
                     title: isDeletingAccount ? "Deleting Account..." : "Delete Account",

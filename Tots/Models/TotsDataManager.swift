@@ -753,16 +753,28 @@ class TotsDataManager: ObservableObject {
         }
         
         // Only create entry if we have all valid measurements
-        let growthEntry = GrowthEntry(
-            date: activity.time,
+            let growthEntry = GrowthEntry(
+                date: activity.time,
             weight: finalWeight,
             height: finalHeight,
             headCircumference: finalHeadCirc
-        )
-        
-        growthData.append(growthEntry)
+            )
+            
+            growthData.append(growthEntry)
         saveGrowthData()
         print("✅ Created growth entry: weight=\(finalWeight), height=\(finalHeight), head=\(finalHeadCirc)")
+        
+        // Sync to CloudKit if signed in
+        if !UserDefaults.standard.bool(forKey: "local_storage_only"), let profileRecord = babyProfileRecord {
+            Task {
+                do {
+                    try await cloudKitManager.saveGrowthEntry(growthEntry, to: profileRecord.recordID)
+                    print("✅ Growth entry synced to CloudKit")
+                } catch {
+                    print("❌ Failed to sync growth entry to CloudKit: \(error)")
+                }
+            }
+        }
     }
     
     func deleteActivity(_ activity: TotsActivity) {
@@ -904,6 +916,20 @@ class TotsDataManager: ObservableObject {
         // Update development score
         updateDevelopmentScore()
         generateAIInsights()
+        
+        // Sync milestone to CloudKit if signed in
+        if !UserDefaults.standard.bool(forKey: "local_storage_only"), let profileRecord = babyProfileRecord {
+            Task {
+                do {
+                    if let updatedMilestone = milestones.first(where: { $0.id == milestone.id }) {
+                        try await cloudKitManager.saveMilestone(updatedMilestone, to: profileRecord.recordID)
+                        print("✅ Milestone synced to CloudKit")
+                    }
+                } catch {
+                    print("❌ Failed to sync milestone to CloudKit: \(error)")
+                }
+            }
+        }
     }
     
     // MARK: - Word Tracking
@@ -939,6 +965,18 @@ class TotsDataManager: ObservableObject {
                     notes: "Now knows 10 words!"
                 )
                 addActivity(activity)
+            }
+            
+            // Sync word to CloudKit if signed in
+            if !UserDefaults.standard.bool(forKey: "local_storage_only"), let profileRecord = babyProfileRecord {
+                Task {
+                    do {
+                        try await cloudKitManager.saveBabyWord(newWord, to: profileRecord.recordID)
+                        print("✅ New word synced to CloudKit")
+                    } catch {
+                        print("❌ Failed to sync new word to CloudKit: \(error)")
+                    }
+                }
             }
         }
     }
@@ -1064,6 +1102,19 @@ class TotsDataManager: ObservableObject {
     
     func addMilestone(_ milestone: Milestone) {
         milestones.append(milestone)
+        saveMilestones()
+        
+        // Sync milestone to CloudKit if signed in
+        if !UserDefaults.standard.bool(forKey: "local_storage_only"), let profileRecord = babyProfileRecord {
+            Task {
+                do {
+                    try await cloudKitManager.saveMilestone(milestone, to: profileRecord.recordID)
+                    print("✅ New milestone synced to CloudKit")
+                } catch {
+                    print("❌ Failed to sync new milestone to CloudKit: \(error)")
+                }
+            }
+        }
     }
     
     func deleteMilestone(_ milestone: Milestone) {
@@ -2187,21 +2238,30 @@ enum MilestoneCategory: String, CaseIterable, Codable {
 }
 
 struct GrowthEntry: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     let date: Date
     let weight: Double // kg
     let height: Double // cm
     let headCircumference: Double // cm
+    
+    init(date: Date, weight: Double, height: Double, headCircumference: Double) {
+        self.id = UUID()
+        self.date = date
+        self.weight = weight
+        self.height = height
+        self.headCircumference = headCircumference
+    }
 }
 
 struct BabyWord: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     var word: String
     var category: WordCategory
     let dateFirstSaid: Date
     var notes: String
     
     init(word: String, category: WordCategory = .other, dateFirstSaid: Date = Date(), notes: String = "") {
+        self.id = UUID()
         self.word = word
         self.category = category
         self.dateFirstSaid = dateFirstSaid
@@ -3012,40 +3072,254 @@ extension TotsDataManager {
         // Check if user is currently using local storage only
         let isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
         
-        if isLocalStorageOnly {
-            // User was using local storage, now wants to sync to CloudKit
-            // Create a CloudKit profile with existing local data
+        // Always try to fetch existing CloudKit data first, regardless of local storage state
+        print("🔄 Fetching existing CloudKit data...")
+        
+        let existingProfiles = try await cloudKitManager.fetchBabyProfiles()
+        
+        // Store current local data for potential merging
+        let localActivities = recentActivities
+        let localBabyName = babyName
+        let localBabyBirthDate = babyBirthDate
+        let localFeedingGoal = UserDefaults.standard.integer(forKey: "feeding_goal")
+        let localSleepGoal = UserDefaults.standard.double(forKey: "sleep_goal")
+        let localDiaperGoal = UserDefaults.standard.integer(forKey: "diaper_goal")
+        
+        if let existingProfile = existingProfiles.first {
+            // Found existing CloudKit data - use it as the base and merge with local
+            print("✅ Found existing CloudKit profile, merging with local data...")
+            babyProfileRecord = existingProfile
+            
+            // Fetch CloudKit activities
+            let cloudKitActivities = try await cloudKitManager.fetchActivities(for: existingProfile.recordID)
+            
+            // Fetch CloudKit growth data, milestones, and words
+            var cloudKitGrowthData: [GrowthEntry] = []
+            var cloudKitMilestones: [Milestone] = []
+            var cloudKitWords: [BabyWord] = []
+            
+            do {
+                cloudKitGrowthData = try await cloudKitManager.fetchGrowthEntries(for: existingProfile.recordID)
+                print("✅ Fetched \(cloudKitGrowthData.count) growth entries from CloudKit")
+            } catch {
+                print("⚠️ Failed to fetch growth data from CloudKit: \(error)")
+            }
+            
+            do {
+                cloudKitMilestones = try await cloudKitManager.fetchMilestones(for: existingProfile.recordID)
+                print("✅ Fetched \(cloudKitMilestones.count) milestones from CloudKit")
+            } catch {
+                print("⚠️ Failed to fetch milestones from CloudKit: \(error)")
+            }
+            
+            do {
+                cloudKitWords = try await cloudKitManager.fetchBabyWords(for: existingProfile.recordID)
+                print("✅ Fetched \(cloudKitWords.count) words from CloudKit")
+            } catch {
+                print("⚠️ Failed to fetch words from CloudKit: \(error)")
+            }
+            
+            await MainActor.run {
+                // Use CloudKit profile data as primary source
+                if let name = existingProfile["name"] as? String, !name.isEmpty {
+                    self.babyName = name
+                    UserDefaults.standard.set(name, forKey: "baby_name")
+                } else if !localBabyName.isEmpty {
+                    // Fallback to local name if CloudKit name is empty
+                    self.babyName = localBabyName
+                    UserDefaults.standard.set(localBabyName, forKey: "baby_name")
+                }
+                
+                if let birthDate = existingProfile["birthDate"] as? Date {
+                    self.babyBirthDate = birthDate
+                    UserDefaults.standard.set(birthDate, forKey: "baby_birth_date")
+                } else {
+                    // Fallback to local birth date
+                    self.babyBirthDate = localBabyBirthDate
+                    UserDefaults.standard.set(localBabyBirthDate, forKey: "baby_birth_date")
+                }
+                
+                // Merge goals (prefer CloudKit, fallback to local)
+                if let feedingGoal = existingProfile["feedingGoal"] as? Int, feedingGoal > 0 {
+                    UserDefaults.standard.set(feedingGoal, forKey: "feeding_goal")
+                } else if localFeedingGoal > 0 {
+                    UserDefaults.standard.set(localFeedingGoal, forKey: "feeding_goal")
+                }
+                
+                if let sleepGoal = existingProfile["sleepGoal"] as? Double, sleepGoal > 0 {
+                    UserDefaults.standard.set(sleepGoal, forKey: "sleep_goal")
+                } else if localSleepGoal > 0 {
+                    UserDefaults.standard.set(localSleepGoal, forKey: "sleep_goal")
+                }
+                
+                if let diaperGoal = existingProfile["diaperGoal"] as? Int, diaperGoal > 0 {
+                    UserDefaults.standard.set(diaperGoal, forKey: "diaper_goal")
+                } else if localDiaperGoal > 0 {
+                    UserDefaults.standard.set(localDiaperGoal, forKey: "diaper_goal")
+                }
+                
+                // Merge activities: combine CloudKit and local, remove duplicates by ID
+                var mergedActivities = cloudKitActivities
+                let cloudKitActivityIDs = Set(cloudKitActivities.map { $0.id })
+                
+                for localActivity in localActivities {
+                    if !cloudKitActivityIDs.contains(localActivity.id) {
+                        mergedActivities.append(localActivity)
+                    }
+                }
+                
+                // Sort by time (most recent first)
+                mergedActivities.sort { $0.time > $1.time }
+                self.recentActivities = mergedActivities
+                
+                // Merge growth data: combine CloudKit and local, remove duplicates by ID
+                var mergedGrowthData = cloudKitGrowthData
+                let cloudKitGrowthIDs = Set(cloudKitGrowthData.map { $0.id })
+                
+                for localGrowth in growthData {
+                    if !cloudKitGrowthIDs.contains(localGrowth.id) {
+                        mergedGrowthData.append(localGrowth)
+                    }
+                }
+                mergedGrowthData.sort { $0.date > $1.date }
+                self.growthData = mergedGrowthData
+                
+                // Merge milestones: combine CloudKit and local, remove duplicates by ID
+                var mergedMilestones = cloudKitMilestones
+                let cloudKitMilestoneIDs = Set(cloudKitMilestones.map { $0.id })
+                
+                for localMilestone in milestones {
+                    if !cloudKitMilestoneIDs.contains(localMilestone.id) {
+                        mergedMilestones.append(localMilestone)
+                    }
+                }
+                self.milestones = mergedMilestones
+                
+                // Merge words: combine CloudKit and local, remove duplicates by ID
+                var mergedWords = cloudKitWords
+                let cloudKitWordIDs = Set(cloudKitWords.map { $0.id })
+                
+                for localWord in words {
+                    if !cloudKitWordIDs.contains(localWord.id) {
+                        mergedWords.append(localWord)
+                    }
+                }
+                mergedWords.sort { $0.dateFirstSaid > $1.dateFirstSaid }
+                self.words = mergedWords
+                
+                print("✅ Merged data: \(cloudKitActivities.count) CloudKit + \(localActivities.count) local = \(mergedActivities.count) total activities")
+                print("✅ Merged growth: \(cloudKitGrowthData.count) CloudKit + \(growthData.count) local = \(mergedGrowthData.count) total entries")
+                print("✅ Merged milestones: \(cloudKitMilestones.count) CloudKit + \(milestones.count) local = \(mergedMilestones.count) total milestones")
+                print("✅ Merged words: \(cloudKitWords.count) CloudKit + \(words.count) local = \(mergedWords.count) total words")
+            }
+            
+            // Upload any new local activities to CloudKit
+            let newLocalActivities = localActivities.filter { localActivity in
+                !cloudKitActivities.contains { $0.id == localActivity.id }
+            }
+            
+            for activity in newLocalActivities {
+                try await cloudKitManager.saveActivity(activity, to: existingProfile.recordID)
+            }
+            
+            if !newLocalActivities.isEmpty {
+                print("📤 Uploaded \(newLocalActivities.count) new local activities to CloudKit")
+            }
+            
+            // Upload any new local growth data to CloudKit
+            let localGrowthData = growthData
+            let newLocalGrowthData = localGrowthData.filter { localGrowth in
+                !cloudKitGrowthData.contains { $0.id == localGrowth.id }
+            }
+            
+            for growthEntry in newLocalGrowthData {
+                try await cloudKitManager.saveGrowthEntry(growthEntry, to: existingProfile.recordID)
+            }
+            
+            if !newLocalGrowthData.isEmpty {
+                print("📤 Uploaded \(newLocalGrowthData.count) new local growth entries to CloudKit")
+            }
+            
+            // Upload any new local milestones to CloudKit
+            let localMilestones = milestones
+            let newLocalMilestones = localMilestones.filter { localMilestone in
+                !cloudKitMilestones.contains { $0.id == localMilestone.id }
+            }
+            
+            for milestone in newLocalMilestones {
+                try await cloudKitManager.saveMilestone(milestone, to: existingProfile.recordID)
+            }
+            
+            if !newLocalMilestones.isEmpty {
+                print("📤 Uploaded \(newLocalMilestones.count) new local milestones to CloudKit")
+            }
+            
+            // Upload any new local words to CloudKit
+            let localWords = words
+            let newLocalWords = localWords.filter { localWord in
+                !cloudKitWords.contains { $0.id == localWord.id }
+            }
+            
+            for word in newLocalWords {
+                try await cloudKitManager.saveBabyWord(word, to: existingProfile.recordID)
+            }
+            
+            if !newLocalWords.isEmpty {
+                print("📤 Uploaded \(newLocalWords.count) new local words to CloudKit")
+            }
+            
+        } else {
+            // No existing CloudKit data - create new profile with current local data
+            print("📝 No existing CloudKit data found, creating new profile with local data...")
             let goals = BabyGoals(
-                feeding: UserDefaults.standard.integer(forKey: "feeding_goal"),
-                sleep: UserDefaults.standard.double(forKey: "sleep_goal"),
-                diaper: UserDefaults.standard.integer(forKey: "diaper_goal")
+                feeding: localFeedingGoal > 0 ? localFeedingGoal : 8,
+                sleep: localSleepGoal > 0 ? localSleepGoal : 12.0,
+                diaper: localDiaperGoal > 0 ? localDiaperGoal : 8
             )
             
             babyProfileRecord = try await cloudKitManager.createBabyProfile(
-                name: babyName,
-                birthDate: babyBirthDate,
+                name: localBabyName.isEmpty ? "Baby" : localBabyName,
+                birthDate: localBabyBirthDate,
                 goals: goals
             )
             
-            // Upload existing local activities to CloudKit
-            for activity in recentActivities {
+            // Upload all local data to CloudKit
                 if let profileRecord = babyProfileRecord {
+                // Upload activities
+                for activity in localActivities {
                     try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
+                }
+                
+                // Upload growth data
+                let localGrowthData = growthData
+                for growthEntry in localGrowthData {
+                    try await cloudKitManager.saveGrowthEntry(growthEntry, to: profileRecord.recordID)
+                }
+                
+                // Upload milestones
+                let localMilestones = milestones
+                for milestone in localMilestones {
+                    try await cloudKitManager.saveMilestone(milestone, to: profileRecord.recordID)
+                }
+                
+                // Upload words
+                let localWords = words
+                for word in localWords {
+                    try await cloudKitManager.saveBabyWord(word, to: profileRecord.recordID)
                 }
             }
             
-            // Note: Growth data, milestones, and words are not currently synced to CloudKit
-            // They remain as local data only for now
+            print("✅ Created new CloudKit profile with \(localActivities.count) activities, \(growthData.count) growth entries, \(milestones.count) milestones, \(words.count) words")
+        }
             
             await MainActor.run {
                 familySharingEnabled = true
                 UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
                 UserDefaults.standard.set(false, forKey: "local_storage_only")
                 UserDefaults.standard.set(babyProfileRecord!.recordID.recordName, forKey: "baby_profile_record_id")
-            }
-        } else {
-            // User was already signed in, just refresh the connection
-            try await cloudKitManager.checkAccountStatus()
+                
+                // Post notification that user signed in
+                NotificationCenter.default.post(name: .init("user_signed_in"), object: nil)
         }
     }
     
@@ -3114,31 +3388,11 @@ extension TotsDataManager {
             self.babyProfileRecord = nil
             self.familySharingEnabled = false
             
-            // Clear ALL UserDefaults data
-            UserDefaults.standard.removeObject(forKey: "baby_name")
-            UserDefaults.standard.removeObject(forKey: "baby_birth_date")
-            UserDefaults.standard.removeObject(forKey: "recent_activities")
-            UserDefaults.standard.removeObject(forKey: "milestones")
-            UserDefaults.standard.removeObject(forKey: "growth_data")
-            UserDefaults.standard.removeObject(forKey: "words")
-            UserDefaults.standard.removeObject(forKey: "widget_enabled")
-            UserDefaults.standard.removeObject(forKey: "use_metric_units")
-            UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
-            UserDefaults.standard.removeObject(forKey: "family_sharing_enabled")
-            UserDefaults.standard.removeObject(forKey: "baby_profile_image")
+            // Clear ALL UserDefaults data comprehensively
+            self.clearAllUserDefaults()
             
-            // Clear timer data
-            UserDefaults.standard.removeObject(forKey: "breastfeeding_start_time")
-            UserDefaults.standard.removeObject(forKey: "breastfeeding_elapsed_time")
-            UserDefaults.standard.removeObject(forKey: "pumping_left_start_time")
-            UserDefaults.standard.removeObject(forKey: "pumping_left_elapsed_time")
-            UserDefaults.standard.removeObject(forKey: "pumping_right_start_time")
-            UserDefaults.standard.removeObject(forKey: "pumping_right_elapsed_time")
-            
-            // Clear tracking goals
-            UserDefaults.standard.removeObject(forKey: "breastfeeding_countdown_interval")
-            UserDefaults.standard.removeObject(forKey: "pumping_countdown_interval")
-            UserDefaults.standard.removeObject(forKey: "diaper_countdown_interval")
+            // Set to local storage only after account deletion
+            UserDefaults.standard.set(true, forKey: "local_storage_only")
             
             // Stop any running live activities
             self.stopLiveActivity()
@@ -3147,6 +3401,79 @@ extension TotsDataManager {
             self.shouldShowOnboarding = true
             
         }
+    }
+    
+    func clearCloudData() async throws {
+        print("🗑️ Clearing all cloud and local data...")
+        
+        // Delete from CloudKit first
+        try await cloudKitManager.deleteAllData()
+        
+        await MainActor.run {
+            // Clear all in-memory data
+            self.recentActivities = []
+            self.milestones = []
+            self.growthData = []
+            self.words = []
+            self.babyName = ""
+            self.babyBirthDate = Calendar.current.date(byAdding: .month, value: -8, to: Date()) ?? Date()
+            
+            // Clear ALL UserDefaults data comprehensively
+            self.clearAllUserDefaults()
+            
+            // Reset to initial state but keep signed in
+            UserDefaults.standard.set(false, forKey: "local_storage_only")
+            UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+            
+            print("✅ All cloud and local data cleared")
+        }
+    }
+    
+    private func clearAllUserDefaults() {
+        // Baby profile data
+        UserDefaults.standard.removeObject(forKey: "baby_name")
+        UserDefaults.standard.removeObject(forKey: "baby_birth_date")
+        UserDefaults.standard.removeObject(forKey: "baby_profile_record_id")
+        UserDefaults.standard.removeObject(forKey: "baby_profile_image")
+        UserDefaults.standard.removeObject(forKey: "primary_caregiver_name")
+        
+        // Activity data
+        UserDefaults.standard.removeObject(forKey: "recent_activities")
+        UserDefaults.standard.removeObject(forKey: "tots_milestones")
+        UserDefaults.standard.removeObject(forKey: "tots_growth_data")
+        UserDefaults.standard.removeObject(forKey: "tots_words")
+        
+        // Timer states
+        UserDefaults.standard.removeObject(forKey: "breastfeedingStartTime")
+        UserDefaults.standard.removeObject(forKey: "breastfeedingElapsed")
+        UserDefaults.standard.removeObject(forKey: "leftPumpingStartTime")
+        UserDefaults.standard.removeObject(forKey: "leftPumpingElapsed")
+        UserDefaults.standard.removeObject(forKey: "rightPumpingStartTime")
+        UserDefaults.standard.removeObject(forKey: "rightPumpingElapsed")
+        UserDefaults.standard.removeObject(forKey: "sleepStartTime")
+        UserDefaults.standard.removeObject(forKey: "sleepElapsed")
+        UserDefaults.standard.set(false, forKey: "breastfeedingIsRunning")
+        UserDefaults.standard.set(false, forKey: "leftPumpingIsRunning")
+        UserDefaults.standard.set(false, forKey: "rightPumpingIsRunning")
+        UserDefaults.standard.set(false, forKey: "sleepIsRunning")
+        
+        // Goals and intervals
+        UserDefaults.standard.removeObject(forKey: "feeding_goal")
+        UserDefaults.standard.removeObject(forKey: "sleep_goal")
+        UserDefaults.standard.removeObject(forKey: "diaper_goal")
+        UserDefaults.standard.removeObject(forKey: "feeding_interval")
+        UserDefaults.standard.removeObject(forKey: "pumping_interval")
+        UserDefaults.standard.removeObject(forKey: "diaper_interval")
+        
+        // App state
+        UserDefaults.standard.removeObject(forKey: "total_activities_logged")
+        UserDefaults.standard.removeObject(forKey: "has_shown_feedback_prompt")
+        UserDefaults.standard.removeObject(forKey: "live_activity_enabled")
+        UserDefaults.standard.removeObject(forKey: "widget_enabled")
+        UserDefaults.standard.removeObject(forKey: "use_metric_units")
+        
+        // Migration flags
+        UserDefaults.standard.removeObject(forKey: "has_migrated_to_v2_activities")
     }
     
     func syncFromCloudKit() async {

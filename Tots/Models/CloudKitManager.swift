@@ -191,7 +191,7 @@ class CloudKitManager: ObservableObject {
         do {
             return try await sharedDatabase.record(for: recordID)
         } catch {
-            return try await privateDatabase.record(for: recordID)
+        return try await privateDatabase.record(for: recordID)
         }
     }
     
@@ -317,6 +317,244 @@ class CloudKitManager: ObservableObject {
         }
         
         return activity
+    }
+    
+    // MARK: - Growth Data Management
+    
+    func saveGrowthEntry(_ entry: GrowthEntry, to babyProfileID: CKRecord.ID) async throws {
+        let userRecord = try await getOrCreateUserRecord()
+        try await createCustomZoneIfNeeded()
+        
+        let recordID = CKRecord.ID(recordName: entry.id.uuidString, zoneID: customZoneID)
+        let record = CKRecord(recordType: "GrowthEntry", recordID: recordID)
+        record["date"] = entry.date
+        record["weight"] = entry.weight
+        record["height"] = entry.height
+        record["headCircumference"] = entry.headCircumference
+        record["babyProfile"] = CKRecord.Reference(recordID: babyProfileID, action: .deleteSelf)
+        record["createdBy"] = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
+        
+        print("💾 Saving growth entry to CloudKit")
+        _ = try await privateDatabase.save(record)
+    }
+    
+    func fetchGrowthEntries(for babyProfileID: CKRecord.ID) async throws -> [GrowthEntry] {
+        try await createCustomZoneIfNeeded()
+        
+        let predicate = NSPredicate(format: "babyProfile == %@", CKRecord.Reference(recordID: babyProfileID, action: .deleteSelf))
+        let query = CKQuery(recordType: "GrowthEntry", predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+        
+        let operation = CKQueryOperation(query: query)
+        operation.zoneID = customZoneID
+        operation.resultsLimit = 500
+        
+        var entries: [GrowthEntry] = []
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.recordMatchedBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    if let entry = self.convertToGrowthEntry(record) {
+                        entries.append(entry)
+                    }
+                case .failure(let error):
+                    print("Error fetching growth entry: \(error)")
+                }
+            }
+            
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            self.privateDatabase.add(operation)
+        }
+        
+        return entries
+    }
+    
+    private func convertToGrowthEntry(_ record: CKRecord) -> GrowthEntry? {
+        guard let date = record["date"] as? Date,
+              let weight = record["weight"] as? Double,
+              let height = record["height"] as? Double,
+              let headCircumference = record["headCircumference"] as? Double else {
+            return nil
+        }
+        
+        return GrowthEntry(
+            date: date,
+            weight: weight,
+            height: height,
+            headCircumference: headCircumference
+        )
+    }
+    
+    // MARK: - Milestone Management
+    
+    func saveMilestone(_ milestone: Milestone, to babyProfileID: CKRecord.ID) async throws {
+        let userRecord = try await getOrCreateUserRecord()
+        try await createCustomZoneIfNeeded()
+        
+        let recordID = CKRecord.ID(recordName: milestone.id.uuidString, zoneID: customZoneID)
+        let record = CKRecord(recordType: "Milestone", recordID: recordID)
+        record["title"] = milestone.title
+        record["isCompleted"] = milestone.isCompleted
+        record["completedDate"] = milestone.completedDate
+        record["minAgeWeeks"] = milestone.minAgeWeeks
+        record["maxAgeWeeks"] = milestone.maxAgeWeeks
+        record["category"] = milestone.category.rawValue
+        record["description"] = milestone.description
+        record["isPredefined"] = milestone.isPredefined
+        record["babyProfile"] = CKRecord.Reference(recordID: babyProfileID, action: .deleteSelf)
+        record["createdBy"] = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
+        
+        print("💾 Saving milestone to CloudKit")
+        _ = try await privateDatabase.save(record)
+    }
+    
+    func fetchMilestones(for babyProfileID: CKRecord.ID) async throws -> [Milestone] {
+        try await createCustomZoneIfNeeded()
+        
+        let predicate = NSPredicate(format: "babyProfile == %@", CKRecord.Reference(recordID: babyProfileID, action: .deleteSelf))
+        let query = CKQuery(recordType: "Milestone", predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "minAgeWeeks", ascending: true)]
+        
+        let operation = CKQueryOperation(query: query)
+        operation.zoneID = customZoneID
+        operation.resultsLimit = 500
+        
+        var milestones: [Milestone] = []
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.recordMatchedBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    if let milestone = self.convertToMilestone(record) {
+                        milestones.append(milestone)
+                    }
+                case .failure(let error):
+                    print("Error fetching milestone: \(error)")
+                }
+            }
+            
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            self.privateDatabase.add(operation)
+        }
+        
+        return milestones
+    }
+    
+    private func convertToMilestone(_ record: CKRecord) -> Milestone? {
+        guard let title = record["title"] as? String,
+              let isCompleted = record["isCompleted"] as? Bool,
+              let minAgeWeeks = record["minAgeWeeks"] as? Int,
+              let maxAgeWeeks = record["maxAgeWeeks"] as? Int,
+              let categoryString = record["category"] as? String,
+              let category = MilestoneCategory(rawValue: categoryString),
+              let description = record["description"] as? String,
+              let isPredefined = record["isPredefined"] as? Bool else {
+            return nil
+        }
+        
+        return Milestone(
+            title: title,
+            isCompleted: isCompleted,
+            completedDate: record["completedDate"] as? Date,
+            minAgeWeeks: minAgeWeeks,
+            maxAgeWeeks: maxAgeWeeks,
+            category: category,
+            description: description,
+            isPredefined: isPredefined
+        )
+    }
+    
+    // MARK: - Words Management
+    
+    func saveBabyWord(_ word: BabyWord, to babyProfileID: CKRecord.ID) async throws {
+        let userRecord = try await getOrCreateUserRecord()
+        try await createCustomZoneIfNeeded()
+        
+        let recordID = CKRecord.ID(recordName: word.id.uuidString, zoneID: customZoneID)
+        let record = CKRecord(recordType: "BabyWord", recordID: recordID)
+        record["word"] = word.word
+        record["category"] = word.category.rawValue
+        record["dateFirstSaid"] = word.dateFirstSaid
+        record["notes"] = word.notes
+        record["babyProfile"] = CKRecord.Reference(recordID: babyProfileID, action: .deleteSelf)
+        record["createdBy"] = CKRecord.Reference(recordID: userRecord.recordID, action: .none)
+        
+        print("💾 Saving baby word to CloudKit")
+        _ = try await privateDatabase.save(record)
+    }
+    
+    func fetchBabyWords(for babyProfileID: CKRecord.ID) async throws -> [BabyWord] {
+        try await createCustomZoneIfNeeded()
+        
+        let predicate = NSPredicate(format: "babyProfile == %@", CKRecord.Reference(recordID: babyProfileID, action: .deleteSelf))
+        let query = CKQuery(recordType: "BabyWord", predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "dateFirstSaid", ascending: false)]
+        
+        let operation = CKQueryOperation(query: query)
+        operation.zoneID = customZoneID
+        operation.resultsLimit = 500
+        
+        var words: [BabyWord] = []
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            operation.recordMatchedBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    if let word = self.convertToBabyWord(record) {
+                        words.append(word)
+                    }
+                case .failure(let error):
+                    print("Error fetching baby word: \(error)")
+                }
+            }
+            
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            self.privateDatabase.add(operation)
+        }
+        
+        return words
+    }
+    
+    private func convertToBabyWord(_ record: CKRecord) -> BabyWord? {
+        guard let word = record["word"] as? String,
+              let categoryString = record["category"] as? String,
+              let category = WordCategory(rawValue: categoryString),
+              let dateFirstSaid = record["dateFirstSaid"] as? Date,
+              let notes = record["notes"] as? String else {
+            return nil
+        }
+        
+        return BabyWord(
+            word: word,
+            category: category,
+            dateFirstSaid: dateFirstSaid,
+            notes: notes
+        )
     }
     
     // MARK: - Family Sharing
@@ -538,6 +776,71 @@ class CloudKitManager: ObservableObject {
         await MainActor.run {
             NotificationCenter.default.post(name: .init("user_signed_out"), object: nil)
         }
+    }
+    
+    func deleteAllData() async throws {
+        print("🗑️ Deleting all CloudKit data...")
+        
+        // Create custom zone if needed
+        try await createCustomZoneIfNeeded()
+        
+        // Delete all records in the custom zone
+        let recordTypes = ["BabyProfile", "Activity", "GrowthEntry", "Milestone", "BabyWord"]
+        
+        for recordType in recordTypes {
+            do {
+                let predicate = NSPredicate(value: true) // Match all records
+                let query = CKQuery(recordType: recordType, predicate: predicate)
+                
+                let operation = CKQueryOperation(query: query)
+                operation.zoneID = customZoneID
+                operation.resultsLimit = 500
+                
+                var recordsToDelete: [CKRecord.ID] = []
+                
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    operation.recordMatchedBlock = { recordID, result in
+                        switch result {
+                        case .success(let record):
+                            recordsToDelete.append(record.recordID)
+                        case .failure(let error):
+                            print("Error fetching record for deletion: \(error)")
+                        }
+                    }
+                    
+                    operation.queryResultBlock = { result in
+                        switch result {
+                        case .success:
+                            continuation.resume()
+                        case .failure(let error):
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                    
+                    self.privateDatabase.add(operation)
+                }
+                
+                // Delete records in batches
+                if !recordsToDelete.isEmpty {
+                    let deleteOperation = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: recordsToDelete)
+                    deleteOperation.modifyRecordsCompletionBlock = { _, deletedRecordIDs, error in
+                        if let error = error {
+                            print("❌ Error deleting \(recordType) records: \(error)")
+                        } else {
+                            print("✅ Deleted \(deletedRecordIDs?.count ?? 0) \(recordType) records")
+                        }
+                    }
+                    
+                    try await privateDatabase.add(deleteOperation)
+                }
+                
+            } catch {
+                print("❌ Error deleting \(recordType) records: \(error)")
+                // Continue with other record types even if one fails
+            }
+        }
+        
+        print("✅ CloudKit data deletion completed")
     }
     
     func deleteAccount() async throws {
