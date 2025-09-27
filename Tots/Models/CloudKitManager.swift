@@ -23,6 +23,7 @@ class CloudKitManager: ObservableObject {
     }
     
     nonisolated private init() {
+        print("🚀 CloudKitManager.init() started")
         privateDatabase = container.privateCloudDatabase
         sharedDatabase = container.sharedCloudDatabase
         
@@ -31,25 +32,34 @@ class CloudKitManager: ObservableObject {
         Task { @MainActor in
             checkAccountStatus()
         }
+        print("🚀 CloudKitManager.init() completed")
     }
     
     // MARK: - Account Management
     
     func checkAccountStatus() {
+        print("🔄 CloudKitManager.checkAccountStatus() (callback version) called")
         container.accountStatus { [weak self] status, error in
             DispatchQueue.main.async {
+                print("🔄 CloudKitManager account status callback received: \(status), error: \(String(describing: error))")
                 switch status {
                 case .available:
+                    print("✅ Account available - setting isSignedIn = true")
                     self?.isSignedIn = true
                 case .noAccount:
+                    print("❌ No account - setting isSignedIn = false")
                     self?.isSignedIn = false
                 case .restricted:
+                    print("❌ Account restricted - setting isSignedIn = false")
                     self?.isSignedIn = false
                 case .couldNotDetermine:
+                    print("❌ Could not determine account - setting isSignedIn = false")
                     self?.isSignedIn = false
                 case .temporarilyUnavailable:
+                    print("❌ Account temporarily unavailable - setting isSignedIn = false")
                     self?.isSignedIn = false
                 @unknown default:
+                    print("❌ Unknown account status - setting isSignedIn = false")
                     self?.isSignedIn = false
                 }
             }
@@ -760,6 +770,10 @@ class CloudKitManager: ObservableObject {
     // MARK: - Account Management
     
     func signOut() async {
+        print("🚨 CloudKitManager.signOut() called - this will post user_signed_out notification")
+        print("🚨 Call stack trace:")
+        Thread.callStackSymbols.forEach { print("  \($0)") }
+        
         await MainActor.run {
             self.isSignedIn = false
             self.familyMembers = []

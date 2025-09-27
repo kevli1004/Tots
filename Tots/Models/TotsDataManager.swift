@@ -454,6 +454,7 @@ class TotsDataManager: ObservableObject {
     }
     
     init() {
+        print("🚀 TotsDataManager.init() started")
         loadData()
         updateCountdowns()
         startCountdownTimer()
@@ -462,27 +463,37 @@ class TotsDataManager: ObservableObject {
         loadPendingSyncData()
         
         // Initialize CloudKit and check for family sharing
+        print("🔄 Starting CloudKit initialization task...")
         Task {
             await initializeCloudKit()
         }
         
         // Start periodic sync for multi-user collaboration
         startPeriodicSync()
+        print("🚀 TotsDataManager.init() completed")
     }
     
     private func initializeCloudKit() async {
+        print("🔄 initializeCloudKit() started")
         do {
             let accountStatus = try await cloudKitManager.checkAccountStatus()
+            print("🔄 CloudKit account status: \(accountStatus)")
+            
             if accountStatus == .available {
+                print("✅ CloudKit account is available")
                 await MainActor.run {
                     cloudKitManager.isSignedIn = true
+                    print("🔄 Set cloudKitManager.isSignedIn = true")
                 }
                 
                 // Check for existing shared records first
                 try await cloudKitManager.checkForSharedRecords()
                 
                 // Try to restore baby profile from UserDefaults
-                if let recordName = UserDefaults.standard.string(forKey: "baby_profile_record_id") {
+                let recordName = UserDefaults.standard.string(forKey: "baby_profile_record_id")
+                print("🔄 Checking for existing baby profile record: \(recordName ?? "none")")
+                
+                if let recordName = recordName {
                     let recordID = CKRecord.ID(recordName: recordName)
                     do {
                         babyProfileRecord = try await cloudKitManager.fetchBabyProfile(recordID: recordID)
@@ -513,12 +524,205 @@ class TotsDataManager: ObservableObject {
                         }
                     } catch {
                         // Profile not found or error - will need to create new one
-                        print("Error fetching baby profile: \(error)")
+                        print("❌ Error fetching baby profile: \(error)")
+                        print("🔄 User will need to manually sign in or create profile")
                     }
+                } else {
+                    print("ℹ️ No baby profile record ID found in UserDefaults")
+                    print("🔄 User appears to be in local storage mode")
                 }
+            } else {
+                print("❌ CloudKit account not available: \(accountStatus)")
+                print("🔄 User will remain in local storage mode")
             }
         } catch {
-            print("Error checking CloudKit account status: \(error)")
+            print("❌ Error checking CloudKit account status: \(error)")
+            print("🔄 User will remain in local storage mode")
+        }
+        
+        await MainActor.run {
+            print("🔄 initializeCloudKit() completed. Final isSignedIn = \(cloudKitManager.isSignedIn)")
+        }
+    }
+    
+    private func syncLocalDataToCloudKit(
+        profileID: CKRecord.ID,
+        localActivities: [TotsActivity],
+        cloudKitActivities: [TotsActivity],
+        localGrowthData: [GrowthEntry],
+        cloudKitGrowthData: [GrowthEntry],
+        localMilestones: [Milestone],
+        cloudKitMilestones: [Milestone],
+        localWords: [BabyWord],
+        cloudKitWords: [BabyWord]
+    ) async {
+        print("🔄 Starting async sync of local data to CloudKit...")
+        
+        do {
+            // Upload any new local activities to CloudKit
+            print("🔍 Checking for duplicate activities: \(localActivities.count) local vs \(cloudKitActivities.count) CloudKit")
+            
+            let newLocalActivities = localActivities.filter { localActivity in
+                let exists = cloudKitActivities.contains { $0.id == localActivity.id }
+                if exists {
+                    print("⏭️ Skipping duplicate activity: \(localActivity.type) at \(localActivity.time)")
+                }
+                return !exists
+            }
+            
+            print("📤 Found \(newLocalActivities.count) new local activities to upload")
+            
+            for activity in newLocalActivities {
+                print("📤 Uploading activity: \(activity.type) at \(activity.time)")
+                try await cloudKitManager.saveActivity(activity, to: profileID)
+            }
+            
+            if !newLocalActivities.isEmpty {
+                print("✅ Uploaded \(newLocalActivities.count) new local activities to CloudKit")
+            } else {
+                print("ℹ️ No new local activities to upload - all already exist in CloudKit")
+            }
+            
+            // Upload any new local growth data to CloudKit
+            print("🔍 Checking for duplicate growth entries: \(localGrowthData.count) local vs \(cloudKitGrowthData.count) CloudKit")
+            
+            let newLocalGrowthData = localGrowthData.filter { localGrowth in
+                // Check for duplicates by content (date, weight, height, head circumference) not just ID
+                let exists = cloudKitGrowthData.contains { cloudGrowth in
+                    cloudGrowth.date == localGrowth.date &&
+                    abs(cloudGrowth.weight - localGrowth.weight) < 0.01 &&
+                    abs(cloudGrowth.height - localGrowth.height) < 0.01 &&
+                    abs(cloudGrowth.headCircumference - localGrowth.headCircumference) < 0.01
+                }
+                if exists {
+                    print("⏭️ Skipping duplicate growth entry by content: \(localGrowth.date)")
+                }
+                return !exists
+            }
+            
+            print("📤 Found \(newLocalGrowthData.count) new local growth entries to upload")
+            
+            for growthEntry in newLocalGrowthData {
+                print("📤 Uploading growth entry: \(growthEntry.date)")
+                try await cloudKitManager.saveGrowthEntry(growthEntry, to: profileID)
+            }
+            
+            if !newLocalGrowthData.isEmpty {
+                print("✅ Uploaded \(newLocalGrowthData.count) new local growth entries to CloudKit")
+            } else {
+                print("ℹ️ No new local growth entries to upload - all already exist in CloudKit")
+            }
+            
+            // Upload any new local milestones to CloudKit
+            print("🔍 Checking for duplicate milestones: \(localMilestones.count) local vs \(cloudKitMilestones.count) CloudKit")
+            
+            let newLocalMilestones = localMilestones.filter { localMilestone in
+                // Check for duplicates by content (title, completion status) not just ID
+                let exists = cloudKitMilestones.contains { cloudMilestone in
+                    cloudMilestone.title == localMilestone.title &&
+                    cloudMilestone.isCompleted == localMilestone.isCompleted
+                }
+                if exists {
+                    print("⏭️ Skipping duplicate milestone by content: \(localMilestone.title)")
+                }
+                return !exists
+            }
+            
+            print("📤 Found \(newLocalMilestones.count) new local milestones to upload")
+            
+            for milestone in newLocalMilestones {
+                print("📤 Uploading milestone: \(milestone.title)")
+                try await cloudKitManager.saveMilestone(milestone, to: profileID)
+            }
+            
+            if !newLocalMilestones.isEmpty {
+                print("✅ Uploaded \(newLocalMilestones.count) new local milestones to CloudKit")
+            } else {
+                print("ℹ️ No new local milestones to upload - all already exist in CloudKit")
+            }
+            
+            // Upload any new local words to CloudKit
+            print("🔍 Checking for duplicate words: \(localWords.count) local vs \(cloudKitWords.count) CloudKit")
+            
+            let newLocalWords = localWords.filter { localWord in
+                // Check for duplicates by content (word, category, date) not just ID
+                let exists = cloudKitWords.contains { cloudWord in
+                    cloudWord.word == localWord.word &&
+                    cloudWord.category == localWord.category &&
+                    cloudWord.dateFirstSaid == localWord.dateFirstSaid
+                }
+                if exists {
+                    print("⏭️ Skipping duplicate word by content: \(localWord.word)")
+                }
+                return !exists
+            }
+            
+            print("📤 Found \(newLocalWords.count) new local words to upload")
+            
+            for word in newLocalWords {
+                print("📤 Uploading word: \(word.word)")
+                try await cloudKitManager.saveBabyWord(word, to: profileID)
+            }
+            
+            if !newLocalWords.isEmpty {
+                print("✅ Uploaded \(newLocalWords.count) new local words to CloudKit")
+            } else {
+                print("ℹ️ No new local words to upload - all already exist in CloudKit")
+            }
+            
+            print("✅ Async sync completed successfully")
+            
+        } catch {
+            print("❌ Async sync failed: \(error)")
+        }
+    }
+    
+    private func uploadAllLocalDataToCloudKit(
+        profileID: CKRecord.ID,
+        localActivities: [TotsActivity],
+        localGrowthData: [GrowthEntry],
+        localMilestones: [Milestone],
+        localWords: [BabyWord]
+    ) async {
+        print("🔄 Starting async upload of all local data to new CloudKit profile...")
+        
+        do {
+            // Upload activities
+            print("📤 Uploading \(localActivities.count) local activities to new CloudKit profile")
+            for activity in localActivities {
+                print("📤 Uploading activity: \(activity.type) at \(activity.time)")
+                try await cloudKitManager.saveActivity(activity, to: profileID)
+            }
+            print("✅ Finished uploading \(localActivities.count) activities")
+            
+            // Upload growth data
+            print("📤 Uploading \(localGrowthData.count) growth entries to new CloudKit profile")
+            for growthEntry in localGrowthData {
+                print("📤 Uploading growth entry: \(growthEntry.date)")
+                try await cloudKitManager.saveGrowthEntry(growthEntry, to: profileID)
+            }
+            print("✅ Finished uploading \(localGrowthData.count) growth entries")
+            
+            // Upload milestones
+            print("📤 Uploading \(localMilestones.count) milestones to new CloudKit profile")
+            for milestone in localMilestones {
+                print("📤 Uploading milestone: \(milestone.title)")
+                try await cloudKitManager.saveMilestone(milestone, to: profileID)
+            }
+            print("✅ Finished uploading \(localMilestones.count) milestones")
+            
+            // Upload words
+            print("📤 Uploading \(localWords.count) words to new CloudKit profile")
+            for word in localWords {
+                print("📤 Uploading word: \(word.word)")
+                try await cloudKitManager.saveBabyWord(word, to: profileID)
+            }
+            print("✅ Finished uploading \(localWords.count) words")
+            
+            print("✅ All local data uploaded to new CloudKit profile successfully")
+            
+        } catch {
+            print("❌ Failed to upload local data to new CloudKit profile: \(error)")
         }
     }
     
@@ -3101,6 +3305,7 @@ extension TotsDataManager {
         if let existingProfile = existingProfiles.first {
             // Found existing CloudKit data - use it as the base and merge with local
             print("✅ Found existing CloudKit profile, merging with local data...")
+            print("🔍 Taking EXISTING PROFILE path - will check for duplicates before uploading")
             babyProfileRecord = existingProfile
             
             // Fetch CloudKit activities
@@ -3226,70 +3431,39 @@ extension TotsDataManager {
                 print("✅ Merged words: \(cloudKitWords.count) CloudKit + \(words.count) local = \(mergedWords.count) total words")
             }
             
-            // Upload any new local activities to CloudKit
-            let newLocalActivities = localActivities.filter { localActivity in
-                !cloudKitActivities.contains { $0.id == localActivity.id }
-            }
-            
-            for activity in newLocalActivities {
-                try await cloudKitManager.saveActivity(activity, to: existingProfile.recordID)
-            }
-            
-            if !newLocalActivities.isEmpty {
-                print("📤 Uploaded \(newLocalActivities.count) new local activities to CloudKit")
-            }
-            
-            // Upload any new local growth data to CloudKit
-            let localGrowthData = growthData
-            let newLocalGrowthData = localGrowthData.filter { localGrowth in
-                !cloudKitGrowthData.contains { $0.id == localGrowth.id }
-            }
-            
-            for growthEntry in newLocalGrowthData {
-                try await cloudKitManager.saveGrowthEntry(growthEntry, to: existingProfile.recordID)
-            }
-            
-            if !newLocalGrowthData.isEmpty {
-                print("📤 Uploaded \(newLocalGrowthData.count) new local growth entries to CloudKit")
-            }
-            
-            // Upload any new local milestones to CloudKit
-            let localMilestones = milestones
-            let newLocalMilestones = localMilestones.filter { localMilestone in
-                !cloudKitMilestones.contains { $0.id == localMilestone.id }
-            }
-            
-            for milestone in newLocalMilestones {
-                try await cloudKitManager.saveMilestone(milestone, to: existingProfile.recordID)
-            }
-            
-            if !newLocalMilestones.isEmpty {
-                print("📤 Uploaded \(newLocalMilestones.count) new local milestones to CloudKit")
-            }
-            
-            // Upload any new local words to CloudKit
-            let localWords = words
-            let newLocalWords = localWords.filter { localWord in
-                !cloudKitWords.contains { $0.id == localWord.id }
-            }
-            
-            for word in newLocalWords {
-                try await cloudKitManager.saveBabyWord(word, to: existingProfile.recordID)
-            }
-            
-            if !newLocalWords.isEmpty {
-                print("📤 Uploaded \(newLocalWords.count) new local words to CloudKit")
+            // Start async sync of local data to CloudKit (don't block sign-in)
+            print("🔄 Starting async sync of local data to CloudKit...")
+            Task {
+                await syncLocalDataToCloudKit(
+                    profileID: existingProfile.recordID,
+                    localActivities: localActivities,
+                    cloudKitActivities: cloudKitActivities,
+                    localGrowthData: growthData,
+                    cloudKitGrowthData: cloudKitGrowthData,
+                    localMilestones: milestones,
+                    cloudKitMilestones: cloudKitMilestones,
+                    localWords: words,
+                    cloudKitWords: cloudKitWords
+                )
             }
             
             // Set CloudKit as signed in for existing profile path
             await MainActor.run {
                 cloudKitManager.isSignedIn = true
+                familySharingEnabled = true
+                UserDefaults.standard.set(true, forKey: "family_sharing_enabled")
+                UserDefaults.standard.set(false, forKey: "local_storage_only")
+                
+                // Post notification that user signed in
+                NotificationCenter.default.post(name: .init("user_signed_in"), object: nil)
+                
                 print("✅ CloudKit sign-in complete (existing profile) - isSignedIn = \(cloudKitManager.isSignedIn)")
             }
             
         } else {
             // No existing CloudKit data - create new profile with current local data
             print("📝 No existing CloudKit data found, creating new profile with local data...")
+            print("🔍 Taking NEW PROFILE path - will upload ALL local data without duplicate checking")
             let goals = BabyGoals(
                 feeding: localFeedingGoal > 0 ? localFeedingGoal : 8,
                 sleep: localSleepGoal > 0 ? localSleepGoal : 12.0,
@@ -3302,33 +3476,21 @@ extension TotsDataManager {
                 goals: goals
             )
             
-            // Upload all local data to CloudKit
-                if let profileRecord = babyProfileRecord {
-                // Upload activities
-                for activity in localActivities {
-                    try await cloudKitManager.saveActivity(activity, to: profileRecord.recordID)
-                }
-                
-                // Upload growth data
-                let localGrowthData = growthData
-                for growthEntry in localGrowthData {
-                    try await cloudKitManager.saveGrowthEntry(growthEntry, to: profileRecord.recordID)
-                }
-                
-                // Upload milestones
-                let localMilestones = milestones
-                for milestone in localMilestones {
-                    try await cloudKitManager.saveMilestone(milestone, to: profileRecord.recordID)
-                }
-                
-                // Upload words
-                let localWords = words
-                for word in localWords {
-                    try await cloudKitManager.saveBabyWord(word, to: profileRecord.recordID)
+            // Start async upload of all local data to CloudKit (don't block sign-in)
+            if let profileRecord = babyProfileRecord {
+                print("🔄 Starting async upload of all local data to new CloudKit profile...")
+                Task {
+                    await uploadAllLocalDataToCloudKit(
+                        profileID: profileRecord.recordID,
+                        localActivities: localActivities,
+                        localGrowthData: growthData,
+                        localMilestones: milestones,
+                        localWords: words
+                    )
                 }
             }
             
-            print("✅ Created new CloudKit profile with \(localActivities.count) activities, \(growthData.count) growth entries, \(milestones.count) milestones, \(words.count) words")
+            print("✅ Created new CloudKit profile - data upload started in background")
         }
             
             await MainActor.run {
@@ -3380,6 +3542,7 @@ extension TotsDataManager {
     }
     
     func signOut() async {
+        print("🚨 TotsDataManager.signOut() called - will call CloudKitManager.signOut()")
         await cloudKitManager.signOut()
         
         await MainActor.run {

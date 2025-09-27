@@ -15,10 +15,7 @@ struct SettingsView: View {
     @State private var showingPersonalDetails = false
     @State private var isSettingUpCloudKit = false
     @State private var cloudKitSetupMessage = ""
-    // Computed property based on CloudKit sign-in state
-    private var isLocalStorageOnly: Bool {
-        return !dataManager.cloudKitManager.isSignedIn
-    }
+    @State private var isLocalStorageOnly = true
     @State private var showingCloudKitShare = false
     @State private var showingFamilyManager = false
     @State private var showingDeleteConfirmation = false
@@ -160,8 +157,17 @@ struct SettingsView: View {
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
             loadAppearanceMode()
-            // Debug: Log current sign-in state
-            print("🔍 SettingsView onAppear: isSignedIn = \(dataManager.cloudKitManager.isSignedIn), isLocalStorageOnly = \(isLocalStorageOnly)")
+            // Update state based on user's storage preference, not CloudKit availability
+            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+            print("🔍 SettingsView onAppear: local_storage_only = \(UserDefaults.standard.bool(forKey: "local_storage_only")), isLocalStorageOnly = \(isLocalStorageOnly)")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_in"))) { _ in
+            print("🔔 SettingsView received user_signed_in notification")
+            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .init("user_signed_out"))) { _ in
+            print("🔔 SettingsView received user_signed_out notification")
+            isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
         }
     }
     
@@ -879,7 +885,10 @@ struct SettingsView: View {
                     print("✅ CloudKit sign-in successful, isSignedIn = \(dataManager.cloudKitManager.isSignedIn)")
                     cloudKitSetupMessage = "✅ Successfully signed in! Your data is now syncing."
                     isSettingUpCloudKit = false
-                    // isLocalStorageOnly is now computed from CloudKitManager.isSignedIn
+                    
+                    // Force refresh the local storage state to ensure UI updates
+                    isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
+                    print("🔄 Forced UI refresh: isLocalStorageOnly = \(isLocalStorageOnly)")
                 }
                 
                 // Clear message after delay
