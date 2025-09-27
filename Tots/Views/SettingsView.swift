@@ -52,8 +52,10 @@ struct SettingsView: View {
                     // App preferences (appearance & live activity)
                     appPreferencesView
                     
-                    // Family sharing
-                    familySharingView
+                    // Family sharing (only show when signed in)
+                    if !isLocalStorageOnly {
+                        familySharingView
+                    }
                     
                     // Settings options (without appearance & live activity)
                     otherSettingsView
@@ -348,22 +350,27 @@ struct SettingsView: View {
         HStack(spacing: 12) {
             // Sync status icon
             Group {
-                switch dataManager.syncStatus {
-                case .synced:
-                    Image(systemName: "checkmark.icloud")
-                        .foregroundColor(.green)
-                case .syncing:
-                    Image(systemName: "arrow.clockwise.icloud")
+                if isLocalStorageOnly {
+                    Image(systemName: "internaldrive")
                         .foregroundColor(.blue)
-                case .pendingSync(let count):
-                    Image(systemName: "exclamationmark.icloud")
-                        .foregroundColor(.orange)
-                case .error:
-                    Image(systemName: "xmark.icloud")
-                        .foregroundColor(.red)
-                case .offline:
-                    Image(systemName: "wifi.slash")
-                        .foregroundColor(.gray)
+                } else {
+                    switch dataManager.syncStatus {
+                    case .synced:
+                        Image(systemName: "checkmark.icloud")
+                            .foregroundColor(.green)
+                    case .syncing:
+                        Image(systemName: "arrow.clockwise.icloud")
+                            .foregroundColor(.blue)
+                    case .pendingSync(let count):
+                        Image(systemName: "exclamationmark.icloud")
+                            .foregroundColor(.orange)
+                    case .error:
+                        Image(systemName: "xmark.icloud")
+                            .foregroundColor(.red)
+                    case .offline:
+                        Image(systemName: "wifi.slash")
+                            .foregroundColor(.gray)
+                    }
                 }
             }
             .font(.system(size: 16, weight: .medium))
@@ -401,6 +408,10 @@ struct SettingsView: View {
     }
     
     private var syncStatusTitle: String {
+        if isLocalStorageOnly {
+            return "Local Data"
+        }
+        
         switch dataManager.syncStatus {
         case .synced:
             return "All Data Synced"
@@ -416,6 +427,10 @@ struct SettingsView: View {
     }
     
     private var syncStatusSubtitle: String {
+        if isLocalStorageOnly {
+            return "All data will sync when you sign in"
+        }
+        
         switch dataManager.syncStatus {
         case .synced:
             return "Your data is up to date across all devices"
@@ -432,51 +447,8 @@ struct SettingsView: View {
     
     private var familySharingView: some View {
         VStack(spacing: 16) {
-            // Check if user is using local storage only
-            let isLocalStorageOnly = UserDefaults.standard.bool(forKey: "local_storage_only")
-            
-            if isLocalStorageOnly {
-                // Show sign in to CloudKit option for local-only users
-                Button(action: {
-                    self.signInToCloudKit()
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "icloud.and.arrow.up.fill")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.blue)
-                        
-                        VStack(alignment: .leading) {
-                            Text("Sign in to CloudKit")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.primary)
-                            Text("Sync your data across devices")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        if isSettingUpCloudKit {
-                            SwiftUI.ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(16)
-                    .liquidGlassCard()
-                }
-                .disabled(isSettingUpCloudKit)
-                
-                if !cloudKitSetupMessage.isEmpty {
-                    Text(cloudKitSetupMessage)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                }
-            } else {
+            // Only show family sharing when signed in to CloudKit
+            if !isLocalStorageOnly {
                 // Single Family Sharing Button
                 Button(action: {
                     Task {
@@ -1242,7 +1214,7 @@ struct PersonalDetailsView: View {
                             HStack {
                                 Image(systemName: "heart.fill")
                                     .foregroundColor(.pink)
-                                Text("Primary Caregiver")
+                                Text("Caregiver")
                                     .font(.headline)
                                     .fontWeight(.semibold)
                             }
@@ -1484,9 +1456,9 @@ struct FamilyManagerView: View {
             return
         }
         
-        // Create share items with parent's name
-        let parentName = dataManager.babyName.isEmpty ? "Parent" : "\(dataManager.babyName)'s Parent"
-        let shareText = "Hi! I'm \(parentName) and I'd like to share our baby's tracking data with you. Tap the link to join and help track activities, feeding, sleep, and more!"
+        // Create share items with caregiver's name
+        let caregiverName = UserDefaults.standard.string(forKey: "primary_caregiver_name") ?? "Caregiver"
+        let shareText = "Hi! I'm \(caregiverName) and I'd like to share our baby's tracking data with you. Tap the link to join and help track activities, feeding, sleep, and more!"
         let shareItems: [Any] = [shareText, shareURL]
         
         // Create native share sheet
@@ -1545,43 +1517,36 @@ struct FamilyMemberRow: View {
     @State private var showingRevokeConfirmation = false
     
     private var displayName: String {
-        // Use parent's name for display
-        let parentName = dataManager.babyName.isEmpty ? "Parent" : "\(dataManager.babyName)'s Parent"
-        return member.role == .owner ? parentName : member.name
+        // Use caregiver name for display
+        let caregiverName = UserDefaults.standard.string(forKey: "primary_caregiver_name") ?? "Caregiver"
+        return member.role == .owner ? caregiverName : member.name
     }
     
     var body: some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(Color.blue.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Text(String(displayName.prefix(1)).uppercased())
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.blue)
-                )
+        HStack {
+            Spacer()
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text(displayName)
-                    .font(.headline)
-                    .foregroundColor(.primary)
+            VStack(spacing: 12) {
+                Circle()
+                    .fill(Color.blue.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                    .overlay(
+                        Text(String(displayName.prefix(1)).uppercased())
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.blue)
+                    )
                 
-                HStack(spacing: 8) {
+                VStack(spacing: 4) {
+                    Text(displayName)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.center)
+                    
                     Text(member.email)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
-                    // Status badge
-                    Text(statusText)
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(statusColor.opacity(0.2))
-                        .foregroundColor(statusColor)
-                        .cornerRadius(8)
+                        .multilineTextAlignment(.center)
                     
                     Text(member.role == .owner ? "Owner" : "Member")
                         .font(.caption)
@@ -1590,33 +1555,23 @@ struct FamilyMemberRow: View {
                         .background(member.role == .owner ? Color.green.opacity(0.2) : Color.blue.opacity(0.2))
                         .foregroundColor(member.role == .owner ? .green : .blue)
                         .cornerRadius(8)
-                    
-                    Text(member.permission == .readWrite ? "Edit" : "View")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.secondary)
-                        .cornerRadius(8)
                 }
                 
                 // Revoke button for non-owners who have accepted
                 if member.role != .owner && member.acceptanceStatus == .accepted {
-                    HStack {
-                        Spacer()
-                        Button("Revoke Access") {
-                            showingRevokeConfirmation = true
-                        }
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(6)
+                    Button("Revoke Access") {
+                        showingRevokeConfirmation = true
                     }
-                    .padding(.top, 4)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(6)
                 }
             }
+            
+            Spacer()
         }
         .padding(16)
         .liquidGlassCard(cornerRadius: 16, shadowRadius: 4)
@@ -1629,32 +1584,6 @@ struct FamilyMemberRow: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Are you sure you want to revoke \(member.name)'s access to baby tracking data?")
-        }
-    }
-    
-    private var statusColor: Color {
-        switch member.acceptanceStatus {
-        case .accepted:
-            return .green
-        case .pending:
-            return .orange
-        case .removed:
-            return .red
-        @unknown default:
-            return .gray
-        }
-    }
-    
-    private var statusText: String {
-        switch member.acceptanceStatus {
-        case .accepted:
-            return "Active"
-        case .pending:
-            return "Invited"
-        case .removed:
-            return "Removed"
-        @unknown default:
-            return "Unknown"
         }
     }
     
