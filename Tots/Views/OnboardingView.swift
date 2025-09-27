@@ -22,6 +22,7 @@ struct OnboardingView: View {
     @State private var userEmail = ""
     @State private var userName = ""
     @State private var isSignedIn = false
+    @State private var isSigningInToCloudKit = false
     
     @State private var totalSteps = 1 // Start with just Apple sign in
     @State private var showingSteps = false // Show steps 2-4 only after sign in
@@ -168,21 +169,40 @@ struct OnboardingView: View {
                 
                 // Sign in with Apple only
                 VStack(spacing: 24) {
-                    // Sign in with Apple button
-                    SignInWithAppleButton(
-                        onRequest: { request in
-                            request.requestedScopes = [.fullName, .email]
-                        },
-                        onCompletion: { result in
-                            handleAppleSignIn(result)
+                    // Sign in with Apple button or loading state
+                    if isSigningInToCloudKit {
+                        // Show loading state while signing into CloudKit
+                        HStack(spacing: 12) {
+                            SwiftUI.ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                            Text("Signing in to CloudKit...")
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
                         }
-                    )
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 56)
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
-                    .scaleEffect(1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentStep)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(Color.black)
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                    } else {
+                        // Sign in with Apple button
+                        SignInWithAppleButton(
+                            onRequest: { request in
+                                request.requestedScopes = [.fullName, .email]
+                            },
+                            onCompletion: { result in
+                                handleAppleSignIn(result)
+                            }
+                        )
+                        .signInWithAppleButtonStyle(.black)
+                        .frame(height: 56)
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                        .scaleEffect(1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentStep)
+                    }
                     
                     // Continue without signing in button
                     Button(action: {
@@ -1046,9 +1066,28 @@ struct OnboardingView: View {
                 
                 isSignedIn = true
                 
-                
-                // Now check for existing profiles
-                checkForExistingData()
+                // Actually sign into CloudKit after Apple ID authentication
+                isSigningInToCloudKit = true
+                Task {
+                    do {
+                        print("🔄 Attempting CloudKit sign-in after Apple ID authentication...")
+                        try await dataManager.signInToCloudKit()
+                        print("✅ CloudKit sign-in successful")
+                        
+                        await MainActor.run {
+                            isSigningInToCloudKit = false
+                            // Now check for existing profiles
+                            checkForExistingData()
+                        }
+                    } catch {
+                        print("❌ CloudKit sign-in failed: \(error)")
+                        await MainActor.run {
+                            isSigningInToCloudKit = false
+                            // If CloudKit sign-in fails, proceed to registration
+                            proceedToRegistration()
+                        }
+                    }
+                }
             }
         case .failure(let error):
             // On sign in failure, show registration steps
@@ -1188,25 +1227,8 @@ struct OnboardingView: View {
             dataManager.startLiveActivity()
         }
         
-        // Automatically sign in to CloudKit if available
-        Task {
-            do {
-                let accountStatus = try await dataManager.cloudKitManager.checkAccountStatus()
-                if accountStatus == .available {
-                    print("🔄 Auto-signing in to CloudKit after onboarding...")
-                    try await dataManager.signInToCloudKit()
-                    print("✅ Auto sign-in to CloudKit successful")
-                } else {
-                    print("ℹ️ CloudKit not available, user will remain in local storage mode")
-                    // Set local storage only if CloudKit is not available
-                    UserDefaults.standard.set(true, forKey: "local_storage_only")
-                }
-            } catch {
-                print("⚠️ Auto sign-in to CloudKit failed: \(error)")
-                // Set local storage only if sign-in fails
-                UserDefaults.standard.set(true, forKey: "local_storage_only")
-            }
-        }
+        // CloudKit sign-in already happened during Apple ID authentication
+        // No need to sign in again here
         
         // Notify the app that onboarding is complete
         NotificationCenter.default.post(name: .init("onboarding_completed"), object: nil)
