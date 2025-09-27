@@ -2524,9 +2524,6 @@ extension TotsDataManager {
         if babyProfileRecord == nil {
             print("🔗 No shareable baby profile record, creating in custom zone...")
             await createDefaultBabyProfile()
-            
-            // Wait a moment for the creation to complete
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         }
         
         guard let profileRecord = babyProfileRecord else { 

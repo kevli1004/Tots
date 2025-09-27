@@ -46,14 +46,14 @@ struct SettingsView: View {
                     babyProfileView
                         .id(profileImageUpdateTrigger)
                     
-                    // Storage status indicator
-                    storageStatusView
+                    // App preferences (appearance & live activity)
+                    appPreferencesView
                     
                     // Family sharing
                     familySharingView
                     
-                    // Settings options
-                    settingsOptionsView
+                    // Settings options (without appearance & live activity)
+                    otherSettingsView
                     
                     // Support section
                     supportSectionView
@@ -341,28 +341,6 @@ struct SettingsView: View {
         .buttonStyle(PlainButtonStyle())
     }
     
-    private var storageStatusView: some View {
-        HStack(spacing: 12) {
-            Image(systemName: UserDefaults.standard.bool(forKey: "local_storage_only") ? "iphone" : "icloud.fill")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(UserDefaults.standard.bool(forKey: "local_storage_only") ? .orange : .blue)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(UserDefaults.standard.bool(forKey: "local_storage_only") ? "Local Storage" : "CloudKit Sync")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.primary)
-                
-                Text(UserDefaults.standard.bool(forKey: "local_storage_only") ? "Data stored on this device only" : "Data synced across devices")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .padding(16)
-        .background(.regularMaterial)
-        .cornerRadius(12)
-    }
     
     private var familySharingView: some View {
         VStack(spacing: 16) {
@@ -420,21 +398,25 @@ struct SettingsView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "person.3.fill")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.white)
+                            .foregroundColor(.blue)
                         
-                        Text("Manage Family Sharing")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
+                        VStack(alignment: .leading) {
+                            Text("Manage Family Sharing")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("Share baby tracking with family")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
                         
                         Spacer()
                         
                         Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white)
+                            .foregroundColor(.secondary)
                     }
                     .padding(16)
-                    .background(Color.blue)
-                    .cornerRadius(12)
+                    .liquidGlassCard()
                 }
             }
             
@@ -449,9 +431,8 @@ struct SettingsView: View {
         }
     }
     
-    private var settingsOptionsView: some View {
+    private var appPreferencesView: some View {
         VStack(spacing: 16) {
-            
             // Appearance mode toggle
             HStack(spacing: 12) {
                 Image(systemName: "moon.circle")
@@ -493,7 +474,11 @@ struct SettingsView: View {
                     }
                 }
             }
+            .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            
+            Divider()
+                .padding(.horizontal, 16)
             
             // Live Activity toggle
             HStack(spacing: 12) {
@@ -537,7 +522,14 @@ struct SettingsView: View {
                     .disabled(true)
                     #endif
             }
+            .padding(.horizontal, 16)
             .padding(.vertical, 12)
+        }
+        .liquidGlassCard()
+    }
+    
+    private var otherSettingsView: some View {
+        VStack(spacing: 16) {
             
             // Home Screen Widget toggle - hidden for now
             /*
@@ -630,7 +622,7 @@ struct SettingsView: View {
                 title: "Rate Tots",
                 action: { 
                     // Open App Store page directly for rating
-                    if let url = URL(string: "https://apps.apple.com/app/id6738046463?action=write-review") {
+                    if let url = URL(string: "https://apps.apple.com/app/id6752828411?action=write-review") {
                         UIApplication.shared.open(url)
                     }
                 }
@@ -711,44 +703,64 @@ struct SettingsView: View {
     private func manageFamilySharing() async {
         print("🔗 Managing family sharing button tapped")
         
+        // Ensure family sharing is always active - create share if needed
         do {
-            print("🔗 Attempting to create/get baby profile share...")
-            if let share = try await dataManager.shareBabyProfile() {
-                print("✅ Got share, presenting CloudKit sharing controller")
-                await MainActor.run {
-                    // Show the native CloudKit sharing controller
-                    presentCloudKitSharingController(share: share)
-                }
-            } else {
-                print("❌ No share returned from shareBabyProfile")
+            // Check if we have an active share, create one if not
+            var activeShare = await dataManager.cloudKitManager.activeShare
+            if activeShare == nil {
+                print("🔗 No active share, creating one...")
+                activeShare = try await dataManager.shareBabyProfile()
+            }
+            
+            // Fetch family members
+            let members = try await dataManager.fetchFamilyMembers()
+            await MainActor.run {
+                familyMembers = members
+                showingFamilyManager = true
             }
         } catch {
-            print("❌ Error in manageFamilySharing: \(error)")
-            // Show error to user
+            print("❌ Error setting up family sharing: \(error)")
             await MainActor.run {
-                cloudKitSetupMessage = "❌ Failed to setup sharing: \(error.localizedDescription)"
+                cloudKitSetupMessage = "❌ Failed to setup family sharing: \(error.localizedDescription)"
             }
         }
     }
     
     private func presentCloudKitSharingController(share: CKShare) {
+        // Get the share URL directly from CloudKit
+        Task {
+            do {
+                guard let shareURL = share.url else {
+                    print("❌ No URL available for CloudKit share")
+                    return
+                }
+                await MainActor.run {
+                    presentNativeShareSheet(with: shareURL)
+                }
+            }
+        }
+    }
+    
+    private func presentNativeShareSheet(with url: URL) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = windowScene.windows.first else {
             return
         }
         
-        let container = CKContainer(identifier: "iCloud.com.mytotsapp.tots.DB")
+        // Create share items
+        let shareText = "Join our family baby tracker! I'd like to share our baby's tracking data with you. Tap the link to join and help track activities, feeding, sleep, and more!"
+        let shareItems: [Any] = [shareText, url]
         
-        // Always use the preparation handler to ensure proper setup
-        let shareController = UICloudSharingController { controller, prepareCompletionHandler in
-            // The share and container are prepared here
-            prepareCompletionHandler(share, container, nil)
+        // Create native share sheet
+        let activityController = UIActivityViewController(activityItems: shareItems, applicationActivities: nil)
+        activityController.modalPresentationStyle = .formSheet
+        
+        // Configure for iPad
+        if let popover = activityController.popoverPresentationController {
+            popover.sourceView = window
+            popover.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
         }
-        
-        shareDelegate = ShareControllerDelegate()
-        shareController.delegate = shareDelegate
-        shareController.availablePermissions = [.allowReadWrite, .allowPrivate]
-        shareController.modalPresentationStyle = .formSheet
         
         // Find the root view controller
         var rootViewController = window.rootViewController
@@ -756,7 +768,7 @@ struct SettingsView: View {
             rootViewController = presented
         }
         
-        rootViewController?.present(shareController, animated: true)
+        rootViewController?.present(activityController, animated: true)
     }
     
     private func signInToCloudKit() {
@@ -1321,13 +1333,22 @@ struct FamilyManagerView: View {
                     Spacer()
                     
                     VStack(spacing: 12) {
+                        // Always show invite button (family sharing is always active)
                         Button(action: {
-                            // Start sharing process
-                            hasActiveShare = true
+                            Task {
+                                if let activeShare = await dataManager.cloudKitManager.activeShare {
+                                    // Present share sheet directly without dismissing
+                                    await MainActor.run {
+                                        presentShareSheet(with: activeShare)
+                                    }
+                                } else {
+                                    print("❌ No active share found for inviting")
+                                }
+                            }
                         }) {
                             HStack {
-                                Image(systemName: "person.3.fill")
-                                Text("Start Sharing")
+                                Image(systemName: "person.badge.plus")
+                                Text("Invite Family Members")
                             }
                             .font(.headline)
                             .foregroundColor(.white)
@@ -1335,29 +1356,6 @@ struct FamilyManagerView: View {
                             .padding()
                             .background(Color.blue)
                             .cornerRadius(12)
-                        }
-                        
-                        if hasActiveShare {
-                            Button(action: {
-                                Task {
-                                    try await dataManager.stopSharingProfile()
-                                    await MainActor.run {
-                                        familyMembers = []
-                                        dismiss()
-                                    }
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: "stop.circle.fill")
-                                    Text("Stop Sharing")
-                                }
-                                .font(.headline)
-                                .foregroundColor(.red)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(12)
-                            }
                         }
                     }
                     .padding()
@@ -1376,14 +1374,52 @@ struct FamilyManagerView: View {
         .task {
             do {
                 familyMembers = try await dataManager.fetchFamilyMembers()
-                hasActiveShare = await dataManager.cloudKitManager.activeShare != nil
+                // Family sharing is always active now
+                hasActiveShare = true
                 isLoading = false
             } catch {
+                familyMembers = []
+                hasActiveShare = true
                 isLoading = false
             }
         }
     }
     
+    private func presentShareSheet(with share: CKShare) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else {
+            return
+        }
+        
+        guard let shareURL = share.url else {
+            print("❌ No URL available for CloudKit share")
+            return
+        }
+        
+        // Create share items with parent's name
+        let parentName = dataManager.babyName.isEmpty ? "Parent" : "\(dataManager.babyName)'s Parent"
+        let shareText = "Hi! I'm \(parentName) and I'd like to share our baby's tracking data with you. Tap the link to join and help track activities, feeding, sleep, and more!"
+        let shareItems: [Any] = [shareText, shareURL]
+        
+        // Create native share sheet
+        let activityController = UIActivityViewController(activityItems: shareItems, applicationActivities: nil)
+        activityController.modalPresentationStyle = .formSheet
+        
+        // Configure for iPad
+        if let popover = activityController.popoverPresentationController {
+            popover.sourceView = window
+            popover.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        // Find the root view controller
+        var rootViewController = window.rootViewController
+        while let presented = rootViewController?.presentedViewController {
+            rootViewController = presented
+        }
+        
+        rootViewController?.present(activityController, animated: true)
+    }
     
     private var debugSectionView: some View {
         VStack(spacing: 16) {
@@ -1420,20 +1456,26 @@ struct FamilyMemberRow: View {
     @EnvironmentObject var dataManager: TotsDataManager
     @State private var showingRevokeConfirmation = false
     
+    private var displayName: String {
+        // Use parent's name for display
+        let parentName = dataManager.babyName.isEmpty ? "Parent" : "\(dataManager.babyName)'s Parent"
+        return member.role == .owner ? parentName : member.name
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             Circle()
                 .fill(Color.blue.opacity(0.2))
                 .frame(width: 40, height: 40)
                 .overlay(
-                    Text(String(member.name.prefix(1)).uppercased())
+                    Text(String(displayName.prefix(1)).uppercased())
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.blue)
                 )
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(member.name)
+                Text(displayName)
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -1543,26 +1585,34 @@ struct FamilyMemberRow: View {
 // CloudKit sharing delegate
 class ShareControllerDelegate: NSObject, UICloudSharingControllerDelegate {
     func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: Error) {
+        print("❌ Failed to save share: \(error)")
     }
     
     func itemTitle(for csc: UICloudSharingController) -> String? {
-        return "Baby Profile"
+        return "Baby Tracker"
     }
     
     func itemThumbnailData(for csc: UICloudSharingController) -> Data? {
-        // Return thumbnail data for the baby profile if you have one
+        // Return app icon as thumbnail
+        if let image = UIImage(named: "TotsIcon") {
+            return image.pngData()
+        }
         return nil
     }
     
     func itemType(for csc: UICloudSharingController) -> String? {
-        return "Baby Tracking Profile"
+        return "Family Baby Tracking"
     }
     
     func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {
+        print("✅ Share saved successfully")
     }
     
     func cloudSharingControllerDidStopSharing(_ csc: UICloudSharingController) {
+        print("🔗 Sharing stopped")
     }
+    
+    // CloudKit handles the sharing configuration automatically
 }
 
 // MARK: - Image Picker

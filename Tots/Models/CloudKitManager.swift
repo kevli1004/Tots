@@ -291,9 +291,24 @@ class CloudKitManager: ObservableObject {
     func shareBabyProfile(_ profileRecord: CKRecord) async throws -> CKShare {
         print("🔗 Starting to share baby profile: \(profileRecord.recordID)")
         
-        // Create the share for the record
+        // Check if the record already has a share reference
+        if let shareReference = profileRecord.share {
+            print("🔗 Record has share reference, fetching actual share...")
+            do {
+                let shareRecord = try await privateDatabase.record(for: shareReference.recordID)
+                if let existingShare = shareRecord as? CKShare {
+                    print("✅ Found existing share, using it")
+                    await setActiveShare(existingShare)
+                    return existingShare
+                }
+            } catch {
+                print("⚠️ Failed to fetch existing share: \(error), creating new one")
+            }
+        }
+        
+        // Create a new share for the record
         let share = CKShare(rootRecord: profileRecord)
-        share[CKShare.SystemFieldKey.title] = profileRecord["name"] as? String ?? "Baby Profile"
+        share[CKShare.SystemFieldKey.title] = "Tots Baby Tracker"
         share.publicPermission = .readWrite  // Allow read/write access for family members
         
         // Save both records in the same operation (required by CloudKit)
@@ -302,13 +317,14 @@ class CloudKitManager: ObservableObject {
         operation.qualityOfService = .userInitiated
         
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            operation.modifyRecordsCompletionBlock = { (savedRecords: [CKRecord]?, deletedRecordIDs: [CKRecord.ID]?, error: Error?) in
-                if let error = error {
-                    print("❌ Failed to save baby profile and share: \(error)")
-                    continuation.resume(throwing: error)
-                } else {
+            operation.modifyRecordsResultBlock = { result in
+                switch result {
+                case .success:
                     print("✅ Successfully saved baby profile and share")
                     continuation.resume()
+                case .failure(let error):
+                    print("❌ Failed to save baby profile and share: \(error)")
+                    continuation.resume(throwing: error)
                 }
             }
             
